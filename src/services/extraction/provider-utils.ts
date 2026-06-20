@@ -2,7 +2,10 @@ import type { ChecklistField, ProviderExtractionOutput } from "@/domain/validati
 
 export function checklistPrompt(checklist: ChecklistField[]) {
   return checklist
-    .map((field) => `- ${field.id}: ${field.category} / ${field.label} / obrigatório=${field.required} / tipo=${field.fieldType}`)
+    .map(
+      (field) =>
+        `- ${field.id}: ${field.category} / ${field.label} / item=${field.itemType} / obrigatório=${field.required} / tipo=${field.fieldType}`,
+    )
     .join("\n");
 }
 

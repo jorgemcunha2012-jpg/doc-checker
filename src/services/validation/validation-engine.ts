@@ -22,15 +22,16 @@ export class ValidationEngine {
     usedPdfVisionFallback: boolean,
   ): ValidationRun {
     const checklist = getChecklist(validationType);
+    const comparisonChecklist = checklist.filter((field) => field.itemType === "COMPARISON");
     const sourceData = toExtractedDocumentData(sourceOutput);
     const targetData = toExtractedDocumentData(targetOutput);
-    const results = checklist.map((field) => this.compareField(organizationId, field, sourceData, targetData));
+    const results = comparisonChecklist.map((field) => this.compareField(organizationId, field, sourceData, targetData));
 
     return {
       id: crypto.randomUUID(),
       organizationId,
       validationType,
-      checklist,
+      checklist: comparisonChecklist,
       results,
       usedPdfVisionFallback,
       summary: {

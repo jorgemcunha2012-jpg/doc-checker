@@ -22,6 +22,8 @@ export type FieldType =
   | "telefone"
   | "email";
 
+export type ChecklistItemType = "COMPARISON" | "DOCUMENT_ATTACHMENT" | "CLAUSE_PRESENCE" | "VALIDITY_CHECK";
+
 export type ChecklistCategory =
   | "Identificação do contrato"
   | "Dados do comprador"
@@ -53,6 +55,7 @@ export type ChecklistField = {
   required: boolean;
   validationType: ValidationType;
   fieldType: FieldType;
+  itemType: ChecklistItemType;
   scopeCondition?: string;
   allowMultiple?: boolean;
 };

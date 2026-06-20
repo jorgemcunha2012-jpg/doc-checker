@@ -9,7 +9,7 @@ function field(
   fieldType: FieldType,
   options: Pick<ChecklistField, "scopeCondition" | "allowMultiple"> = {},
 ): ChecklistField {
-  return { id, category, label, required, validationType, fieldType, ...options };
+  return { id, category, label, required, validationType, fieldType, itemType: "COMPARISON", ...options };
 }
 
 const minutaFields: ChecklistField[] = [
