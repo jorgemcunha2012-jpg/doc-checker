@@ -3,7 +3,13 @@ import type { ValidationRun } from "@/domain/validation";
 import { renderValidationReport } from "@/services/report/validation-report";
 
 export async function POST(request: Request) {
-  const run = (await request.json()) as ValidationRun;
+  let run: ValidationRun;
+
+  try {
+    run = (await request.json()) as ValidationRun;
+  } catch {
+    return NextResponse.json({ error: "JSON inválido para geração do relatório." }, { status: 400 });
+  }
 
   if (!run?.results?.length) {
     return NextResponse.json({ error: "Resultado de validação inválido." }, { status: 400 });

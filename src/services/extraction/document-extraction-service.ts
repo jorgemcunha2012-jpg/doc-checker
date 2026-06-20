@@ -13,8 +13,10 @@ export class DocumentExtractionService {
 
   async extract(request: ExtractionRequest): Promise<ExtractionResult> {
     const checklist = getChecklist(request.validationType);
-    const sourceDocuments = request.documents.filter((document) => document.type === "PRINT" || document.type === "IMAGE" || document.type === "ITBI_GUIDE");
-    const targetDocuments = request.documents.filter((document) => document.type === "PDF" || document.type === "CONTRACT" || document.type === "COMPLEMENTARY");
+    const sourceDocuments = request.documents.filter((document) => document.type === "PRINT" || document.type === "IMAGE");
+    const targetDocuments = request.documents.filter(
+      (document) => document.type === "PDF" || document.type === "CONTRACT" || document.type === "ITBI_GUIDE" || document.type === "COMPLEMENTARY",
+    );
 
     const sourceData = await this.extractSourceData(sourceDocuments, checklist);
     const targetExtraction = await this.extractTargetData(targetDocuments, checklist);

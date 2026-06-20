@@ -4,6 +4,9 @@ import type { UploadedDocument, ValidationType } from "@/domain/validation";
 import { createValidationProcess, createValidationProcessAndWait } from "@/services/process/process-validation";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
 
+const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
+const ACCEPTED_MIME_TYPES = new Set(["image/png", "image/jpeg", "application/pdf"]);
+
 export async function POST(request: Request) {
   const contentType = request.headers.get("content-type") ?? "";
 
@@ -24,7 +27,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Envie ao menos um documento." }, { status: 400 });
   }
 
+  const invalidFile = files.find((file) => !isAcceptedFile(file));
+
+  if (invalidFile) {
+    return NextResponse.json({ error: `Arquivo inválido ou muito grande: ${invalidFile.name}` }, { status: 400 });
+  }
+
   const documents = await Promise.all(files.map((file) => toUploadedDocumentPayload(file, validationType)));
+  const documentValidation = validateComparisonSides(documents);
+
+  if (documentValidation) {
+    return NextResponse.json({ error: documentValidation }, { status: 400 });
+  }
+
   const validationProcess =
     process.env.VERCEL === "1"
       ? await createValidationProcessAndWait(validationType, documents)
@@ -35,6 +50,25 @@ export async function POST(request: Request) {
     status: validationProcess.status,
     process: validationProcess,
   });
+}
+
+function isAcceptedFile(file: File) {
+  const name = file.name.toLowerCase();
+  const mimeType = file.type || "application/octet-stream";
+  const acceptedExtension = name.endsWith(".pdf") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg");
+
+  return file.size <= MAX_FILE_SIZE_BYTES && (ACCEPTED_MIME_TYPES.has(mimeType) || acceptedExtension);
+}
+
+function validateComparisonSides(documents: UploadedDocumentPayload[]) {
+  const hasSource = documents.some((document) => document.type === "PRINT" || document.type === "IMAGE");
+  const hasTarget = documents.some((document) => document.type === "PDF" || document.type === "CONTRACT" || document.type === "ITBI_GUIDE" || document.type === "COMPLEMENTARY");
+
+  if (!hasSource || !hasTarget) {
+    return "Envie ao menos uma imagem/print do dado do cliente e um documento de destino para comparação.";
+  }
+
+  return null;
 }
 
 async function toUploadedDocumentPayload(file: File, validationType: ValidationType): Promise<UploadedDocumentPayload> {
