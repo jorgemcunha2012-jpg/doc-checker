@@ -23,13 +23,15 @@ export type FieldType =
   | "email";
 
 export type ChecklistCategory =
+  | "Identificação do contrato"
   | "Dados do comprador"
   | "Dados do adquirente"
   | "Dados do transmitente"
   | "Dados do imóvel"
   | "Dados financeiros"
-  | "Documentação"
-  | "Cláusulas e assinaturas";
+  | "Declaração de valores"
+  | "Guias Fortaleza"
+  | "Página de assinaturas";
 
 export type Organization = {
   id: string;
@@ -51,6 +53,8 @@ export type ChecklistField = {
   required: boolean;
   validationType: ValidationType;
   fieldType: FieldType;
+  scopeCondition?: string;
+  allowMultiple?: boolean;
 };
 
 export type ExtractedField = {
@@ -70,6 +74,8 @@ export type ValidationResult = {
   targetValue: string;
   sourceValueNormalized: string;
   targetValueNormalized: string;
+  sourceDiffTokens?: string[];
+  targetDiffTokens?: string[];
   sourceConfidence: number;
   targetConfidence: number;
   status: ValidationStatus;

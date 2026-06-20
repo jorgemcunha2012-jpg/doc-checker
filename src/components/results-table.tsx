@@ -88,16 +88,57 @@ function ResultRow({ result }: { result: ValidationResult }) {
         <div className="text-sm font-semibold text-slate-950">{result.field.label}</div>
         <div className="mt-1 text-xs text-slate-500">{result.field.category}</div>
       </td>
-      <td className="max-w-72 px-4 py-4 text-slate-700">{result.sourceValue}</td>
-      <td className="max-w-72 px-4 py-4 text-slate-700">{result.targetValue}</td>
+      <td className="max-w-72 px-4 py-4 text-slate-700">
+        <HighlightedValue value={result.sourceValue} diffTokens={result.sourceDiffTokens} />
+      </td>
+      <td className="max-w-72 px-4 py-4 text-slate-700">
+        <HighlightedValue value={result.targetValue} diffTokens={result.targetDiffTokens} />
+      </td>
       <td className="px-4 py-4">
         <div className="text-sm font-bold text-slate-900">{Math.min(result.sourceConfidence, result.targetConfidence)}%</div>
         <div className="mt-1 text-xs text-slate-500">Origem {result.sourceConfidence}% / Destino {result.targetConfidence}%</div>
       </td>
       <td className="px-4 py-4">
         <StatusBadge status={result.status as ValidationStatus} />
-        <div className="mt-2 max-w-56 text-xs text-slate-500">{result.observation}</div>
+        <div className={`mt-2 max-w-64 text-xs leading-5 ${result.status === "DIVERGENCE" ? "font-semibold text-rose-700" : "text-slate-500"}`}>
+          {result.observation}
+        </div>
       </td>
     </tr>
   );
+}
+
+function HighlightedValue({ value, diffTokens }: { value: string; diffTokens?: string[] }) {
+  if (!diffTokens?.length) {
+    return <span>{value}</span>;
+  }
+
+  const normalizedDiffTokens = new Set(diffTokens.map(normalizeToken));
+
+  return (
+    <span>
+      {value.split(/(\s+)/).map((part, index) => {
+        const isWhitespace = /^\s+$/.test(part);
+        const isDifferent = !isWhitespace && normalizedDiffTokens.has(normalizeToken(part));
+
+        if (!isDifferent) {
+          return <span key={`${part}-${index}`}>{part}</span>;
+        }
+
+        return (
+          <mark key={`${part}-${index}`} className="rounded bg-rose-100 px-1 font-semibold text-rose-800 line-through decoration-rose-500 decoration-2">
+            {part}
+          </mark>
+        );
+      })}
+    </span>
+  );
+}
+
+function normalizeToken(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^\p{L}\p{N}]+/gu, "")
+    .toUpperCase();
 }

@@ -9,6 +9,7 @@ import type {
 } from "@/domain/validation";
 import { getChecklist } from "@/domain/checklists";
 import { normalizeValue } from "@/services/normalization/normalization-service";
+import { buildDivergenceDiagnostic } from "./divergence-diagnostics";
 
 const LOW_CONFIDENCE_THRESHOLD = 70;
 
@@ -55,6 +56,10 @@ export class ValidationEngine {
     const sourceConfidence = source?.confidence ?? 0;
     const targetConfidence = target?.confidence ?? 0;
     const status = this.resolveStatus(field.required, sourceValueNormalized, targetValueNormalized, sourceConfidence, targetConfidence);
+    const diagnostic =
+      status === "DIVERGENCE"
+        ? buildDivergenceDiagnostic(field.fieldType, sourceValue, targetValue, sourceValueNormalized, targetValueNormalized)
+        : undefined;
 
     return {
       organizationId,
@@ -63,10 +68,12 @@ export class ValidationEngine {
       targetValue: targetValue || "Não encontrado",
       sourceValueNormalized,
       targetValueNormalized,
+      sourceDiffTokens: diagnostic?.sourceDiffTokens,
+      targetDiffTokens: diagnostic?.targetDiffTokens,
       sourceConfidence,
       targetConfidence,
       status,
-      observation: this.buildObservation(status),
+      observation: diagnostic?.observation ?? this.buildObservation(status),
     };
   }
 
