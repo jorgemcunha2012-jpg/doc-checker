@@ -2,7 +2,7 @@ import { getChecklist } from "@/domain/checklists";
 import type { ProviderExtractionOutput } from "@/domain/validation";
 import { DeepSeekProvider } from "./deepseek-provider";
 import { KimiProvider } from "./kimi-provider";
-import { extractPdfText, hasEnoughPdfText, renderPdfPagesToImages } from "./pdf-text-service";
+import { extractPdfText, hasEnoughPdfText } from "./pdf-text-service";
 import type { ExtractionRequest, ExtractionResult, UploadedDocumentPayload } from "./types";
 
 export class DocumentExtractionService {
@@ -52,23 +52,7 @@ export class DocumentExtractionService {
           outputs.push(await this.deepSeekProvider.structureText(text, checklist));
         } else {
           usedPdfVisionFallback = true;
-          const pageImages = await renderPdfPagesToImages(document.buffer);
-          const pageOutputs = await Promise.all(
-            pageImages.map((pageImage, index) =>
-              this.kimiProvider.extractFromImage(
-                {
-                  ...document,
-                  id: `${document.id}_page_${index + 1}`,
-                  name: `${document.name} página ${index + 1}.png`,
-                  mimeType: "image/png",
-                  type: "IMAGE",
-                  buffer: pageImage,
-                },
-                checklist,
-              ),
-            ),
-          );
-          outputs.push(mergeOutputs(pageOutputs, checklist));
+          outputs.push(await this.kimiProvider.extractFromPdfFallback(document, checklist));
         }
       } else if (document.mimeType.includes("image")) {
         outputs.push(await this.kimiProvider.extractFromImage(document, checklist));

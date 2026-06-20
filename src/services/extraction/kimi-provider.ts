@@ -36,4 +36,26 @@ export class KimiProvider implements DocumentExtractionProvider {
     return coerceExtractionOutput(result, checklist);
   }
 
+  async extractFromPdfFallback(document: UploadedDocumentPayload, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
+    const dataUrl = `data:${document.mimeType};base64,${document.buffer.toString("base64")}`;
+    const result = await this.client.completeJson([
+      {
+        role: "system",
+        content:
+          "Você extrai dados de PDFs escaneados recebidos como arquivo visual/base64. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"value\":string|null,\"confidence\":number}]}.",
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `O PDF não possui texto suficiente por parsing direto. Extraia os campos esperados.\n${checklistPrompt(checklist)}`,
+          },
+          { type: "image_url", image_url: { url: dataUrl } },
+        ],
+      },
+    ]);
+
+    return coerceExtractionOutput(result, checklist);
+  }
 }

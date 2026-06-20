@@ -5,6 +5,12 @@ import { createValidationProcess } from "@/services/process/process-validation";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
 
 export async function POST(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+
+  if (!contentType.includes("multipart/form-data")) {
+    return NextResponse.json({ error: "Envie os documentos em multipart/form-data." }, { status: 400 });
+  }
+
   const formData = await request.formData();
   const validationType = formData.get("validationType");
 

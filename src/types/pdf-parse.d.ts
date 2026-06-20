@@ -7,15 +7,5 @@ declare module "pdf-parse" {
     version?: string;
   };
 
-  export class PDFParse {
-    constructor(options: { data: Buffer });
-    getText(): Promise<PdfParseResult>;
-    getScreenshot(options?: {
-      first?: number;
-      desiredWidth?: number;
-      imageBuffer?: boolean;
-      imageDataUrl?: boolean;
-    }): Promise<{ pages: Array<{ data: Uint8Array }> }>;
-    destroy(): Promise<void>;
-  }
+  export default function pdfParse(buffer: Buffer): Promise<PdfParseResult>;
 }
