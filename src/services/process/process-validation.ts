@@ -4,11 +4,30 @@ import { getChecklist } from "@/domain/checklists";
 import { DocumentExtractionService } from "@/services/extraction/document-extraction-service";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
 import { ValidationEngine } from "@/services/validation/validation-engine";
-import { saveValidationProcess, updateValidationProcess } from "./validation-process-store";
+import { getValidationProcess, saveValidationProcess, updateValidationProcess } from "./validation-process-store";
 
 export function createValidationProcess(validationType: ValidationType, documents: UploadedDocumentPayload[]) {
+  const process = createBaseValidationProcess(validationType, documents);
+
+  saveValidationProcess(process);
+  void processValidation(process.id, validationType, documents);
+
+  return process;
+}
+
+export async function createValidationProcessAndWait(validationType: ValidationType, documents: UploadedDocumentPayload[]) {
+  const process = createBaseValidationProcess(validationType, documents);
+
+  saveValidationProcess(process);
+  await processValidation(process.id, validationType, documents);
+
+  return getValidationProcess(process.id) ?? process;
+}
+
+function createBaseValidationProcess(validationType: ValidationType, documents: UploadedDocumentPayload[]): ValidationProcess {
   const now = new Date().toISOString();
-  const process: ValidationProcess = {
+
+  return {
     id: crypto.randomUUID(),
     organizationId: defaultOrganization.id,
     userId: defaultUser.id,
@@ -18,11 +37,6 @@ export function createValidationProcess(validationType: ValidationType, document
     createdAt: now,
     updatedAt: now,
   };
-
-  saveValidationProcess(process);
-  void processValidation(process.id, validationType, documents);
-
-  return process;
 }
 
 async function processValidation(processId: string, validationType: ValidationType, documents: UploadedDocumentPayload[]) {

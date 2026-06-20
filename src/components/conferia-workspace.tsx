@@ -100,7 +100,7 @@ export function ConferiaWorkspace() {
       method: "POST",
       body: formData,
     });
-    const payload = (await response.json()) as { processId?: string; error?: string };
+    const payload = (await response.json()) as { processId?: string; process?: ValidationProcess; error?: string };
     setIsSubmitting(false);
 
     if (!response.ok || !payload.processId) {
@@ -115,6 +115,21 @@ export function ConferiaWorkspace() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
+      return;
+    }
+
+    if (payload.process) {
+      setProcess(payload.process);
+    }
+
+    if (payload.process?.status === "DONE") {
+      setRun(payload.process.result ?? null);
+      setProcessId(payload.processId);
+      return;
+    }
+
+    if (payload.process?.status === "FAILED") {
+      setProcessId(null);
       return;
     }
 

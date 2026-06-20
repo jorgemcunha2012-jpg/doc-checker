@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { defaultOrganization } from "@/domain/tenant";
 import type { UploadedDocument, ValidationType } from "@/domain/validation";
-import { createValidationProcess } from "@/services/process/process-validation";
+import { createValidationProcess, createValidationProcessAndWait } from "@/services/process/process-validation";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
 
 export async function POST(request: Request) {
@@ -25,9 +25,16 @@ export async function POST(request: Request) {
   }
 
   const documents = await Promise.all(files.map((file) => toUploadedDocumentPayload(file, validationType)));
-  const process = createValidationProcess(validationType, documents);
+  const validationProcess =
+    process.env.VERCEL === "1"
+      ? await createValidationProcessAndWait(validationType, documents)
+      : createValidationProcess(validationType, documents);
 
-  return NextResponse.json({ processId: process.id, status: process.status });
+  return NextResponse.json({
+    processId: validationProcess.id,
+    status: validationProcess.status,
+    process: validationProcess,
+  });
 }
 
 async function toUploadedDocumentPayload(file: File, validationType: ValidationType): Promise<UploadedDocumentPayload> {
