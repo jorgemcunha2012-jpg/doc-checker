@@ -33,14 +33,14 @@ export function ResultsTable({ results }: { results: ValidationResult[] }) {
   }, [filter, query, results]);
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 p-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-2">
           {filters.map((item) => (
             <button
               key={item.id}
-              className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${
-                filter === item.id ? "border-teal-700 bg-teal-700 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              className={`rounded-md border px-3 py-2 text-sm font-bold transition ${
+                filter === item.id ? "border-slate-900 bg-slate-900 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
               }`}
               onClick={() => setFilter(item.id)}
             >
@@ -48,7 +48,7 @@ export function ResultsTable({ results }: { results: ValidationResult[] }) {
             </button>
           ))}
         </div>
-        <label className="flex min-h-10 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3">
+        <label className="flex min-h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 shadow-sm">
           <Search className="h-4 w-4 text-slate-400" />
           <input
             className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400 lg:w-64"
@@ -62,7 +62,7 @@ export function ResultsTable({ results }: { results: ValidationResult[] }) {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[840px] border-collapse text-left text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+            <tr className="border-b border-slate-200 bg-slate-900 text-xs uppercase text-slate-200">
               <th className="px-4 py-3 font-semibold">Campo</th>
               <th className="px-4 py-3 font-semibold">Origem</th>
               <th className="px-4 py-3 font-semibold">Destino</th>
@@ -83,7 +83,7 @@ export function ResultsTable({ results }: { results: ValidationResult[] }) {
 
 function ResultRow({ result }: { result: ValidationResult }) {
   return (
-    <tr className="border-b border-slate-100 align-top last:border-0">
+    <tr className="border-b border-slate-100 align-top transition hover:bg-slate-50 last:border-0">
       <td className="px-4 py-4">
         <div className="text-sm font-semibold text-slate-950">{result.field.label}</div>
         <div className="mt-1 text-xs text-slate-500">{result.field.category}</div>

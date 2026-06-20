@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, CheckCircle2, Database, Download, FileCheck2, FileSearch, Layers3, Loader2, ShieldCheck, UploadCloud } from "lucide-react";
+import { AlertTriangle, Building2, CheckCircle2, Database, Download, FileCheck2, FileSearch, Layers3, Loader2, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
 import type { ValidationProcess, ValidationRun, ValidationType } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
 import { validationTypeCopy } from "@/lib/validation-copy";
@@ -123,28 +123,48 @@ export function ConferiaWorkspace() {
 
   return (
     <main className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white/85 backdrop-blur">
+      <header className="border-b border-slate-800 bg-slate-950 text-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-700 text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-500 text-slate-950 shadow-sm shadow-teal-950/30">
               <Building2 className="h-5 w-5" aria-hidden="true" />
             </div>
             <div>
-              <div className="text-lg font-bold text-slate-950">ConferIA</div>
-              <div className="text-xs font-medium text-slate-500">Conferência documental imobiliária</div>
+              <div className="text-lg font-bold tracking-wide">ConferIA</div>
+              <div className="text-xs font-medium text-slate-400">Conferência documental imobiliária</div>
             </div>
           </div>
-          <div className="hidden items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 sm:flex">
+          <div className="hidden items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-300 sm:flex">
             <Database className="h-4 w-4" aria-hidden="true" />
             SaaS-ready
           </div>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-6 px-5 py-6 lg:grid-cols-[340px_1fr]">
+      <section className="border-b border-slate-200 bg-[linear-gradient(135deg,#0f172a_0%,#164e63_55%,#7c5b22_100%)] text-white">
+        <div className="mx-auto max-w-7xl px-5 py-7">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-cyan-100">
+                <Sparkles className="h-3.5 w-3.5" />
+                Extração IA/OCR em fluxo auditável
+              </div>
+              <h1 className="mt-4 max-w-3xl text-3xl font-bold text-white sm:text-4xl">Conferência documental imobiliária com checklist inteligente</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">Organize documentos, extraia campos por IA e compare dados críticos de Minuta e ITBI em um processo rastreável.</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 rounded-lg border border-white/10 bg-white/10 p-2 backdrop-blur">
+              <MiniMetric label="Tipos" value="2" />
+              <MiniMetric label="Status" value="5" />
+              <MiniMetric label="IA" value="2" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="mx-auto grid max-w-7xl gap-6 px-5 py-6 lg:grid-cols-[360px_1fr]">
         <aside className="space-y-4">
           <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <h1 className="text-xl font-bold text-slate-950">Nova conferência</h1>
+            <h2 className="text-xl font-bold text-slate-950">Nova conferência</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">Selecione o fluxo documental e execute uma análise com extração IA/OCR e checklist configurável.</p>
 
             <div className="mt-5 space-y-3">
@@ -156,7 +176,7 @@ export function ConferiaWorkspace() {
                   <button
                     key={type}
                     className={`w-full rounded-lg border p-4 text-left transition ${
-                      isSelected ? "border-teal-700 bg-teal-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                      isSelected ? "border-teal-700 bg-teal-50 shadow-sm ring-2 ring-teal-700/10" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                     }`}
                     onClick={() => setValidationType(type)}
                   >
@@ -176,7 +196,7 @@ export function ConferiaWorkspace() {
             <div className="mt-4 space-y-3">
               {processSteps.map((step) => (
                 <div key={step.label} className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-teal-700">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-900 text-cyan-200">
                     <step.icon className="h-4 w-4" aria-hidden="true" />
                   </div>
                   <span className="text-sm font-medium text-slate-700">{step.label}</span>
@@ -190,12 +210,12 @@ export function ConferiaWorkspace() {
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-sm font-semibold text-teal-700">{selectedCopy.shortTitle}</p>
+                <p className="text-sm font-bold uppercase tracking-wide text-teal-700">{selectedCopy.shortTitle}</p>
                 <h2 className="mt-1 text-2xl font-bold text-slate-950">{selectedCopy.title}</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{selectedCopy.description}</p>
               </div>
               <button
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                 disabled={!hasDocuments || isProcessing}
                 onClick={handleRunValidation}
               >
@@ -248,8 +268,10 @@ export function ConferiaWorkspace() {
               <ResultsTable results={run.results} />
             </>
           ) : (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-8 text-center">
-              <FileCheck2 className="mx-auto h-10 w-10 text-slate-400" aria-hidden="true" />
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                <FileCheck2 className="h-7 w-7" aria-hidden="true" />
+              </span>
               <h2 className="mt-3 text-base font-bold text-slate-950">Checklist aguardando processamento</h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Adicione ao menos um documento para simular a extração OCR/IA e gerar a tabela de conferência.</p>
             </div>
@@ -271,6 +293,15 @@ function SummaryCard({ label, value, tone }: { label: string; value: number; ton
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className={`inline-flex h-9 min-w-12 items-center justify-center rounded-md px-3 text-lg font-bold ${toneClasses[tone]}`}>{value}</div>
       <div className="mt-3 text-sm font-semibold text-slate-700">{label}</div>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-20 rounded-md bg-white/10 px-3 py-2 text-center">
+      <div className="text-lg font-bold text-white">{value}</div>
+      <div className="text-xs font-semibold text-slate-300">{label}</div>
     </div>
   );
 }
