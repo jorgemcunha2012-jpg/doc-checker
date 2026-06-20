@@ -136,6 +136,30 @@ export function ConferiaWorkspace() {
     setProcessId(payload.processId);
   }
 
+  async function handleExportReport() {
+    if (!run) {
+      return;
+    }
+
+    const response = await fetch("/api/reports/validation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(run),
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `conferia-${run.id}.pdf`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <main className="min-h-screen">
       <header className="border-b border-slate-800 bg-slate-950 text-white">
@@ -272,13 +296,13 @@ export function ConferiaWorkspace() {
                 <SummaryCard label="Total pendente de revisão" value={run.summary.reviewRequired} tone="warning" />
               </div>
               {processId ? (
-                <a
+                <button
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                  href={`/api/validation-processes/${processId}/report`}
+                  onClick={handleExportReport}
                 >
                   <Download className="h-4 w-4" />
                   Exportar relatório
-                </a>
+                </button>
               ) : null}
               <ResultsTable results={run.results} />
             </>
