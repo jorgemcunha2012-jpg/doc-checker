@@ -1,20 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { Building2, CheckCircle2, Database, FileCheck2, FileSearch, Layers3, Loader2, ShieldCheck, UploadCloud } from "lucide-react";
-import type { UploadedDocument, ValidationRun, ValidationType } from "@/domain/validation";
-import { runValidation } from "@/services/validation/run-validation";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Building2, CheckCircle2, Database, Download, FileCheck2, FileSearch, Layers3, Loader2, ShieldCheck, UploadCloud } from "lucide-react";
+import type { ValidationProcess, ValidationRun, ValidationType } from "@/domain/validation";
+import { defaultOrganization } from "@/domain/tenant";
 import { validationTypeCopy } from "@/lib/validation-copy";
-import { FileDropZone } from "./file-drop-zone";
+import { ClientUploadedDocument, FileDropZone } from "./file-drop-zone";
 import { ResultsTable } from "./results-table";
 
 const validationTypes: ValidationType[] = ["MINUTA", "ITBI"];
 
 export function ConferiaWorkspace() {
   const [validationType, setValidationType] = useState<ValidationType>("MINUTA");
-  const [documents, setDocuments] = useState<UploadedDocument[]>([]);
+  const [documents, setDocuments] = useState<ClientUploadedDocument[]>([]);
+  const [processId, setProcessId] = useState<string | null>(null);
+  const [process, setProcess] = useState<ValidationProcess | null>(null);
   const [run, setRun] = useState<ValidationRun | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const selectedCopy = validationTypeCopy[validationType];
 
@@ -25,11 +27,14 @@ export function ConferiaWorkspace() {
         return;
       }
 
-      const pastedDocuments = Array.from(files).map<UploadedDocument>((file, index) => ({
+      const pastedDocuments = Array.from(files).map<ClientUploadedDocument>((file, index) => ({
         id: crypto.randomUUID(),
+        organizationId: defaultOrganization.id,
         name: file.name || `print-colado-${index + 1}.png`,
         type: "PRINT",
         mimeType: file.type || "image/png",
+        sizeBytes: file.size,
+        file,
       }));
 
       setDocuments((current) => [...current, ...pastedDocuments]);
@@ -41,10 +46,36 @@ export function ConferiaWorkspace() {
 
   useEffect(() => {
     setDocuments([]);
+    setProcessId(null);
+    setProcess(null);
     setRun(null);
   }, [validationType]);
 
+  useEffect(() => {
+    if (!processId) {
+      return;
+    }
+
+    const interval = window.setInterval(async () => {
+      const response = await fetch(`/api/validation-processes/${processId}`);
+      const nextProcess = (await response.json()) as ValidationProcess;
+      setProcess(nextProcess);
+
+      if (nextProcess.status === "DONE") {
+        setRun(nextProcess.result ?? null);
+        window.clearInterval(interval);
+      }
+
+      if (nextProcess.status === "FAILED") {
+        window.clearInterval(interval);
+      }
+    }, 2500);
+
+    return () => window.clearInterval(interval);
+  }, [processId]);
+
   const hasDocuments = documents.length > 0;
+  const isProcessing = isSubmitting || process?.status === "PENDING" || process?.status === "EXTRACTING" || process?.status === "COMPARING";
 
   const processSteps = useMemo(
     () => [
@@ -56,11 +87,38 @@ export function ConferiaWorkspace() {
     [validationType],
   );
 
-  function handleRunValidation() {
-    startTransition(async () => {
-      const response = await runValidation(validationType, documents);
-      setRun(response.validation);
+  async function handleRunValidation() {
+    setIsSubmitting(true);
+    setRun(null);
+    setProcess(null);
+
+    const formData = new FormData();
+    formData.set("validationType", validationType);
+    documents.forEach((document) => formData.append("documents", document.file, document.name));
+
+    const response = await fetch("/api/validation-processes", {
+      method: "POST",
+      body: formData,
     });
+    const payload = (await response.json()) as { processId?: string; error?: string };
+    setIsSubmitting(false);
+
+    if (!response.ok || !payload.processId) {
+      setProcess({
+        id: "local_error",
+        organizationId: defaultOrganization.id,
+        userId: "usr_conferia_analista",
+        validationType,
+        status: "FAILED",
+        documents,
+        error: payload.error ?? "Falha ao iniciar processo.",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    setProcessId(payload.processId);
   }
 
   return (
@@ -87,7 +145,7 @@ export function ConferiaWorkspace() {
         <aside className="space-y-4">
           <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <h1 className="text-xl font-bold text-slate-950">Nova conferência</h1>
-            <p className="mt-2 text-sm leading-6 text-slate-500">Selecione o fluxo documental e execute uma análise simulada com checklist configurável.</p>
+            <p className="mt-2 text-sm leading-6 text-slate-500">Selecione o fluxo documental e execute uma análise com extração IA/OCR e checklist configurável.</p>
 
             <div className="mt-5 space-y-3">
               {validationTypes.map((type) => {
@@ -138,10 +196,10 @@ export function ConferiaWorkspace() {
               </div>
               <button
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                disabled={!hasDocuments || isPending}
+                disabled={!hasDocuments || isProcessing}
                 onClick={handleRunValidation}
               >
-                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+                {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
                 Processar conferência
               </button>
             </div>
@@ -149,13 +207,44 @@ export function ConferiaWorkspace() {
 
           <FileDropZone validationType={validationType} documents={documents} onDocumentsChange={setDocuments} />
 
+          {process && process.status !== "DONE" ? (
+            <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                {process.status === "FAILED" ? <AlertTriangle className="h-5 w-5 text-rose-600" /> : <Loader2 className="h-5 w-5 animate-spin text-teal-700" />}
+                <div>
+                  <div className="text-sm font-bold text-slate-950">Status do processo: {process.status}</div>
+                  {process.error ? <div className="mt-1 text-sm text-rose-700">{process.error}</div> : <div className="mt-1 text-sm text-slate-500">A tela consulta o processo automaticamente a cada 2,5 segundos.</div>}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {run ? (
             <>
+              {run.usedPdfVisionFallback ? (
+                <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                  <div>
+                    <div className="text-sm font-bold">Fallback de visão utilizado</div>
+                    <div className="mt-1 text-sm">O PDF tinha pouco ou nenhum texto extraível e foi enviado para análise visual.</div>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="grid gap-3 md:grid-cols-3">
                 <SummaryCard label="Total de campos conferidos" value={run.summary.totalChecked} tone="neutral" />
                 <SummaryCard label="Total de divergências" value={run.summary.divergences} tone="danger" />
                 <SummaryCard label="Total pendente de revisão" value={run.summary.reviewRequired} tone="warning" />
               </div>
+              {processId ? (
+                <a
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                  href={`/api/validation-processes/${processId}/report`}
+                >
+                  <Download className="h-4 w-4" />
+                  Exportar relatório
+                </a>
+              ) : null}
               <ResultsTable results={run.results} />
             </>
           ) : (

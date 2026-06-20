@@ -2,11 +2,16 @@
 
 import { FileText, ImageIcon, Paperclip, Clipboard } from "lucide-react";
 import type { UploadedDocument, ValidationType } from "@/domain/validation";
+import { defaultOrganization } from "@/domain/tenant";
+
+export type ClientUploadedDocument = UploadedDocument & {
+  file: File;
+};
 
 type FileDropZoneProps = {
   validationType: ValidationType;
-  documents: UploadedDocument[];
-  onDocumentsChange: (documents: UploadedDocument[]) => void;
+  documents: ClientUploadedDocument[];
+  onDocumentsChange: (documents: ClientUploadedDocument[]) => void;
 };
 
 const acceptedCopy: Record<ValidationType, string> = {
@@ -20,11 +25,14 @@ export function FileDropZone({ validationType, documents, onDocumentsChange }: F
       return;
     }
 
-    const nextDocuments = Array.from(files).map<UploadedDocument>((file) => ({
+    const nextDocuments = Array.from(files).map<ClientUploadedDocument>((file) => ({
       id: crypto.randomUUID(),
+      organizationId: defaultOrganization.id,
       name: file.name,
       type: resolveDocumentType(file, validationType),
       mimeType: file.type || "application/octet-stream",
+      sizeBytes: file.size,
+      file,
     }));
 
     onDocumentsChange([...documents, ...nextDocuments]);

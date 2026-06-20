@@ -6,12 +6,13 @@ import type { ValidationResult, ValidationStatus } from "@/domain/validation";
 import { statusCopy } from "@/lib/validation-copy";
 import { StatusBadge } from "./status-badge";
 
-type Filter = "ALL" | "DIVERGENCE" | "REVIEW_REQUIRED";
+type Filter = "ALL" | "DIVERGENCE" | "REVIEW_REQUIRED" | "LOW_CONFIDENCE";
 
 const filters: Array<{ id: Filter; label: string }> = [
   { id: "ALL", label: "Todos" },
   { id: "DIVERGENCE", label: "Divergências" },
   { id: "REVIEW_REQUIRED", label: "Revisão necessária" },
+  { id: "LOW_CONFIDENCE", label: "Baixa confiança" },
 ];
 
 export function ResultsTable({ results }: { results: ValidationResult[] }) {
@@ -23,7 +24,8 @@ export function ResultsTable({ results }: { results: ValidationResult[] }) {
       const matchesFilter =
         filter === "ALL" ||
         result.status === filter ||
-        (filter === "REVIEW_REQUIRED" && result.status === "NOT_FOUND");
+        (filter === "REVIEW_REQUIRED" && result.status === "NOT_FOUND") ||
+        (filter === "LOW_CONFIDENCE" && Math.min(result.sourceConfidence, result.targetConfidence) < 70);
       const text = `${result.field.category} ${result.field.label} ${result.sourceValue} ${result.targetValue} ${statusCopy[result.status]}`.toLowerCase();
 
       return matchesFilter && text.includes(query.toLowerCase());
@@ -64,6 +66,7 @@ export function ResultsTable({ results }: { results: ValidationResult[] }) {
               <th className="px-4 py-3 font-semibold">Campo</th>
               <th className="px-4 py-3 font-semibold">Origem</th>
               <th className="px-4 py-3 font-semibold">Destino</th>
+              <th className="px-4 py-3 font-semibold">Confiança</th>
               <th className="px-4 py-3 font-semibold">Status</th>
             </tr>
           </thead>
@@ -87,6 +90,10 @@ function ResultRow({ result }: { result: ValidationResult }) {
       </td>
       <td className="max-w-72 px-4 py-4 text-slate-700">{result.sourceValue}</td>
       <td className="max-w-72 px-4 py-4 text-slate-700">{result.targetValue}</td>
+      <td className="px-4 py-4">
+        <div className="text-sm font-bold text-slate-900">{Math.min(result.sourceConfidence, result.targetConfidence)}%</div>
+        <div className="mt-1 text-xs text-slate-500">Origem {result.sourceConfidence}% / Destino {result.targetConfidence}%</div>
+      </td>
       <td className="px-4 py-4">
         <StatusBadge status={result.status as ValidationStatus} />
         <div className="mt-2 max-w-56 text-xs text-slate-500">{result.observation}</div>

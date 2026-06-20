@@ -1,0 +1,59 @@
+import { defaultOrganization, defaultUser } from "@/domain/tenant";
+import type { UploadedDocument, ValidationProcess, ValidationType } from "@/domain/validation";
+import { getChecklist } from "@/domain/checklists";
+import { DocumentExtractionService } from "@/services/extraction/document-extraction-service";
+import type { UploadedDocumentPayload } from "@/services/extraction/types";
+import { ValidationEngine } from "@/services/validation/validation-engine";
+import { saveValidationProcess, updateValidationProcess } from "./validation-process-store";
+
+export function createValidationProcess(validationType: ValidationType, documents: UploadedDocumentPayload[]) {
+  const now = new Date().toISOString();
+  const process: ValidationProcess = {
+    id: crypto.randomUUID(),
+    organizationId: defaultOrganization.id,
+    userId: defaultUser.id,
+    validationType,
+    status: "PENDING",
+    documents: documents.map(stripBuffer),
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  saveValidationProcess(process);
+  void processValidation(process.id, validationType, documents);
+
+  return process;
+}
+
+async function processValidation(processId: string, validationType: ValidationType, documents: UploadedDocumentPayload[]) {
+  try {
+    updateValidationProcess(processId, { status: "EXTRACTING" });
+    const checklist = getChecklist(validationType);
+    const extractionService = new DocumentExtractionService();
+    const extraction = await extractionService.extract({ validationType, checklist, documents });
+
+    updateValidationProcess(processId, { status: "COMPARING" });
+    const engine = new ValidationEngine();
+    const result = engine.run(defaultOrganization.id, validationType, extraction.sourceData, extraction.targetData, extraction.usedPdfVisionFallback);
+
+    updateValidationProcess(processId, { status: "DONE", result });
+  } catch (error) {
+    updateValidationProcess(processId, {
+      status: "FAILED",
+      error: error instanceof Error ? error.message : "Erro inesperado no processamento.",
+    });
+  }
+}
+
+function stripBuffer(document: UploadedDocumentPayload): UploadedDocument {
+  const metadata: UploadedDocument = {
+    id: document.id,
+    organizationId: document.organizationId,
+    name: document.name,
+    type: document.type,
+    mimeType: document.mimeType,
+    sizeBytes: document.sizeBytes,
+  };
+
+  return metadata;
+}

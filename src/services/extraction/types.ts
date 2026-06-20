@@ -1,18 +1,28 @@
-import type { ExtractedDocumentData, ExtractionProvider, UploadedDocument, ValidationType } from "@/domain/validation";
+import type {
+  ChecklistField,
+  ExtractionProvider,
+  ProviderExtractionOutput,
+  UploadedDocument,
+  ValidationType,
+} from "@/domain/validation";
+
+export type UploadedDocumentPayload = UploadedDocument & {
+  buffer: Buffer;
+};
 
 export type ExtractionRequest = {
   validationType: ValidationType;
-  documents: UploadedDocument[];
+  checklist: ChecklistField[];
+  documents: UploadedDocumentPayload[];
 };
 
 export type ExtractionResult = {
-  provider: ExtractionProvider;
-  sourceData: ExtractedDocumentData;
-  targetData: ExtractedDocumentData;
-  confidence: number;
+  provider: ExtractionProvider | "MIXED";
+  sourceData: ProviderExtractionOutput;
+  targetData: ProviderExtractionOutput;
+  usedPdfVisionFallback: boolean;
 };
 
-export interface DocumentExtractionService {
+export interface DocumentExtractionProvider {
   provider: ExtractionProvider;
-  extract(request: ExtractionRequest): Promise<ExtractionResult>;
 }

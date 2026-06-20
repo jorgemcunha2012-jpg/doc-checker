@@ -1,29 +1,37 @@
 import type {
   ChecklistField,
   ExtractedDocumentData,
+  ProviderExtractionOutput,
   ValidationResult,
   ValidationRun,
   ValidationStatus,
   ValidationType,
 } from "@/domain/validation";
 import { getChecklist } from "@/domain/checklists";
+import { normalizeValue } from "@/services/normalization/normalization-service";
 
-const reviewTokens = ["revisar", "não localizado", "nao localizado", "pendente"];
+const LOW_CONFIDENCE_THRESHOLD = 70;
 
 export class ValidationEngine {
   run(
+    organizationId: string,
     validationType: ValidationType,
-    sourceData: ExtractedDocumentData,
-    targetData: ExtractedDocumentData,
+    sourceOutput: ProviderExtractionOutput,
+    targetOutput: ProviderExtractionOutput,
+    usedPdfVisionFallback: boolean,
   ): ValidationRun {
     const checklist = getChecklist(validationType);
-    const results = checklist.map((field) => this.compareField(field, sourceData[field.id], targetData[field.id]));
+    const sourceData = toExtractedDocumentData(sourceOutput);
+    const targetData = toExtractedDocumentData(targetOutput);
+    const results = checklist.map((field) => this.compareField(organizationId, field, sourceData, targetData));
 
     return {
       id: crypto.randomUUID(),
+      organizationId,
       validationType,
       checklist,
       results,
+      usedPdfVisionFallback,
       summary: {
         totalChecked: results.length,
         divergences: results.filter((result) => result.status === "DIVERGENCE").length,
@@ -32,62 +40,75 @@ export class ValidationEngine {
     };
   }
 
-  private compareField(field: ChecklistField, sourceValue?: string, targetValue?: string): ValidationResult {
-    const source = sourceValue?.trim() ?? "";
-    const target = targetValue?.trim() ?? "";
-    const status = this.resolveStatus(field.required, source, target);
+  private compareField(
+    organizationId: string,
+    field: ChecklistField,
+    sourceData: ExtractedDocumentData,
+    targetData: ExtractedDocumentData,
+  ): ValidationResult {
+    const source = sourceData[field.id];
+    const target = targetData[field.id];
+    const sourceValue = source?.value?.trim() ?? "";
+    const targetValue = target?.value?.trim() ?? "";
+    const sourceValueNormalized = normalizeValue(sourceValue, field.fieldType);
+    const targetValueNormalized = normalizeValue(targetValue, field.fieldType);
+    const sourceConfidence = source?.confidence ?? 0;
+    const targetConfidence = target?.confidence ?? 0;
+    const status = this.resolveStatus(field.required, sourceValueNormalized, targetValueNormalized, sourceConfidence, targetConfidence);
 
     return {
+      organizationId,
       field,
-      sourceValue: source || "Não encontrado",
-      targetValue: target || "Não encontrado",
+      sourceValue: sourceValue || "Não encontrado",
+      targetValue: targetValue || "Não encontrado",
+      sourceValueNormalized,
+      targetValueNormalized,
+      sourceConfidence,
+      targetConfidence,
       status,
       observation: this.buildObservation(status),
     };
   }
 
-  private resolveStatus(required: boolean, source: string, target: string): ValidationStatus {
-    if (!source && !target && !required) {
+  private resolveStatus(
+    required: boolean,
+    sourceNormalized: string,
+    targetNormalized: string,
+    sourceConfidence: number,
+    targetConfidence: number,
+  ): ValidationStatus {
+    if (!sourceNormalized && !targetNormalized && !required) {
       return "NOT_APPLICABLE";
     }
 
-    if (!source || !target) {
+    if (!sourceNormalized || !targetNormalized) {
       return "NOT_FOUND";
     }
 
-    if (this.requiresReview(source) || this.requiresReview(target)) {
+    if (sourceConfidence < LOW_CONFIDENCE_THRESHOLD || targetConfidence < LOW_CONFIDENCE_THRESHOLD) {
       return "REVIEW_REQUIRED";
     }
 
-    if (this.normalize(source) === this.normalize(target)) {
+    if (sourceNormalized === targetNormalized) {
       return "MATCH";
     }
 
     return "DIVERGENCE";
   }
 
-  private normalize(value: string) {
-    return value
-      .normalize("NFD")
-      .replace(/\p{Diacritic}/gu, "")
-      .replace(/[^\p{L}\p{N}]+/gu, "")
-      .toLowerCase();
-  }
-
-  private requiresReview(value: string) {
-    const normalized = value.toLowerCase();
-    return reviewTokens.some((token) => normalized.includes(token));
-  }
-
   private buildObservation(status: ValidationStatus) {
     const observations: Record<ValidationStatus, string> = {
-      MATCH: "Campo conferido automaticamente.",
-      DIVERGENCE: "Valores diferentes entre origem e destino.",
+      MATCH: "Campo conferido automaticamente após normalização.",
+      DIVERGENCE: "Valores normalizados diferentes entre origem e destino.",
       NOT_FOUND: "Informação ausente em uma das fontes.",
-      NOT_APPLICABLE: "Campo opcional sem ocorrência para este processo.",
-      REVIEW_REQUIRED: "Campo localizado, mas exige revisão humana.",
+      NOT_APPLICABLE: "Campo opcional ausente nas duas fontes.",
+      REVIEW_REQUIRED: "Extração com confiança abaixo de 70%.",
     };
 
     return observations[status];
   }
+}
+
+function toExtractedDocumentData(output: ProviderExtractionOutput): ExtractedDocumentData {
+  return Object.fromEntries(output.fields.map((field) => [field.fieldId, field]));
 }
