@@ -1,46 +1,35 @@
-# doc-checker
+# ConferIA
 
-Ferramenta inicial para validar arquivos de documentos pela linha de comando.
+Plataforma SaaS de conferência documental imobiliária com arquitetura modular para checklists, regras e documentos por tipo de validação.
 
-Nesta primeira versão, o `doc-checker` verifica:
+## MVP
 
-- se o arquivo existe;
-- se a extensão é permitida;
-- se o arquivo está vazio;
-- se o arquivo ultrapassa um tamanho máximo configurável.
+- Seleção entre Conferência de Minuta e Conferência de ITBI.
+- Entrada por colagem de print, upload de imagem e upload de PDF/documentos.
+- Serviços isolados para extração, comparação e geração de checklist.
+- Dados mockados para simular OCR/IA enquanto as integrações reais não entram.
+- Interfaces preparadas para OpenAI, OCR genérico, Azure Document Intelligence e AWS Textract.
 
-## Requisitos
+## Stack
 
-- Python 3.9+
+- Next.js 15
+- TypeScript
+- Tailwind CSS
+- App Router
+- Arquitetura preparada para SaaS
 
-## Instalação para desenvolvimento
+## Desenvolvimento
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
+npm install
+npm run dev
 ```
 
-## Uso
+Abra `http://localhost:3000`.
+
+## Scripts
 
 ```bash
-doc-checker contrato.pdf proposta.docx
-```
-
-Também é possível ajustar as regras:
-
-```bash
-doc-checker arquivo.pdf --allowed-extension .pdf --max-size-mb 5
-```
-
-Para saída em JSON:
-
-```bash
-doc-checker arquivo.pdf --json
-```
-
-## Testes
-
-```bash
-pytest
+npm run lint
+npm run build
 ```
