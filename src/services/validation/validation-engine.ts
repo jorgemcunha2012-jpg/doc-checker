@@ -36,6 +36,7 @@ export class ValidationEngine {
       usedPdfVisionFallback,
       summary: {
         totalChecked: results.length,
+        matches: results.filter((result) => result.status === "MATCH").length,
         divergences: results.filter((result) => result.status === "DIVERGENCE").length,
         reviewRequired: results.filter((result) => result.status === "REVIEW_REQUIRED" || result.status === "NOT_FOUND").length,
       },

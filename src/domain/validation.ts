@@ -98,6 +98,7 @@ export type UploadedDocument = {
 
 export type ValidationSummary = {
   totalChecked: number;
+  matches: number;
   divergences: number;
   reviewRequired: number;
 };

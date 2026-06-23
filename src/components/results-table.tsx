@@ -6,10 +6,11 @@ import type { ValidationResult, ValidationStatus } from "@/domain/validation";
 import { statusCopy } from "@/lib/validation-copy";
 import { StatusBadge } from "./status-badge";
 
-type Filter = "ALL" | "DIVERGENCE" | "REVIEW_REQUIRED" | "LOW_CONFIDENCE";
+type Filter = "ALL" | "MATCH" | "DIVERGENCE" | "REVIEW_REQUIRED" | "LOW_CONFIDENCE";
 
 const filters: Array<{ id: Filter; label: string }> = [
   { id: "ALL", label: "Todos" },
+  { id: "MATCH", label: "Conferidos" },
   { id: "DIVERGENCE", label: "Divergências" },
   { id: "REVIEW_REQUIRED", label: "Revisão necessária" },
   { id: "LOW_CONFIDENCE", label: "Baixa confiança" },
@@ -32,8 +33,17 @@ export function ResultsTable({ results }: { results: ValidationResult[] }) {
     });
   }, [filter, query, results]);
 
+  const matchCount = results.filter((result) => result.status === "MATCH").length;
+  const divergenceCount = results.filter((result) => result.status === "DIVERGENCE").length;
+  const reviewCount = results.filter((result) => result.status === "REVIEW_REQUIRED" || result.status === "NOT_FOUND").length;
+
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="grid gap-3 border-b border-slate-200 bg-white p-4 md:grid-cols-3">
+        <ResultMetric label="Conferidos" value={matchCount} tone="success" />
+        <ResultMetric label="Divergências" value={divergenceCount} tone="danger" />
+        <ResultMetric label="Revisão" value={reviewCount} tone="warning" />
+      </div>
       <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 p-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-2">
           {filters.map((item) => (
@@ -78,6 +88,21 @@ export function ResultsTable({ results }: { results: ValidationResult[] }) {
         </table>
       </div>
     </section>
+  );
+}
+
+function ResultMetric({ label, value, tone }: { label: string; value: number; tone: "success" | "danger" | "warning" }) {
+  const toneClasses = {
+    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    danger: "border-rose-200 bg-rose-50 text-rose-700",
+    warning: "border-amber-200 bg-amber-50 text-amber-700",
+  };
+
+  return (
+    <div className={`rounded-md border px-3 py-2 ${toneClasses[tone]}`}>
+      <div className="text-lg font-bold">{value}</div>
+      <div className="text-xs font-semibold">{label}</div>
+    </div>
   );
 }
 

@@ -312,8 +312,9 @@ export function ConferiaWorkspace() {
                 </div>
               ) : null}
 
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-4">
                 <SummaryCard label="Total de campos conferidos" value={run.summary.totalChecked} tone="neutral" />
+                <SummaryCard label="Campos que bateram" value={run.summary.matches ?? run.results.filter((result) => result.status === "MATCH").length} tone="success" />
                 <SummaryCard label="Total de divergências" value={run.summary.divergences} tone="danger" />
                 <SummaryCard label="Total pendente de revisão" value={run.summary.reviewRequired} tone="warning" />
               </div>
@@ -349,9 +350,10 @@ async function readJsonSafely<T>(response: Response): Promise<T | null> {
   }
 }
 
-function SummaryCard({ label, value, tone }: { label: string; value: number; tone: "neutral" | "danger" | "warning" }) {
+function SummaryCard({ label, value, tone }: { label: string; value: number; tone: "neutral" | "success" | "danger" | "warning" }) {
   const toneClasses = {
     neutral: "text-slate-950 bg-slate-100",
+    success: "text-emerald-700 bg-emerald-50",
     danger: "text-rose-700 bg-rose-50",
     warning: "text-amber-700 bg-amber-50",
   };

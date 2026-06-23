@@ -24,6 +24,8 @@ export async function renderValidationReport(run: ValidationRun) {
 }
 
 function ValidationReportDocument({ run }: { run: ValidationRun }) {
+  const matches = run.summary.matches ?? run.results.filter((result) => result.status === "MATCH").length;
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -41,6 +43,10 @@ function ValidationReportDocument({ run }: { run: ValidationRun }) {
           <View style={styles.summaryCard}>
             <Text style={styles.summaryValue}>{run.summary.totalChecked}</Text>
             <Text>Total de campos conferidos</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryValue}>{matches}</Text>
+            <Text>Campos que bateram</Text>
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryValue}>{run.summary.divergences}</Text>

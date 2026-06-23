@@ -18,8 +18,10 @@ export class DocumentExtractionService {
       (document) => document.type === "PDF" || document.type === "CONTRACT" || document.type === "ITBI_GUIDE" || document.type === "COMPLEMENTARY",
     );
 
-    const sourceData = await this.extractSourceData(sourceDocuments, checklist);
-    const targetExtraction = await this.extractTargetData(targetDocuments, checklist);
+    const [sourceData, targetExtraction] = await Promise.all([
+      this.extractSourceData(sourceDocuments, checklist),
+      this.extractTargetData(targetDocuments, checklist),
+    ]);
 
     return {
       provider: targetExtraction.usedPdfVisionFallback ? "MIXED" : "DEEPSEEK",
