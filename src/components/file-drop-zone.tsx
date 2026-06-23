@@ -1,7 +1,7 @@
 "use client";
 
 import { FileText, ImageIcon, Paperclip, Clipboard, X } from "lucide-react";
-import type { UploadedDocument, ValidationType } from "@/domain/validation";
+import { activeDocumentSources, type DocumentSource, type UploadedDocument, type ValidationType } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
 
 export type ClientUploadedDocument = UploadedDocument & {
@@ -17,6 +17,7 @@ type FileDropZoneProps = {
 const acceptedCopy: Record<ValidationType, string> = {
   MINUTA: "Print, JPG, PNG ou PDF do contrato",
   ITBI: "Guia DTI/ITBI, contrato e complementares",
+  RECONCILIATION: "Documentos do SIOPI, Minuta e ITBI; confirme a fonte de cada arquivo",
 };
 
 export function FileDropZone({ validationType, documents, onDocumentsChange }: FileDropZoneProps) {
@@ -32,6 +33,7 @@ export function FileDropZone({ validationType, documents, onDocumentsChange }: F
       type: resolveDocumentType(file, validationType),
       mimeType: file.type || "application/octet-stream",
       sizeBytes: file.size,
+      source: validationType === "RECONCILIATION" ? inferDocumentSource(file.name) : undefined,
       file,
     }));
 
@@ -40,6 +42,10 @@ export function FileDropZone({ validationType, documents, onDocumentsChange }: F
 
   function removeDocument(id: string) {
     onDocumentsChange(documents.filter((document) => document.id !== id));
+  }
+
+  function updateDocumentSource(id: string, source: DocumentSource) {
+    onDocumentsChange(documents.map((document) => (document.id === id ? { ...document, source } : document)));
   }
 
   return (
@@ -73,16 +79,32 @@ export function FileDropZone({ validationType, documents, onDocumentsChange }: F
 
       <div className="mt-4 space-y-2">
         {documents.map((document) => (
-          <div key={document.id} className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+          <div key={document.id} className="flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-teal-700 shadow-sm">
                 {document.mimeType.includes("image") ? <ImageIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
               </span>
               <span className="truncate text-sm font-medium text-slate-800">{document.name}</span>
             </div>
-            <button className="rounded-md p-1.5 text-slate-500 hover:bg-white hover:text-slate-900" onClick={() => removeDocument(document.id)} title="Remover">
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              {validationType === "RECONCILIATION" ? (
+                <select
+                  aria-label={`Fonte de ${document.name}`}
+                  className="min-h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-slate-700 outline-none focus:border-teal-700"
+                  value={document.source ?? "SIOPI"}
+                  onChange={(event) => updateDocumentSource(document.id, event.target.value as DocumentSource)}
+                >
+                  {activeDocumentSources.map((source) => (
+                    <option key={source} value={source}>
+                      {source}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              <button className="rounded-md p-1.5 text-slate-500 hover:bg-white hover:text-slate-900" onClick={() => removeDocument(document.id)} title="Remover">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -105,4 +127,10 @@ function resolveDocumentType(file: File, validationType: ValidationType): Upload
   }
 
   return validationType === "ITBI" ? "COMPLEMENTARY" : "CONTRACT";
+}
+
+function inferDocumentSource(name: string): DocumentSource {
+  if (/itbi|dti|guia/i.test(name)) return "ITBI";
+  if (/minuta|contrato|instrumento/i.test(name)) return "MINUTA";
+  return "SIOPI";
 }

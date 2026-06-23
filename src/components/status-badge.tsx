@@ -8,6 +8,7 @@ const statusClasses: Record<ValidationStatus, string> = {
   NOT_FOUND: "border-amber-200 bg-amber-50 text-amber-800",
   NOT_APPLICABLE: "border-slate-200 bg-slate-50 text-slate-600",
   REVIEW_REQUIRED: "border-cyan-200 bg-cyan-50 text-cyan-700",
+  SOURCE_UNREADABLE: "border-violet-200 bg-violet-50 text-violet-700",
 };
 
 export function StatusBadge({ status }: { status: ValidationStatus }) {

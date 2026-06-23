@@ -11,6 +11,11 @@ export const validationTypeCopy: Record<ValidationType, { title: string; shortTi
     shortTitle: "ITBI",
     description: "Confira guia DTI/ITBI, contrato e documentos complementares com checklist próprio.",
   },
+  RECONCILIATION: {
+    title: "Reconciliação Documental",
+    shortTitle: "Reconciliação",
+    description: "Consolide SIOPI, Minuta e ITBI para identificar concordâncias, divergências, ausências e fontes ilegíveis.",
+  },
 };
 
 export const statusCopy: Record<ValidationStatus, string> = {
@@ -19,4 +24,5 @@ export const statusCopy: Record<ValidationStatus, string> = {
   NOT_FOUND: "Não encontrado",
   NOT_APPLICABLE: "Não aplicável",
   REVIEW_REQUIRED: "Revisão necessária",
+  SOURCE_UNREADABLE: "Fonte ilegível",
 };

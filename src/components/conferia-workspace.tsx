@@ -7,8 +7,9 @@ import { defaultOrganization } from "@/domain/tenant";
 import { validationTypeCopy } from "@/lib/validation-copy";
 import { ClientUploadedDocument, FileDropZone } from "./file-drop-zone";
 import { ResultsTable } from "./results-table";
+import { ReconciliationResultsTable } from "./reconciliation-results-table";
 
-const validationTypes: ValidationType[] = ["MINUTA", "ITBI"];
+const validationTypes: ValidationType[] = ["MINUTA", "ITBI", "RECONCILIATION"];
 
 export function ConferiaWorkspace() {
   const [validationType, setValidationType] = useState<ValidationType>("MINUTA");
@@ -34,6 +35,7 @@ export function ConferiaWorkspace() {
         type: "PRINT",
         mimeType: file.type || "image/png",
         sizeBytes: file.size,
+        source: validationType === "RECONCILIATION" ? "SIOPI" : undefined,
         file,
       }));
 
@@ -42,7 +44,7 @@ export function ConferiaWorkspace() {
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, []);
+  }, [validationType]);
 
   useEffect(() => {
     setDocuments([]);
@@ -96,15 +98,18 @@ export function ConferiaWorkspace() {
     return () => window.clearInterval(interval);
   }, [processId]);
 
-  const hasDocuments = documents.length > 0;
+  const hasDocuments =
+    validationType === "RECONCILIATION"
+      ? new Set(documents.map((document) => document.source).filter(Boolean)).size >= 2
+      : documents.length > 0;
   const isProcessing = isSubmitting || process?.status === "PENDING" || process?.status === "EXTRACTING" || process?.status === "COMPARING";
 
   const processSteps = useMemo(
     () => [
-      { icon: FileSearch, label: validationType === "MINUTA" ? "Extrair dados do print" : "Ler guia DTI/ITBI" },
-      { icon: FileCheck2, label: "Extrair dados do contrato" },
-      { icon: Layers3, label: "Comparar campos e regras" },
-      { icon: CheckCircle2, label: "Gerar checklist auditável" },
+      { icon: FileSearch, label: validationType === "RECONCILIATION" ? "Extrair cada fonte" : validationType === "MINUTA" ? "Extrair dados do print" : "Ler guia DTI/ITBI" },
+      { icon: FileCheck2, label: validationType === "RECONCILIATION" ? "Consolidar evidências" : "Extrair dados do contrato" },
+      { icon: Layers3, label: validationType === "RECONCILIATION" ? "Reconciliar todas as fontes" : "Comparar campos e regras" },
+      { icon: CheckCircle2, label: "Gerar resultado auditável" },
     ],
     [validationType],
   );
@@ -117,6 +122,9 @@ export function ConferiaWorkspace() {
     const formData = new FormData();
     formData.set("validationType", validationType);
     documents.forEach((document) => formData.append("documents", document.file, document.name));
+    if (validationType === "RECONCILIATION") {
+      formData.set("documentSources", JSON.stringify(documents.map((document) => document.source ?? "SIOPI")));
+    }
 
     const response = await fetch("/api/validation-processes", {
       method: "POST",
@@ -211,11 +219,11 @@ export function ConferiaWorkspace() {
                 Extração IA/OCR em fluxo auditável
               </div>
               <h1 className="mt-4 max-w-3xl text-3xl font-bold text-white sm:text-4xl">Conferência documental imobiliária com checklist inteligente</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">Organize documentos, extraia campos por IA e compare dados críticos de Minuta e ITBI em um processo rastreável.</p>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">Organize documentos, extraia campos por IA e reconcilie dados críticos entre SIOPI, Minuta e ITBI em um processo rastreável.</p>
             </div>
             <div className="grid grid-cols-3 gap-2 rounded-lg border border-white/10 bg-white/10 p-2 backdrop-blur">
-              <MiniMetric label="Tipos" value="2" />
-              <MiniMetric label="Status" value="5" />
+              <MiniMetric label="Fluxos" value="3" />
+              <MiniMetric label="Status" value="6" />
               <MiniMetric label="IA" value="2" />
             </div>
           </div>
@@ -306,18 +314,39 @@ export function ConferiaWorkspace() {
                 <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                   <div>
-                    <div className="text-sm font-bold">Fallback de visão utilizado</div>
-                    <div className="mt-1 text-sm">O PDF tinha pouco ou nenhum texto extraível e foi enviado para análise visual.</div>
+                    <div className="text-sm font-bold">
+                      {run.validationType === "RECONCILIATION" ? "Fonte sem texto extraível" : "Fallback de visão utilizado"}
+                    </div>
+                    <div className="mt-1 text-sm">
+                      {run.validationType === "RECONCILIATION"
+                        ? "Um PDF exigia OCR visual e foi sinalizado como fonte ilegível para não comprometer as demais fontes."
+                        : "O PDF tinha pouco ou nenhum texto extraível e exigiu análise visual."}
+                    </div>
                   </div>
                 </div>
               ) : null}
 
-              <div className="grid gap-3 md:grid-cols-4">
+              <div className={`grid gap-3 ${run.validationType === "RECONCILIATION" ? "md:grid-cols-5" : "md:grid-cols-4"}`}>
                 <SummaryCard label="Total de campos conferidos" value={run.summary.totalChecked} tone="neutral" />
                 <SummaryCard label="Campos que bateram" value={run.summary.matches ?? run.results.filter((result) => result.status === "MATCH").length} tone="success" />
                 <SummaryCard label="Total de divergências" value={run.summary.divergences} tone="danger" />
                 <SummaryCard label="Total pendente de revisão" value={run.summary.reviewRequired} tone="warning" />
+                {run.validationType === "RECONCILIATION" ? (
+                  <SummaryCard label="Campos em fonte ilegível" value={run.summary.unreadable} tone="warning" />
+                ) : null}
               </div>
+              {run.validationType === "RECONCILIATION" ? (
+                <div className="grid gap-3 md:grid-cols-3">
+                  {run.participatingSources.map((source) => (
+                    <div key={source} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="text-xs font-bold uppercase text-slate-500">{source}</div>
+                      <div className="mt-2 text-sm text-slate-700">
+                        {run.summary.missingBySource[source] ?? 0} ausentes · {run.summary.unreadableBySource[source] ?? 0} ilegíveis
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <button
                 className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
                 onClick={handleExportReport}
@@ -325,7 +354,11 @@ export function ConferiaWorkspace() {
                 <Download className="h-4 w-4" />
                 Exportar relatório
               </button>
-              <ResultsTable results={run.results} />
+              {run.validationType === "RECONCILIATION" ? (
+                <ReconciliationResultsTable results={run.results} />
+              ) : (
+                <ResultsTable results={run.results} />
+              )}
             </>
           ) : (
             <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
@@ -333,7 +366,11 @@ export function ConferiaWorkspace() {
                 <FileCheck2 className="h-7 w-7" aria-hidden="true" />
               </span>
               <h2 className="mt-3 text-base font-bold text-slate-950">Checklist aguardando processamento</h2>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Adicione ao menos um documento para simular a extração OCR/IA e gerar a tabela de conferência.</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                {validationType === "RECONCILIATION"
+                  ? "Adicione documentos de ao menos duas fontes distintas para gerar a reconciliação."
+                  : "Adicione os documentos de origem e destino para gerar a tabela de conferência."}
+              </p>
             </div>
           )}
         </section>

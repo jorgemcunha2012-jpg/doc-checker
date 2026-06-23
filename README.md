@@ -5,10 +5,13 @@ Plataforma SaaS de conferência documental imobiliária com arquitetura modular 
 ## MVP
 
 - Seleção entre Conferência de Minuta e Conferência de ITBI.
+- Fluxo de reconciliação entre SIOPI, Minuta e ITBI com suporte a futuras fontes.
 - Entrada por colagem de print, upload de imagem e upload de PDF/documentos.
 - Providers reais configuráveis para Kimi e DeepSeek via API compatível com OpenAI.
 - Extração direta de texto de PDF antes de recorrer à visão.
 - Comparação determinística após normalização por tipo de campo.
+- Evidências de extração por página, seção e trecho original quando disponíveis.
+- Diagnóstico isolado de fontes ilegíveis sem derrubar as demais fontes do processo.
 - Processamento assíncrono em fila in-memory com polling no frontend.
 - Estrutura multi-tenant inicial com `Organization`, `User` e `organizationId` nos processos.
 

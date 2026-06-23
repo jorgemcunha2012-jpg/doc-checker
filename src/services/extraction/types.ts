@@ -1,5 +1,7 @@
 import type {
   ChecklistField,
+  DocumentSource,
+  ExtractedFieldValue,
   ExtractionProvider,
   ProviderExtractionOutput,
   UploadedDocument,
@@ -20,6 +22,14 @@ export type ExtractionResult = {
   provider: ExtractionProvider | "MIXED";
   sourceData: ProviderExtractionOutput;
   targetData: ProviderExtractionOutput;
+  usedPdfVisionFallback: boolean;
+};
+
+export type ReconciliationExtractionResult = {
+  values: ExtractedFieldValue[];
+  participatingSources: DocumentSource[];
+  unreadableSources: DocumentSource[];
+  conflictedFieldsBySource: Partial<Record<DocumentSource, string[]>>;
   usedPdfVisionFallback: boolean;
 };
 

@@ -18,7 +18,7 @@ export class DeepSeekProvider implements DocumentExtractionProvider {
       {
         role: "system",
         content:
-          "Você estrutura texto bruto de documentos imobiliários. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"value\":string|null,\"confidence\":number}]}. Não compare campos.",
+          "Você estrutura texto bruto de documentos imobiliários. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"value\":string|null,\"confidence\":number,\"sourceLocation\":{\"page\":number|null,\"section\":string|null,\"rawText\":string|null}}]}. rawText deve ser apenas o pequeno trecho que sustenta o valor. Não compare campos.",
       },
       {
         role: "user",

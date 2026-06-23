@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
@@ -28,6 +29,7 @@
     "eslint-config-next": "^15.0.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^4.1.17",
+    "tsx": "^4.22.4",
     "typescript": "^5.7.2"
   }
 }

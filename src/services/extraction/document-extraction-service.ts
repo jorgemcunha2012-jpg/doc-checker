@@ -1,9 +1,10 @@
 import { getChecklist } from "@/domain/checklists";
-import type { ProviderExtractionOutput } from "@/domain/validation";
+import type { DocumentSource, ExtractedFieldValue, ProviderExtractionOutput } from "@/domain/validation";
+import { normalizeValue } from "@/services/normalization/normalization-service";
 import { DeepSeekProvider } from "./deepseek-provider";
 import { KimiProvider } from "./kimi-provider";
 import { extractPdfText, hasEnoughPdfText } from "./pdf-text-service";
-import type { ExtractionRequest, ExtractionResult, UploadedDocumentPayload } from "./types";
+import type { ExtractionRequest, ExtractionResult, ReconciliationExtractionResult, UploadedDocumentPayload } from "./types";
 
 export class DocumentExtractionService {
   constructor(
@@ -28,6 +29,29 @@ export class DocumentExtractionService {
       sourceData,
       targetData: targetExtraction.data,
       usedPdfVisionFallback: targetExtraction.usedPdfVisionFallback,
+    };
+  }
+
+  async extractReconciliation(request: ExtractionRequest): Promise<ReconciliationExtractionResult> {
+    const checklist = getChecklist("RECONCILIATION");
+    const participatingSources = Array.from(
+      new Set(request.documents.map((document) => document.source).filter((source): source is DocumentSource => Boolean(source))),
+    );
+    const sourceResults = await Promise.all(
+      participatingSources.map(async (source) => {
+        const documents = request.documents.filter((document) => document.source === source);
+        return this.extractDocumentSource(source, documents, checklist);
+      }),
+    );
+
+    return {
+      values: sourceResults.flatMap((result) => result.values),
+      participatingSources,
+      unreadableSources: sourceResults.filter((result) => result.unreadable).map((result) => result.source),
+      conflictedFieldsBySource: Object.fromEntries(
+        sourceResults.filter((result) => result.conflictedFields.length).map((result) => [result.source, result.conflictedFields]),
+      ),
+      usedPdfVisionFallback: sourceResults.some((result) => result.usedPdfVisionFallback),
     };
   }
 
@@ -65,6 +89,43 @@ export class DocumentExtractionService {
 
     return { data: mergeOutputs(outputs, checklist), usedPdfVisionFallback };
   }
+
+  private async extractDocumentSource(
+    source: DocumentSource,
+    documents: UploadedDocumentPayload[],
+    checklist: ExtractionRequest["checklist"],
+  ) {
+    const attempts = await Promise.all(
+      documents.map(async (document) => {
+        try {
+          const isPdf = document.mimeType.includes("pdf") || document.name.toLowerCase().endsWith(".pdf");
+          if (isPdf) {
+            const text = await tryExtractPdfText(document.buffer);
+            if (!hasEnoughPdfText(text)) {
+              return { output: null, usedPdfVisionFallback: true };
+            }
+            return { output: await this.deepSeekProvider.structureText(text, checklist), usedPdfVisionFallback: false };
+          }
+          if (document.mimeType.includes("image")) {
+            return { output: await this.kimiProvider.extractFromImage(document, checklist), usedPdfVisionFallback: false };
+          }
+          return { output: null, usedPdfVisionFallback: false };
+        } catch {
+          return { output: null, usedPdfVisionFallback: false };
+        }
+      }),
+    );
+    const outputs = attempts.flatMap((attempt) => (attempt.output ? [attempt.output] : []));
+    const consolidated = consolidateSourceOutputs(source, outputs, checklist);
+
+    return {
+      source,
+      values: consolidated.values,
+      conflictedFields: consolidated.conflictedFields,
+      unreadable: outputs.length === 0,
+      usedPdfVisionFallback: attempts.some((attempt) => attempt.usedPdfVisionFallback),
+    };
+  }
 }
 
 async function tryExtractPdfText(buffer: Buffer) {
@@ -96,4 +157,32 @@ function mergeOutputs(outputs: ProviderExtractionOutput[], checklist: Extraction
       return best ?? { fieldId: field.id, value: null, confidence: 0 };
     }),
   };
+}
+
+function consolidateSourceOutputs(
+  source: DocumentSource,
+  outputs: ProviderExtractionOutput[],
+  checklist: ExtractionRequest["checklist"],
+) {
+  const conflictedFields: string[] = [];
+  const values: ExtractedFieldValue[] = checklist.map((field) => {
+    const candidates = outputs
+      .flatMap((output) => output.fields)
+      .filter((candidate) => candidate.fieldId === field.id && candidate.value != null && String(candidate.value).trim());
+    const distinctValues = new Set(
+      candidates.map((candidate) => normalizeValue(String(candidate.value), field.fieldType)),
+    );
+    if (distinctValues.size > 1) conflictedFields.push(field.id);
+    const best = candidates.sort((left, right) => right.confidence - left.confidence)[0];
+
+    return {
+      fieldId: field.id,
+      source,
+      value: best?.value ?? null,
+      confidence: best?.confidence ?? 0,
+      sourceLocation: best?.sourceLocation,
+    };
+  });
+
+  return { values, conflictedFields };
 }

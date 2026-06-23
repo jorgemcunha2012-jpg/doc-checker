@@ -16,7 +16,7 @@ const LOW_CONFIDENCE_THRESHOLD = 70;
 export class ValidationEngine {
   run(
     organizationId: string,
-    validationType: ValidationType,
+    validationType: Exclude<ValidationType, "RECONCILIATION">,
     sourceOutput: ProviderExtractionOutput,
     targetOutput: ProviderExtractionOutput,
     usedPdfVisionFallback: boolean,
@@ -112,6 +112,7 @@ export class ValidationEngine {
       NOT_FOUND: "Informação ausente em uma das fontes.",
       NOT_APPLICABLE: "Campo opcional ausente nas duas fontes.",
       REVIEW_REQUIRED: "Extração com confiança abaixo de 70%.",
+      SOURCE_UNREADABLE: "A fonte não pôde ser interpretada.",
     };
 
     return observations[status];

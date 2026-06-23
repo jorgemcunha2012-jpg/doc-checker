@@ -19,7 +19,7 @@ export class KimiProvider implements DocumentExtractionProvider {
       {
         role: "system",
         content:
-          "Você extrai dados documentais imobiliários de imagens. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"value\":string|null,\"confidence\":number}]}. Campos ausentes devem retornar value null e confidence 0.",
+          "Você extrai dados documentais imobiliários de imagens. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"value\":string|null,\"confidence\":number,\"sourceLocation\":{\"page\":number|null,\"section\":string|null,\"rawText\":string|null}}]}. rawText deve conter somente o pequeno trecho que evidencia o valor, nunca a página inteira. Campos ausentes devem retornar value null, confidence 0 e sourceLocation omitido.",
       },
       {
         role: "user",
@@ -42,7 +42,7 @@ export class KimiProvider implements DocumentExtractionProvider {
       {
         role: "system",
         content:
-          "Você extrai dados de PDFs escaneados recebidos como arquivo visual/base64. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"value\":string|null,\"confidence\":number}]}.",
+          "Você extrai dados de PDFs escaneados recebidos como arquivo visual/base64. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"value\":string|null,\"confidence\":number,\"sourceLocation\":{\"page\":number|null,\"section\":string|null,\"rawText\":string|null}}]}. rawText deve ser um trecho curto de evidência.",
       },
       {
         role: "user",

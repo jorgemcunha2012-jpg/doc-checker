@@ -1,5 +1,6 @@
 import { Document, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import type { ValidationRun } from "@/domain/validation";
+import { activeDocumentSources } from "@/domain/validation";
 import { statusCopy, validationTypeCopy } from "@/lib/validation-copy";
 
 const styles = StyleSheet.create({
@@ -17,6 +18,11 @@ const styles = StyleSheet.create({
   value: { width: "24%", paddingRight: 6 },
   status: { width: "17%", paddingRight: 6 },
   confidence: { width: "12%" },
+  reconciliationField: { width: "18%", paddingRight: 5 },
+  reconciliationValue: { width: "17%", paddingRight: 5 },
+  reconciliationStatus: { width: "15%", paddingRight: 5 },
+  reconciliationDiagnostic: { width: "16%" },
+  evidence: { marginTop: 2, color: "#64748B", fontSize: 7 },
 });
 
 export async function renderValidationReport(run: ValidationRun) {
@@ -58,23 +64,57 @@ function ValidationReportDocument({ run }: { run: ValidationRun }) {
           </View>
         </View>
 
-        <View style={[styles.row, styles.head]}>
-          <Text style={styles.field}>Campo</Text>
-          <Text style={styles.value}>Origem</Text>
-          <Text style={styles.value}>Destino</Text>
-          <Text style={styles.status}>Status</Text>
-          <Text style={styles.confidence}>Conf.</Text>
-        </View>
-
-        {run.results.map((result) => (
-          <View key={result.field.id} style={styles.row}>
-            <Text style={styles.field}>{result.field.label}</Text>
-            <Text style={styles.value}>{result.sourceValue}</Text>
-            <Text style={styles.value}>{result.targetValue}</Text>
-            <Text style={styles.status}>{statusCopy[result.status]}</Text>
-            <Text style={styles.confidence}>{Math.min(result.sourceConfidence, result.targetConfidence)}%</Text>
-          </View>
-        ))}
+        {run.validationType === "RECONCILIATION" ? (
+          <>
+            <View style={[styles.row, styles.head]}>
+              <Text style={styles.reconciliationField}>Campo</Text>
+              {activeDocumentSources.map((source) => (
+                <Text key={source} style={styles.reconciliationValue}>{source}</Text>
+              ))}
+              <Text style={styles.reconciliationStatus}>Status</Text>
+              <Text style={styles.reconciliationDiagnostic}>Diagnóstico</Text>
+            </View>
+            {run.results.map((result) => (
+              <View key={result.field.id} style={styles.row} wrap={false}>
+                <Text style={styles.reconciliationField}>{result.field.label}</Text>
+                {activeDocumentSources.map((source) => {
+                  const sourceValue = result.valuesBySource[source];
+                  const evidence = sourceValue?.sourceLocation;
+                  return (
+                    <View key={source} style={styles.reconciliationValue}>
+                      <Text>{sourceValue?.value ?? (sourceValue ? "Não encontrado" : "Não aplicável")}</Text>
+                      {sourceValue ? <Text style={styles.evidence}>{sourceValue.confidence}% confiança</Text> : null}
+                      {evidence?.page ? <Text style={styles.evidence}>Página {evidence.page}</Text> : null}
+                      {evidence?.section ? <Text style={styles.evidence}>{evidence.section}</Text> : null}
+                      {evidence?.rawText ? <Text style={styles.evidence}>“{evidence.rawText}”</Text> : null}
+                    </View>
+                  );
+                })}
+                <Text style={styles.reconciliationStatus}>{statusCopy[result.status]}</Text>
+                <Text style={styles.reconciliationDiagnostic}>{result.observation}</Text>
+              </View>
+            ))}
+          </>
+        ) : (
+          <>
+            <View style={[styles.row, styles.head]}>
+              <Text style={styles.field}>Campo</Text>
+              <Text style={styles.value}>Origem</Text>
+              <Text style={styles.value}>Destino</Text>
+              <Text style={styles.status}>Status</Text>
+              <Text style={styles.confidence}>Conf.</Text>
+            </View>
+            {run.results.map((result) => (
+              <View key={result.field.id} style={styles.row}>
+                <Text style={styles.field}>{result.field.label}</Text>
+                <Text style={styles.value}>{result.sourceValue}</Text>
+                <Text style={styles.value}>{result.targetValue}</Text>
+                <Text style={styles.status}>{statusCopy[result.status]}</Text>
+                <Text style={styles.confidence}>{Math.min(result.sourceConfidence, result.targetConfidence)}%</Text>
+              </View>
+            ))}
+          </>
+        )}
       </Page>
     </Document>
   );

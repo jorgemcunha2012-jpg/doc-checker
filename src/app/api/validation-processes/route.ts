@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { defaultOrganization } from "@/domain/tenant";
-import type { UploadedDocument, ValidationType } from "@/domain/validation";
+import { activeDocumentSources, type DocumentSource, type UploadedDocument, type ValidationType } from "@/domain/validation";
 import { createValidationProcessAndWait } from "@/services/process/process-validation";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
 
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const validationType = formData.get("validationType");
 
-  if (validationType !== "MINUTA" && validationType !== "ITBI") {
+  if (validationType !== "MINUTA" && validationType !== "ITBI" && validationType !== "RECONCILIATION") {
     return NextResponse.json({ error: "Tipo de validação inválido." }, { status: 400 });
   }
 
@@ -33,8 +33,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Arquivo inválido ou muito grande: ${invalidFile.name}` }, { status: 400 });
   }
 
-  const documents = await Promise.all(files.map((file) => toUploadedDocumentPayload(file, validationType)));
-  const documentValidation = validateComparisonSides(documents);
+  const documentSources = parseDocumentSources(formData.get("documentSources"), files.length);
+  if (validationType === "RECONCILIATION" && !documentSources) {
+    return NextResponse.json({ error: "Informe uma fonte válida para cada documento." }, { status: 400 });
+  }
+
+  const documents = await Promise.all(
+    files.map((file, index) => toUploadedDocumentPayload(file, validationType, documentSources?.[index])),
+  );
+  const documentValidation =
+    validationType === "RECONCILIATION" ? validateReconciliationSources(documents) : validateComparisonSides(documents);
 
   if (documentValidation) {
     return NextResponse.json({ error: documentValidation }, { status: 400 });
@@ -68,7 +76,11 @@ function validateComparisonSides(documents: UploadedDocumentPayload[]) {
   return null;
 }
 
-async function toUploadedDocumentPayload(file: File, validationType: ValidationType): Promise<UploadedDocumentPayload> {
+async function toUploadedDocumentPayload(
+  file: File,
+  validationType: ValidationType,
+  source?: DocumentSource,
+): Promise<UploadedDocumentPayload> {
   const arrayBuffer = await file.arrayBuffer();
   const metadata: UploadedDocument = {
     id: crypto.randomUUID(),
@@ -77,12 +89,35 @@ async function toUploadedDocumentPayload(file: File, validationType: ValidationT
     type: resolveDocumentType(file, validationType),
     mimeType: file.type || "application/octet-stream",
     sizeBytes: file.size,
+    source,
   };
 
   return {
     ...metadata,
     buffer: Buffer.from(arrayBuffer),
   };
+}
+
+function parseDocumentSources(value: FormDataEntryValue | null, expectedLength: number) {
+  if (typeof value !== "string") return null;
+  try {
+    const sources = JSON.parse(value) as unknown;
+    if (
+      !Array.isArray(sources) ||
+      sources.length !== expectedLength ||
+      !sources.every((source): source is DocumentSource => activeDocumentSources.includes(source as DocumentSource))
+    ) {
+      return null;
+    }
+    return sources;
+  } catch {
+    return null;
+  }
+}
+
+function validateReconciliationSources(documents: UploadedDocumentPayload[]) {
+  const sources = new Set(documents.map((document) => document.source).filter(Boolean));
+  return sources.size < 2 ? "Envie documentos de pelo menos duas fontes distintas para reconciliar." : null;
 }
 
 function resolveDocumentType(file: File, validationType: ValidationType): UploadedDocument["type"] {

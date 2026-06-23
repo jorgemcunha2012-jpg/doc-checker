@@ -1,4 +1,4 @@
-import type { ChecklistField, FieldType, ValidationType } from "./validation";
+import type { ChecklistField, DocumentSource, FieldType, ValidationType } from "./validation";
 
 function field(
   id: string,
@@ -7,7 +7,7 @@ function field(
   required: boolean,
   validationType: ValidationType,
   fieldType: FieldType,
-  options: Pick<ChecklistField, "scopeCondition" | "allowMultiple"> = {},
+  options: Pick<ChecklistField, "scopeCondition" | "allowMultiple" | "expectedSources"> = {},
 ): ChecklistField {
   return { id, category, label, required, validationType, fieldType, itemType: "COMPARISON", ...options };
 }
@@ -60,9 +60,60 @@ const itbiFields: ChecklistField[] = [
   }),
 ];
 
+const sourceMap: Record<string, DocumentSource[]> = {
+  "contract.number": ["SIOPI", "MINUTA"],
+  "contract.date": ["SIOPI", "MINUTA"],
+  "buyer.name": ["SIOPI", "MINUTA", "ITBI"],
+  "buyer.cpf": ["SIOPI", "MINUTA", "ITBI"],
+  "buyer.rg": ["SIOPI", "MINUTA"],
+  "buyer.maritalStatus": ["SIOPI", "MINUTA"],
+  "buyer.address": ["SIOPI", "MINUTA", "ITBI"],
+  "buyer.email": ["SIOPI", "ITBI"],
+  "buyer.phone": ["SIOPI", "ITBI"],
+  "seller.legalName": ["MINUTA", "ITBI"],
+  "seller.cnpj": ["MINUTA", "ITBI"],
+  "seller.address": ["MINUTA", "ITBI"],
+  "property.development": ["SIOPI", "MINUTA", "ITBI"],
+  "property.registration": ["SIOPI", "MINUTA", "ITBI"],
+  "property.iptu": ["SIOPI", "MINUTA", "ITBI"],
+  "property.address": ["SIOPI", "MINUTA", "ITBI"],
+  "property.unit": ["SIOPI", "MINUTA", "ITBI"],
+  "property.tower": ["SIOPI", "MINUTA", "ITBI"],
+  "property.idealFraction": ["SIOPI", "MINUTA", "ITBI"],
+  "property.areas": ["SIOPI", "MINUTA"],
+  "property.privateArea": ["SIOPI", "MINUTA", "ITBI"],
+  "property.commonArea": ["SIOPI", "MINUTA", "ITBI"],
+  "property.totalArea": ["SIOPI", "MINUTA", "ITBI"],
+  "property.landArea": ["MINUTA", "ITBI"],
+  "financial.downPayment": ["SIOPI", "MINUTA"],
+  "financial.financing": ["SIOPI", "MINUTA", "ITBI"],
+  "financial.financedValue": ["SIOPI", "MINUTA", "ITBI"],
+  "financial.nonFinancedValue": ["SIOPI", "MINUTA", "ITBI"],
+  "financial.fgts": ["SIOPI", "MINUTA"],
+  "financial.subsidy": ["SIOPI", "MINUTA"],
+  "financial.totalValue": ["SIOPI", "MINUTA", "ITBI"],
+  "financial.declaredTotal": ["SIOPI", "MINUTA", "ITBI"],
+  "signature.city": ["SIOPI", "MINUTA"],
+  "fortaleza.guideNumber": ["ITBI"],
+  "fortaleza.assessmentValue": ["ITBI"],
+};
+
+const reconciliationFields: ChecklistField[] = Array.from(
+  new Map(
+    [...minutaFields, ...itbiFields]
+      .filter((item) => item.id !== "financial.financedValue" && item.id !== "financial.declaredTotal")
+      .map((item) => [item.id, item]),
+  ).values(),
+).map((item) => ({
+  ...item,
+  validationType: "RECONCILIATION",
+  expectedSources: sourceMap[item.id] ?? ["SIOPI", "MINUTA", "ITBI"],
+}));
+
 export const checklists: Record<ValidationType, ChecklistField[]> = {
   MINUTA: minutaFields,
   ITBI: itbiFields,
+  RECONCILIATION: reconciliationFields,
 };
 
 export function getChecklist(validationType: ValidationType) {

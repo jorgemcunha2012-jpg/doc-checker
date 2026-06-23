@@ -1,11 +1,16 @@
-export type ValidationType = "MINUTA" | "ITBI";
+export type ValidationType = "MINUTA" | "ITBI" | "RECONCILIATION";
+
+export type DocumentSource = "SIOPI" | "MINUTA" | "ITBI" | "MATRICULA" | "CERTIDAO";
+
+export const activeDocumentSources: DocumentSource[] = ["SIOPI", "MINUTA", "ITBI"];
 
 export type ValidationStatus =
   | "MATCH"
   | "DIVERGENCE"
   | "NOT_FOUND"
   | "NOT_APPLICABLE"
-  | "REVIEW_REQUIRED";
+  | "REVIEW_REQUIRED"
+  | "SOURCE_UNREADABLE";
 
 export type ValidationProcessStatus = "PENDING" | "EXTRACTING" | "COMPARING" | "DONE" | "FAILED";
 
@@ -58,12 +63,24 @@ export type ChecklistField = {
   itemType: ChecklistItemType;
   scopeCondition?: string;
   allowMultiple?: boolean;
+  expectedSources?: DocumentSource[];
 };
 
 export type ExtractedField = {
   fieldId: string;
   value: string | null;
   confidence: number;
+  sourceLocation?: SourceLocation;
+};
+
+export type SourceLocation = {
+  page?: number;
+  section?: string;
+  rawText?: string;
+};
+
+export type ExtractedFieldValue = ExtractedField & {
+  source: DocumentSource;
 };
 
 export type ProviderExtractionOutput = {
@@ -94,6 +111,7 @@ export type UploadedDocument = {
   type: "PRINT" | "IMAGE" | "PDF" | "ITBI_GUIDE" | "CONTRACT" | "COMPLEMENTARY";
   mimeType: string;
   sizeBytes?: number;
+  source?: DocumentSource;
 };
 
 export type ValidationSummary = {
@@ -103,15 +121,52 @@ export type ValidationSummary = {
   reviewRequired: number;
 };
 
-export type ValidationRun = {
+export type LegacyValidationRun = {
   id: string;
   organizationId: string;
-  validationType: ValidationType;
+  validationType: "MINUTA" | "ITBI";
   checklist: ChecklistField[];
   results: ValidationResult[];
   summary: ValidationSummary;
   usedPdfVisionFallback: boolean;
 };
+
+export type ReconciliationStatus = "MATCH" | "DIVERGENCE" | "REVIEW_REQUIRED" | "SOURCE_UNREADABLE";
+
+export type ReconciliationSourceValue = {
+  value: string | null;
+  normalizedValue: string;
+  confidence: number;
+  sourceLocation?: SourceLocation;
+  diffTokens?: string[];
+};
+
+export type FieldComparisonResult = {
+  organizationId: string;
+  field: ChecklistField;
+  valuesBySource: Partial<Record<DocumentSource, ReconciliationSourceValue>>;
+  status: ReconciliationStatus;
+  observation: string;
+};
+
+export type ReconciliationSummary = ValidationSummary & {
+  unreadable: number;
+  missingBySource: Partial<Record<DocumentSource, number>>;
+  unreadableBySource: Partial<Record<DocumentSource, number>>;
+};
+
+export type ReconciliationRun = {
+  id: string;
+  organizationId: string;
+  validationType: "RECONCILIATION";
+  checklist: ChecklistField[];
+  results: FieldComparisonResult[];
+  summary: ReconciliationSummary;
+  usedPdfVisionFallback: boolean;
+  participatingSources: DocumentSource[];
+};
+
+export type ValidationRun = LegacyValidationRun | ReconciliationRun;
 
 export type ValidationProcess = {
   id: string;

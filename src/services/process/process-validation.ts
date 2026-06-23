@@ -4,6 +4,7 @@ import { getChecklist } from "@/domain/checklists";
 import { DocumentExtractionService } from "@/services/extraction/document-extraction-service";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
 import { ValidationEngine } from "@/services/validation/validation-engine";
+import { ReconciliationEngine } from "@/services/validation/reconciliation-engine";
 import { getValidationProcess, saveValidationProcess, updateValidationProcess } from "./validation-process-store";
 
 export function createValidationProcess(validationType: ValidationType, documents: UploadedDocumentPayload[]) {
@@ -44,11 +45,10 @@ async function processValidation(processId: string, validationType: ValidationTy
     updateValidationProcess(processId, { status: "EXTRACTING" });
     const checklist = getChecklist(validationType);
     const extractionService = new DocumentExtractionService();
-    const extraction = await extractionService.extract({ validationType, checklist, documents });
-
-    updateValidationProcess(processId, { status: "COMPARING" });
-    const engine = new ValidationEngine();
-    const result = engine.run(defaultOrganization.id, validationType, extraction.sourceData, extraction.targetData, extraction.usedPdfVisionFallback);
+    const result =
+      validationType === "RECONCILIATION"
+        ? await processReconciliation(processId, extractionService, checklist, documents)
+        : await processLegacyValidation(processId, extractionService, validationType, checklist, documents);
 
     updateValidationProcess(processId, { status: "DONE", result });
   } catch (error) {
@@ -59,6 +59,35 @@ async function processValidation(processId: string, validationType: ValidationTy
   }
 }
 
+async function processLegacyValidation(
+  processId: string,
+  extractionService: DocumentExtractionService,
+  validationType: "MINUTA" | "ITBI",
+  checklist: ReturnType<typeof getChecklist>,
+  documents: UploadedDocumentPayload[],
+) {
+  const extraction = await extractionService.extract({ validationType, checklist, documents });
+  updateValidationProcess(processId, { status: "COMPARING" });
+  const engine = new ValidationEngine();
+  return engine.run(defaultOrganization.id, validationType, extraction.sourceData, extraction.targetData, extraction.usedPdfVisionFallback);
+}
+
+async function processReconciliation(
+  processId: string,
+  extractionService: DocumentExtractionService,
+  checklist: ReturnType<typeof getChecklist>,
+  documents: UploadedDocumentPayload[],
+) {
+  const extraction = await extractionService.extractReconciliation({
+    validationType: "RECONCILIATION",
+    checklist,
+    documents,
+  });
+  updateValidationProcess(processId, { status: "COMPARING" });
+  const engine = new ReconciliationEngine();
+  return engine.run(defaultOrganization.id, extraction);
+}
+
 function stripBuffer(document: UploadedDocumentPayload): UploadedDocument {
   const metadata: UploadedDocument = {
     id: document.id,
@@ -67,6 +96,7 @@ function stripBuffer(document: UploadedDocumentPayload): UploadedDocument {
     type: document.type,
     mimeType: document.mimeType,
     sizeBytes: document.sizeBytes,
+    source: document.source,
   };
 
   return metadata;

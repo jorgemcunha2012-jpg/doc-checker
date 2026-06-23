@@ -19,7 +19,7 @@ export async function extractPdfText(buffer: Buffer) {
       .filter(Boolean)
       .join(" ");
 
-    pages.push(pageText);
+    pages.push(`[PÁGINA ${pageNumber}]\n${pageText}`);
     page.cleanup();
   }
 
