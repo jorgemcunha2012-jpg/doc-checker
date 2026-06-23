@@ -1,6 +1,12 @@
 export const MIN_PDF_TEXT_CHARACTERS = 250;
 
 export async function extractPdfText(buffer: Buffer) {
+  const canvas = await import("@napi-rs/canvas");
+  const pdfGlobals = globalThis as Record<string, unknown>;
+  pdfGlobals.DOMMatrix ??= canvas.DOMMatrix;
+  pdfGlobals.ImageData ??= canvas.ImageData;
+  pdfGlobals.Path2D ??= canvas.Path2D;
+
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const bytes = new Uint8Array(buffer);
   const loadingTask = pdfjs.getDocument({ data: bytes, useWorkerFetch: false });
