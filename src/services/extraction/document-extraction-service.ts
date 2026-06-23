@@ -37,11 +37,37 @@ export class DocumentExtractionService {
     const participatingSources = Array.from(
       new Set(request.documents.map((document) => document.source).filter((source): source is DocumentSource => Boolean(source))),
     );
-    const sourceResults = await Promise.all(
-      participatingSources.map(async (source) => {
-        const documents = request.documents.filter((document) => document.source === source);
-        return this.extractDocumentSource(source, documents, checklist);
-      }),
+    const imageSources = participatingSources.filter((source) =>
+      request.documents
+        .filter((document) => document.source === source)
+        .every((document) => document.mimeType.includes("image")),
+    );
+    const pdfSources = participatingSources.filter((source) => !imageSources.includes(source));
+    const imageResultsPromise = Promise.all(
+      imageSources.map((source) =>
+        this.extractDocumentSource(
+          source,
+          request.documents.filter((document) => document.source === source),
+          checklist,
+        ),
+      ),
+    );
+    const pdfResults = [];
+
+    // DeepSeek may throttle concurrent large-document requests. Keep PDFs ordered
+    // while image OCR continues independently through Kimi.
+    for (const source of pdfSources) {
+      pdfResults.push(
+        await this.extractDocumentSource(
+          source,
+          request.documents.filter((document) => document.source === source),
+          checklist,
+        ),
+      );
+    }
+
+    const sourceResults = [...pdfResults, ...(await imageResultsPromise)].sort(
+      (left, right) => participatingSources.indexOf(left.source) - participatingSources.indexOf(right.source),
     );
 
     return {
