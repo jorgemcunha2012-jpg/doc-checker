@@ -136,7 +136,12 @@ export class DocumentExtractionService {
             return { output: await this.kimiProvider.extractFromImage(document, checklist), usedPdfVisionFallback: false };
           }
           return { output: null, usedPdfVisionFallback: false };
-        } catch {
+        } catch (error) {
+          console.error("[ConferIA] Falha de extração por documento", {
+            source,
+            documentName: document.name,
+            error: error instanceof Error ? error.message : "Erro desconhecido",
+          });
           return { output: null, usedPdfVisionFallback: false };
         }
       }),
