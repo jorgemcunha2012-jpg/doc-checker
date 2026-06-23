@@ -22,10 +22,21 @@ export class DeepSeekProvider implements DocumentExtractionProvider {
       },
       {
         role: "user",
-        content: `Texto bruto:\n${text.slice(0, 120000)}\n\nCampos esperados:\n${checklistPrompt(checklist)}`,
+        content: `Texto bruto:\n${compactDocumentText(text)}\n\nCampos esperados:\n${checklistPrompt(checklist)}`,
       },
     ]);
 
     return coerceExtractionOutput(result, checklist);
   }
+}
+
+function compactDocumentText(text: string) {
+  const maximumCharacters = 60_000;
+  if (text.length <= maximumCharacters) {
+    return text;
+  }
+
+  const headSize = 42_000;
+  const tailSize = maximumCharacters - headSize;
+  return `${text.slice(0, headSize)}\n\n[CONTEÚDO INTERMEDIÁRIO OMITIDO]\n\n${text.slice(-tailSize)}`;
 }

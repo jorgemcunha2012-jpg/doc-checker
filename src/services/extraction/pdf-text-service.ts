@@ -1,13 +1,9 @@
-import path from "node:path";
-
 export const MIN_PDF_TEXT_CHARACTERS = 250;
-
-const standardFontDataUrl = `${path.join(process.cwd(), "node_modules", "pdfjs-dist", "standard_fonts")}${path.sep}`;
 
 export async function extractPdfText(buffer: Buffer) {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const bytes = new Uint8Array(buffer);
-  const loadingTask = pdfjs.getDocument({ data: bytes, standardFontDataUrl, useWorkerFetch: false });
+  const loadingTask = pdfjs.getDocument({ data: bytes, useWorkerFetch: false });
   const document = await loadingTask.promise;
   const pages: string[] = [];
 
