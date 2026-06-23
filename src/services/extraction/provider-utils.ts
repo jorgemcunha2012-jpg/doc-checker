@@ -33,5 +33,6 @@ function clampConfidence(value: unknown) {
     return 0;
   }
 
-  return Math.max(0, Math.min(100, numberValue));
+  const percentValue = numberValue > 0 && numberValue <= 1 ? numberValue * 100 : numberValue;
+  return Math.round(Math.max(0, Math.min(100, percentValue)));
 }

@@ -47,7 +47,7 @@ KIMI_MODEL=kimi-k2.6
 
 DEEPSEEK_API_KEY=
 DEEPSEEK_API_BASE_URL=
-DEEPSEEK_MODEL=deepseek-v4
+DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
 Sem essas chaves, o processo real de extração falhará de forma explícita na tela.

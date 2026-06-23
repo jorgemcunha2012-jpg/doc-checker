@@ -48,13 +48,13 @@ export class DocumentExtractionService {
 
     for (const document of documents) {
       if (document.mimeType.includes("pdf") || document.name.toLowerCase().endsWith(".pdf")) {
-        const text = await extractPdfText(document.buffer);
+        const text = await tryExtractPdfText(document.buffer);
 
         if (hasEnoughPdfText(text)) {
           outputs.push(await this.deepSeekProvider.structureText(text, checklist));
         } else {
           usedPdfVisionFallback = true;
-          outputs.push(await this.kimiProvider.extractFromPdfFallback(document, checklist));
+          outputs.push(emptyOutput(checklist));
         }
       } else if (document.mimeType.includes("image")) {
         outputs.push(await this.kimiProvider.extractFromImage(document, checklist));
@@ -62,6 +62,14 @@ export class DocumentExtractionService {
     }
 
     return { data: mergeOutputs(outputs, checklist), usedPdfVisionFallback };
+  }
+}
+
+async function tryExtractPdfText(buffer: Buffer) {
+  try {
+    return await extractPdfText(buffer);
+  } catch {
+    return "";
   }
 }
 

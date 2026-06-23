@@ -58,11 +58,33 @@ export function ConferiaWorkspace() {
 
     const interval = window.setInterval(async () => {
       const response = await fetch(`/api/validation-processes/${processId}`);
-      const nextProcess = (await response.json()) as ValidationProcess;
+      const nextProcess = await readJsonSafely<ValidationProcess & { error?: string }>(response);
+
+      if (!response.ok) {
+        setProcess((current) =>
+          current
+            ? {
+                ...current,
+                status: "FAILED",
+                error: nextProcess?.error ?? "Falha ao consultar o processo.",
+                updatedAt: new Date().toISOString(),
+              }
+            : null,
+        );
+        window.clearInterval(interval);
+        return;
+      }
+
+      if (!nextProcess) {
+        window.clearInterval(interval);
+        return;
+      }
+
       setProcess(nextProcess);
 
       if (nextProcess.status === "DONE") {
         setRun(nextProcess.result ?? null);
+        setProcessId(null);
         window.clearInterval(interval);
       }
 
@@ -100,10 +122,10 @@ export function ConferiaWorkspace() {
       method: "POST",
       body: formData,
     });
-    const payload = (await response.json()) as { processId?: string; process?: ValidationProcess; error?: string };
+    const payload = await readJsonSafely<{ processId?: string; process?: ValidationProcess; error?: string }>(response);
     setIsSubmitting(false);
 
-    if (!response.ok || !payload.processId) {
+    if (!response.ok || !payload?.processId) {
       setProcess({
         id: "local_error",
         organizationId: defaultOrganization.id,
@@ -111,7 +133,7 @@ export function ConferiaWorkspace() {
         validationType,
         status: "FAILED",
         documents,
-        error: payload.error ?? "Falha ao iniciar processo.",
+        error: payload?.error ?? "Falha ao iniciar processo.",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -124,7 +146,7 @@ export function ConferiaWorkspace() {
 
     if (payload.process?.status === "DONE") {
       setRun(payload.process.result ?? null);
-      setProcessId(payload.processId);
+      setProcessId(null);
       return;
     }
 
@@ -295,15 +317,13 @@ export function ConferiaWorkspace() {
                 <SummaryCard label="Total de divergências" value={run.summary.divergences} tone="danger" />
                 <SummaryCard label="Total pendente de revisão" value={run.summary.reviewRequired} tone="warning" />
               </div>
-              {processId ? (
-                <button
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                  onClick={handleExportReport}
-                >
-                  <Download className="h-4 w-4" />
-                  Exportar relatório
-                </button>
-              ) : null}
+              <button
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                onClick={handleExportReport}
+              >
+                <Download className="h-4 w-4" />
+                Exportar relatório
+              </button>
               <ResultsTable results={run.results} />
             </>
           ) : (
@@ -319,6 +339,14 @@ export function ConferiaWorkspace() {
       </div>
     </main>
   );
+}
+
+async function readJsonSafely<T>(response: Response): Promise<T | null> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
 }
 
 function SummaryCard({ label, value, tone }: { label: string; value: number; tone: "neutral" | "danger" | "warning" }) {

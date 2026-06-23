@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { defaultOrganization } from "@/domain/tenant";
 import type { UploadedDocument, ValidationType } from "@/domain/validation";
-import { createValidationProcess, createValidationProcessAndWait } from "@/services/process/process-validation";
+import { createValidationProcessAndWait } from "@/services/process/process-validation";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
@@ -40,10 +40,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: documentValidation }, { status: 400 });
   }
 
-  const validationProcess =
-    process.env.VERCEL === "1"
-      ? await createValidationProcessAndWait(validationType, documents)
-      : createValidationProcess(validationType, documents);
+  const validationProcess = await createValidationProcessAndWait(validationType, documents);
 
   return NextResponse.json({
     processId: validationProcess.id,
