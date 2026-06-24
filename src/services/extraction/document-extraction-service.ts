@@ -74,6 +74,9 @@ export class DocumentExtractionService {
       values: sourceResults.flatMap((result) => result.values),
       participatingSources,
       unreadableSources: sourceResults.filter((result) => result.unreadable).map((result) => result.source),
+      sourceErrors: Object.fromEntries(
+        sourceResults.filter((result) => result.error).map((result) => [result.source, result.error]),
+      ),
       conflictedFieldsBySource: Object.fromEntries(
         sourceResults.filter((result) => result.conflictedFields.length).map((result) => [result.source, result.conflictedFields]),
       ),
@@ -135,14 +138,15 @@ export class DocumentExtractionService {
           if (document.mimeType.includes("image")) {
             return { output: await this.kimiProvider.extractFromImage(document, checklist), usedPdfVisionFallback: false };
           }
-          return { output: null, usedPdfVisionFallback: false };
+          return { output: null, usedPdfVisionFallback: false, error: "Formato de arquivo não suportado." };
         } catch (error) {
+          const errorMessage = sanitizeExtractionError(error);
           console.error("[ConferIA] Falha de extração por documento", {
             source,
             documentName: document.name,
-            error: error instanceof Error ? error.message : "Erro desconhecido",
+            error: errorMessage,
           });
-          return { output: null, usedPdfVisionFallback: false };
+          return { output: null, usedPdfVisionFallback: false, error: errorMessage };
         }
       }),
     );
@@ -154,9 +158,18 @@ export class DocumentExtractionService {
       values: consolidated.values,
       conflictedFields: consolidated.conflictedFields,
       unreadable: outputs.length === 0,
+      error: attempts.find((attempt) => attempt.error)?.error,
       usedPdfVisionFallback: attempts.some((attempt) => attempt.usedPdfVisionFallback),
     };
   }
+}
+
+function sanitizeExtractionError(error: unknown) {
+  const message = error instanceof Error ? error.message : "Erro desconhecido";
+  return message
+    .replace(/Bearer\s+\S+/gi, "Bearer [oculto]")
+    .replace(/sk-[A-Za-z0-9_-]+/g, "[chave oculta]")
+    .slice(0, 500);
 }
 
 async function tryExtractPdfText(buffer: Buffer) {

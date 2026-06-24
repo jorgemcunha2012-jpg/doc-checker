@@ -17,6 +17,7 @@ export type ReconciliationInput = {
   values: ExtractedFieldValue[];
   participatingSources: DocumentSource[];
   unreadableSources: DocumentSource[];
+  sourceErrors: Partial<Record<DocumentSource, string>>;
   conflictedFieldsBySource: Partial<Record<DocumentSource, string[]>>;
   usedPdfVisionFallback: boolean;
 };
@@ -88,7 +89,16 @@ export class ReconciliationEngine {
 
     const unreadable = expectedParticipants.filter((source) => input.unreadableSources.includes(source));
     if (unreadable.length) {
-      return result(organizationId, field, valuesBySource, "SOURCE_UNREADABLE", `Não foi possível interpretar a fonte ${joinSources(unreadable)}.`);
+      const technicalDetails = unreadable
+        .map((source) => input.sourceErrors[source])
+        .filter(Boolean);
+      return result(
+        organizationId,
+        field,
+        valuesBySource,
+        "SOURCE_UNREADABLE",
+        `Não foi possível interpretar a fonte ${joinSources(unreadable)}.${technicalDetails.length ? ` Motivo: ${technicalDetails.join(" | ")}` : ""}`,
+      );
     }
 
     const conflicts = expectedParticipants.filter((source) => input.conflictedFieldsBySource[source]?.includes(field.id));

@@ -87,6 +87,7 @@ function run(
     participatingSources,
     conflictedFieldsBySource,
     unreadableSources,
+    sourceErrors: {},
     usedPdfVisionFallback: false,
   });
 }

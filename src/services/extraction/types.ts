@@ -29,6 +29,7 @@ export type ReconciliationExtractionResult = {
   values: ExtractedFieldValue[];
   participatingSources: DocumentSource[];
   unreadableSources: DocumentSource[];
+  sourceErrors: Partial<Record<DocumentSource, string>>;
   conflictedFieldsBySource: Partial<Record<DocumentSource, string[]>>;
   usedPdfVisionFallback: boolean;
 };
