@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #eef2f5;
-  --foreground: #17202e;
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
 * {
@@ -34,6 +34,6 @@ label {
 }
 
 ::selection {
-  background: #0f766e;
+  background: #2563eb;
   color: #ffffff;
 }

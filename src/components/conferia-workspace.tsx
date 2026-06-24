@@ -1,26 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, CheckCircle2, Database, Download, FileCheck2, FileSearch, Layers3, Loader2, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
-import type { ValidationProcess, ValidationRun, ValidationType } from "@/domain/validation";
+import { AlertTriangle, Building2, Check, CheckCircle2, Download, FileCheck2, FileSearch, Layers3, Loader2, ScanText, Sparkles, UploadCloud } from "lucide-react";
+import type { ValidationProcess, ValidationRun } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
-import { validationTypeCopy } from "@/lib/validation-copy";
 import { ClientUploadedDocument, FileDropZone } from "./file-drop-zone";
-import { ResultsTable } from "./results-table";
 import { ReconciliationResultsTable } from "./reconciliation-results-table";
 
-const validationTypes: ValidationType[] = ["MINUTA", "ITBI", "RECONCILIATION"];
+const validationType = "RECONCILIATION" as const;
 
 export function ConferiaWorkspace() {
-  const [validationType, setValidationType] = useState<ValidationType>("MINUTA");
   const [documents, setDocuments] = useState<ClientUploadedDocument[]>([]);
   const [processId, setProcessId] = useState<string | null>(null);
   const [process, setProcess] = useState<ValidationProcess | null>(null);
   const [run, setRun] = useState<ValidationRun | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const selectedCopy = validationTypeCopy[validationType];
+  const [processingStartedAt, setProcessingStartedAt] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
     function handlePaste(event: ClipboardEvent) {
@@ -36,7 +33,7 @@ export function ConferiaWorkspace() {
         type: "PRINT",
         mimeType: file.type || "image/png",
         sizeBytes: file.size,
-        source: validationType === "RECONCILIATION" ? "DADOS_RESERVA" : undefined,
+        source: "DADOS_RESERVA",
         file,
       }));
 
@@ -45,14 +42,15 @@ export function ConferiaWorkspace() {
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [validationType]);
+  }, []);
 
   useEffect(() => {
-    setDocuments([]);
-    setProcessId(null);
-    setProcess(null);
-    setRun(null);
-  }, [validationType]);
+    if (!processingStartedAt || !isSubmitting) return;
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - processingStartedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isSubmitting, processingStartedAt]);
 
   useEffect(() => {
     if (!processId) {
@@ -99,33 +97,30 @@ export function ConferiaWorkspace() {
     return () => window.clearInterval(interval);
   }, [processId]);
 
-  const hasDocuments =
-    validationType === "RECONCILIATION"
-      ? new Set(documents.map((document) => document.source).filter(Boolean)).size >= 2
-      : documents.length > 0;
+  const hasDocuments = new Set(documents.map((document) => document.source).filter(Boolean)).size >= 2;
   const isProcessing = isSubmitting || process?.status === "PENDING" || process?.status === "EXTRACTING" || process?.status === "COMPARING";
 
   const processSteps = useMemo(
     () => [
-      { icon: FileSearch, label: validationType === "RECONCILIATION" ? "Extrair cada fonte" : validationType === "MINUTA" ? "Extrair dados do print" : "Ler guia DTI/ITBI" },
-      { icon: FileCheck2, label: validationType === "RECONCILIATION" ? "Consolidar evidências" : "Extrair dados do contrato" },
-      { icon: Layers3, label: validationType === "RECONCILIATION" ? "Reconciliar todas as fontes" : "Comparar campos e regras" },
-      { icon: CheckCircle2, label: "Gerar resultado auditável" },
+      { icon: FileSearch, label: "Identificando documentos", threshold: 0 },
+      { icon: ScanText, label: "Extraindo dados e evidências", threshold: 10 },
+      { icon: Layers3, label: "Comparando informações", threshold: 55 },
+      { icon: CheckCircle2, label: "Montando o checklist", threshold: 95 },
     ],
-    [validationType],
+    [],
   );
 
   async function handleRunValidation() {
     setIsSubmitting(true);
+    setProcessingStartedAt(Date.now());
+    setElapsedSeconds(0);
     setRun(null);
     setProcess(null);
 
     const formData = new FormData();
     formData.set("validationType", validationType);
     documents.forEach((document) => formData.append("documents", document.file, document.name));
-    if (validationType === "RECONCILIATION") {
-      formData.set("documentSources", JSON.stringify(documents.map((document) => document.source ?? "SIOPI")));
-    }
+    formData.set("documentSources", JSON.stringify(documents.map((document) => document.source ?? "SIOPI")));
 
     const response = await fetch("/api/validation-processes", {
       method: "POST",
@@ -133,6 +128,7 @@ export function ConferiaWorkspace() {
     });
     const payload = await readJsonSafely<{ processId?: string; process?: ValidationProcess; error?: string }>(response);
     setIsSubmitting(false);
+    setProcessingStartedAt(null);
 
     if (!response.ok || !payload?.processId) {
       setProcess({
@@ -193,121 +189,58 @@ export function ConferiaWorkspace() {
 
   return (
     <main className="min-h-screen">
-      <header className="border-b border-slate-800 bg-slate-950 text-white">
+      <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-500 text-slate-950 shadow-sm shadow-teal-950/30">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2563eb] text-white">
               <Building2 className="h-5 w-5" aria-hidden="true" />
             </div>
             <div>
-              <div className="text-lg font-bold tracking-wide">ConferIA</div>
-              <div className="text-xs font-medium text-slate-400">Conferência documental imobiliária</div>
+              <div className="text-lg font-bold text-slate-950">ConferIA</div>
+              <div className="text-xs font-medium text-slate-500">Conferência documental imobiliária</div>
             </div>
           </div>
-          <div className="hidden items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-300 sm:flex">
-            <Database className="h-4 w-4" aria-hidden="true" />
-            SaaS-ready
+          <div className="hidden items-center gap-2 text-xs font-semibold text-slate-500 sm:flex">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            Sistema operacional
           </div>
         </div>
       </header>
 
-      <section className="border-b border-slate-200 bg-[linear-gradient(135deg,#0f172a_0%,#164e63_55%,#7c5b22_100%)] text-white">
-        <div className="mx-auto max-w-7xl px-5 py-7">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-cyan-100">
-                <Sparkles className="h-3.5 w-3.5" />
-                Extração IA/OCR em fluxo auditável
-              </div>
-              <h1 className="mt-4 max-w-3xl text-3xl font-bold text-white sm:text-4xl">Conferência documental imobiliária com checklist inteligente</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">Organize documentos, extraia campos por IA e reconcilie dados críticos entre SIOPI, Minuta e ITBI em um processo rastreável.</p>
-            </div>
-            <div className="grid grid-cols-3 gap-2 rounded-lg border border-white/10 bg-white/10 p-2 backdrop-blur">
-              <MiniMetric label="Fluxos" value="3" />
-              <MiniMetric label="Status" value="6" />
-              <MiniMetric label="IA" value="2" />
-            </div>
+      <section className="border-b border-slate-200 bg-[#f8fafc]">
+        <div className="mx-auto max-w-7xl px-5 py-9 sm:py-12">
+          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase text-[#2563eb]">
+            <Sparkles className="h-4 w-4" />
+            Checklist inteligente com IA
           </div>
+          <h1 className="mt-3 max-w-3xl text-3xl font-bold text-slate-950 sm:text-4xl">Conferência documental imobiliária</h1>
+          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">Envie os documentos do processo. A ConferIA identifica cada fonte, extrai as informações e apresenta tudo o que confere, diverge ou precisa de revisão.</p>
         </div>
       </section>
 
-      <div className="mx-auto grid max-w-7xl gap-6 px-5 py-6 lg:grid-cols-[360px_1fr]">
-        <aside className="space-y-4">
-          <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-xl font-bold text-slate-950">Nova conferência</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500">Selecione o fluxo documental e execute uma análise com extração IA/OCR e checklist configurável.</p>
-
-            <div className="mt-5 space-y-3">
-              {validationTypes.map((type) => {
-                const copy = validationTypeCopy[type];
-                const isSelected = validationType === type;
-
-                return (
-                  <button
-                    key={type}
-                    className={`w-full rounded-lg border p-4 text-left transition ${
-                      isSelected ? "border-teal-700 bg-teal-50 shadow-sm ring-2 ring-teal-700/10" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                    }`}
-                    onClick={() => setValidationType(type)}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-bold text-slate-950">{copy.title}</span>
-                      <ShieldCheck className={`h-5 w-5 ${isSelected ? "text-teal-700" : "text-slate-400"}`} aria-hidden="true" />
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-slate-500">{copy.description}</p>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-bold text-slate-950">Pipeline modular</h2>
-            <div className="mt-4 space-y-3">
-              {processSteps.map((step) => (
-                <div key={step.label} className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-900 text-cyan-200">
-                    <step.icon className="h-4 w-4" aria-hidden="true" />
-                  </div>
-                  <span className="text-sm font-medium text-slate-700">{step.label}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        </aside>
-
+      <div className="mx-auto max-w-7xl px-5 py-8">
         <section className="space-y-5">
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-sm font-bold uppercase tracking-wide text-teal-700">{selectedCopy.shortTitle}</p>
-                <h2 className="mt-1 text-2xl font-bold text-slate-950">{selectedCopy.title}</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{selectedCopy.description}</p>
+                <h2 className="text-xl font-bold text-slate-950">Nova conferência</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Adicione pelo menos dois documentos. Você poderá revisar a identificação de cada fonte antes de processar.</p>
               </div>
-              <button
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                disabled={!hasDocuments || isProcessing}
-                onClick={handleRunValidation}
-              >
-                {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-                Processar conferência
-              </button>
             </div>
+            <button
+              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-[#2563eb] px-5 py-2 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:bg-slate-300"
+              disabled={!hasDocuments || isProcessing}
+              onClick={handleRunValidation}
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+              Iniciar conferência
+            </button>
           </div>
 
           <FileDropZone validationType={validationType} documents={documents} onDocumentsChange={setDocuments} />
 
-          {process && process.status !== "DONE" ? (
-            <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-3">
-                {process.status === "FAILED" ? <AlertTriangle className="h-5 w-5 text-rose-600" /> : <Loader2 className="h-5 w-5 animate-spin text-teal-700" />}
-                <div>
-                  <div className="text-sm font-bold text-slate-950">Status do processo: {process.status}</div>
-                  {process.error ? <div className="mt-1 text-sm text-rose-700">{process.error}</div> : <div className="mt-1 text-sm text-slate-500">A tela consulta o processo automaticamente a cada 2,5 segundos.</div>}
-                </div>
-              </div>
-            </div>
-          ) : null}
+          {isProcessing ? <ProcessingPanel steps={processSteps} elapsedSeconds={elapsedSeconds} documentCount={documents.length} /> : null}
+          {process?.status === "FAILED" ? <ProcessError message={process.error} /> : null}
 
           {run ? (
             <>
@@ -355,11 +288,7 @@ export function ConferiaWorkspace() {
                 <Download className="h-4 w-4" />
                 Exportar relatório
               </button>
-              {run.validationType === "RECONCILIATION" ? (
-                <ReconciliationResultsTable results={run.results} sources={run.participatingSources} />
-              ) : (
-                <ResultsTable results={run.results} />
-              )}
+              {run.validationType === "RECONCILIATION" ? <ReconciliationResultsTable results={run.results} sources={run.participatingSources} /> : null}
             </>
           ) : (
             <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
@@ -368,9 +297,7 @@ export function ConferiaWorkspace() {
               </span>
               <h2 className="mt-3 text-base font-bold text-slate-950">Checklist aguardando processamento</h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-                {validationType === "RECONCILIATION"
-                  ? "Adicione documentos de ao menos duas fontes distintas para gerar a reconciliação."
-                  : "Adicione os documentos de origem e destino para gerar a tabela de conferência."}
+                Adicione documentos de ao menos duas fontes distintas para gerar a conferência.
               </p>
             </div>
           )}
@@ -404,11 +331,69 @@ function SummaryCard({ label, value, tone }: { label: string; value: number; ton
   );
 }
 
-function MiniMetric({ label, value }: { label: string; value: string }) {
+function ProcessingPanel({
+  steps,
+  elapsedSeconds,
+  documentCount,
+}: {
+  steps: Array<{ icon: typeof FileSearch; label: string; threshold: number }>;
+  elapsedSeconds: number;
+  documentCount: number;
+}) {
+  const activeIndex = Math.min(
+    steps.length - 1,
+    steps.findLastIndex((step) => elapsedSeconds >= step.threshold),
+  );
+  const progress = Math.min(92, 12 + elapsedSeconds * 0.55);
+
   return (
-    <div className="min-w-20 rounded-md bg-white/10 px-3 py-2 text-center">
-      <div className="text-lg font-bold text-white">{value}</div>
-      <div className="text-xs font-semibold text-slate-300">{label}</div>
+    <section className="border border-blue-200 bg-blue-50/50 p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
+            <Loader2 className="h-4 w-4 animate-spin text-[#2563eb]" />
+            Conferência em andamento
+          </div>
+          <p className="mt-1 text-sm text-slate-600">{documentCount} documentos em processamento · {formatElapsed(elapsedSeconds)}</p>
+        </div>
+        <span className="text-xs font-semibold text-slate-500">Não feche esta página</span>
+      </div>
+      <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-blue-100">
+        <div className="h-full rounded-full bg-[#2563eb] transition-all duration-1000" style={{ width: `${progress}%` }} />
+      </div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-4">
+        {steps.map((step, index) => {
+          const isComplete = index < activeIndex;
+          const isActive = index === activeIndex;
+          return (
+            <div key={step.label} className="flex items-center gap-2">
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isComplete || isActive ? "bg-[#2563eb] text-white" : "bg-white text-slate-400"}`}>
+                {isComplete ? <Check className="h-4 w-4" /> : <step.icon className={`h-4 w-4 ${isActive ? "animate-pulse" : ""}`} />}
+              </span>
+              <span className={`text-xs font-semibold leading-4 ${isActive ? "text-slate-950" : "text-slate-500"}`}>{step.label}</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-4 text-xs text-slate-500">A etapa exibida é uma estimativa baseada no tempo de processamento. Documentos extensos podem levar alguns minutos.</p>
+    </section>
+  );
+}
+
+function ProcessError({ message }: { message?: string }) {
+  return (
+    <div className="flex items-start gap-3 border border-rose-200 bg-rose-50 p-4">
+      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+      <div>
+        <div className="text-sm font-bold text-rose-950">Não foi possível concluir a conferência</div>
+        <div className="mt-1 text-sm text-rose-700">{message ?? "Tente novamente em alguns instantes."}</div>
+      </div>
     </div>
   );
+}
+
+function formatElapsed(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return minutes ? `${minutes}min ${remainingSeconds}s` : `${remainingSeconds}s`;
 }
