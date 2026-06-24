@@ -141,6 +141,15 @@ export type LegacyValidationRun = {
 };
 
 export type ReconciliationStatus = "MATCH" | "DIVERGENCE" | "REVIEW_REQUIRED" | "SOURCE_UNREADABLE";
+export type HumanReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export type HumanReview = {
+  status: Exclude<HumanReviewStatus, "PENDING">;
+  justification: string;
+  reviewerId: string;
+  reviewerName: string;
+  reviewedAt: string;
+};
 
 export type ReconciliationSourceValue = {
   value: string | null;
@@ -156,6 +165,7 @@ export type FieldComparisonResult = {
   valuesBySource: Partial<Record<DocumentSource, ReconciliationSourceValue>>;
   status: ReconciliationStatus;
   observation: string;
+  humanReview?: HumanReview;
 };
 
 export type ReconciliationSummary = ValidationSummary & {

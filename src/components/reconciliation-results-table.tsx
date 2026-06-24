@@ -1,8 +1,8 @@
 "use client";
 
-import { FileSearch, Search } from "lucide-react";
+import { CheckCircle2, FileSearch, RotateCcw, Search, ShieldCheck, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { documentSourceLabels, type DocumentSource, type FieldComparisonResult, type ReconciliationStatus } from "@/domain/validation";
+import { documentSourceLabels, type DocumentSource, type FieldComparisonResult, type HumanReview, type ReconciliationStatus } from "@/domain/validation";
 import { statusCopy } from "@/lib/validation-copy";
 import { StatusBadge } from "./status-badge";
 
@@ -20,19 +20,23 @@ const filters: Array<{ id: Filter; label: string }> = [
 export function ReconciliationResultsTable({
   results,
   sources,
+  onReview,
 }: {
   results: FieldComparisonResult[];
   sources: DocumentSource[];
+  onReview: (fieldId: string, review?: HumanReview) => void;
 }) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [query, setQuery] = useState("");
+  const [reviewingResult, setReviewingResult] = useState<FieldComparisonResult | null>(null);
 
   const filteredResults = useMemo(
     () =>
       results.filter((result) => {
         const hasMissing = result.observation.includes("não encontrado na fonte");
+        const effectiveStatus = result.humanReview?.status === "APPROVED" ? "MATCH" : result.status;
         const matchesFilter =
-          filter === "ALL" || result.status === filter || (filter === "MISSING" && hasMissing);
+          filter === "ALL" || effectiveStatus === filter || (filter === "MISSING" && hasMissing && !result.humanReview);
         const sourceText = sources
           .map((source) => result.valuesBySource[source]?.value ?? "")
           .join(" ");
@@ -78,7 +82,7 @@ export function ReconciliationResultsTable({
                 <th key={source} className="px-4 py-3 font-semibold">{documentSourceLabels[source]}</th>
               ))}
               <th className="px-4 py-3 font-semibold">Status</th>
-              <th className="px-4 py-3 font-semibold">Diagnóstico</th>
+              <th className="px-4 py-3 font-semibold">Diagnóstico e revisão</th>
             </tr>
           </thead>
           <tbody>
@@ -94,18 +98,132 @@ export function ReconciliationResultsTable({
                   </td>
                 ))}
                 <td className="px-4 py-4">
-                  <StatusBadge status={result.status} />
+                  {result.humanReview?.status === "APPROVED" ? (
+                    <div>
+                      <span className="inline-flex min-w-32 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+                        Conferido
+                      </span>
+                      <div className="mt-1 text-[11px] text-slate-400">Automático: {statusCopy[result.status]}</div>
+                    </div>
+                  ) : (
+                    <StatusBadge status={result.status} />
+                  )}
                 </td>
-                <td className={`max-w-72 px-4 py-4 text-xs leading-5 ${result.status === "DIVERGENCE" ? "font-semibold text-rose-700" : "text-slate-600"}`}>
-                  {result.observation}
+                <td className="max-w-80 px-4 py-4">
+                  <div className={`text-xs leading-5 ${result.status === "DIVERGENCE" ? "font-semibold text-rose-700" : "text-slate-600"}`}>
+                    {result.observation}
+                  </div>
+                  {result.humanReview ? (
+                    <div className="mt-3 border-l-2 border-emerald-500 pl-3">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Validado manualmente
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-slate-600">{result.humanReview.justification}</p>
+                      <div className="mt-1 text-[11px] text-slate-400">
+                        {result.humanReview.reviewerName} · {formatReviewDate(result.humanReview.reviewedAt)}
+                      </div>
+                      <button
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900"
+                        onClick={() => onReview(result.field.id)}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Desfazer
+                      </button>
+                    </div>
+                  ) : result.status !== "MATCH" ? (
+                    <button
+                      className="mt-3 inline-flex min-h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700"
+                      onClick={() => setReviewingResult(result)}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Validar item
+                    </button>
+                  ) : null}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {reviewingResult ? (
+        <ReviewDialog
+          result={reviewingResult}
+          onClose={() => setReviewingResult(null)}
+          onConfirm={(review) => {
+            onReview(reviewingResult.field.id, review);
+            setReviewingResult(null);
+          }}
+        />
+      ) : null}
     </section>
   );
+}
+
+function ReviewDialog({
+  result,
+  onClose,
+  onConfirm,
+}: {
+  result: FieldComparisonResult;
+  onClose: () => void;
+  onConfirm: (review: HumanReview) => void;
+}) {
+  const [justification, setJustification] = useState("");
+  const canConfirm = justification.trim().length >= 5;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4" role="dialog" aria-modal="true" aria-labelledby="review-title">
+      <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
+        <div className="flex items-start justify-between border-b border-slate-200 p-5">
+          <div>
+            <h2 id="review-title" className="text-lg font-bold text-slate-950">Validar “{result.field.label}”</h2>
+            <p className="mt-1 text-sm text-slate-500">A divergência automática continuará registrada no histórico.</p>
+          </div>
+          <button className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={onClose} title="Fechar">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="p-5">
+          <div className="rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">{result.observation}</div>
+          <label className="mt-4 block text-sm font-bold text-slate-800" htmlFor="review-justification">Justificativa</label>
+          <textarea
+            id="review-justification"
+            className="mt-2 min-h-28 w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-blue-100"
+            placeholder="Ex.: diferença de formatação conferida no documento original."
+            value={justification}
+            onChange={(event) => setJustification(event.target.value)}
+          />
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-200 p-4">
+          <button className="min-h-10 rounded-md px-4 text-sm font-bold text-slate-600 hover:bg-slate-100" onClick={onClose}>Cancelar</button>
+          <button
+            className="inline-flex min-h-10 items-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            disabled={!canConfirm}
+            onClick={() =>
+              onConfirm({
+                status: "APPROVED",
+                justification: justification.trim(),
+                reviewerId: "usr_conferia_analista",
+                reviewerName: "Analista ConferIA",
+                reviewedAt: new Date().toISOString(),
+              })
+            }
+          >
+            <ShieldCheck className="h-4 w-4" />
+            Confirmar validação
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatReviewDate(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function SourceValueCell({ source, result }: { source: DocumentSource; result: FieldComparisonResult }) {

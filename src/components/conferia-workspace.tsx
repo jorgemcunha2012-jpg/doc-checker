@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, Check, CheckCircle2, Download, FileCheck2, FileSearch, Layers3, Loader2, ScanText, Sparkles, UploadCloud } from "lucide-react";
-import type { ValidationProcess, ValidationRun } from "@/domain/validation";
+import { AlertTriangle, Building2, Check, CheckCircle2, Download, FileCheck2, FileSearch, Layers3, Loader2, ScanText, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
+import type { HumanReview, ReconciliationRun, ValidationProcess, ValidationRun } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
 import { ClientUploadedDocument, FileDropZone } from "./file-drop-zone";
@@ -18,6 +18,27 @@ export function ConferiaWorkspace() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [processingStartedAt, setProcessingStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!run || run.validationType !== "RECONCILIATION") return;
+    const saved = window.localStorage.getItem(reviewStorageKey(run.id));
+    if (!saved) return;
+
+    try {
+      const reviews = JSON.parse(saved) as Record<string, HumanReview>;
+      setRun({
+        ...run,
+        results: run.results.map((result) => ({
+          ...result,
+          humanReview: reviews[result.field.id],
+        })),
+      });
+    } catch {
+      window.localStorage.removeItem(reviewStorageKey(run.id));
+    }
+    // Reviews are hydrated once when a new run arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run?.id]);
 
   useEffect(() => {
     function handlePaste(event: ClipboardEvent) {
@@ -187,6 +208,27 @@ export function ConferiaWorkspace() {
     URL.revokeObjectURL(url);
   }
 
+  function handleReview(fieldId: string, review?: HumanReview) {
+    setRun((current) => {
+      if (!current || current.validationType !== "RECONCILIATION") return current;
+      const next: ReconciliationRun = {
+        ...current,
+        results: current.results.map((result) =>
+          result.field.id === fieldId
+            ? { ...result, humanReview: review }
+            : result,
+        ),
+      };
+      const reviews = Object.fromEntries(
+        next.results
+          .filter((result) => result.humanReview)
+          .map((result) => [result.field.id, result.humanReview]),
+      );
+      window.localStorage.setItem(reviewStorageKey(next.id), JSON.stringify(reviews));
+      return next;
+    });
+  }
+
   return (
     <main className="min-h-screen">
       <header className="border-b border-slate-200 bg-white">
@@ -244,6 +286,7 @@ export function ConferiaWorkspace() {
 
           {run ? (
             <>
+              {run.validationType === "RECONCILIATION" ? <ReviewProgress run={run} /> : null}
               {run.usedPdfVisionFallback ? (
                 <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -262,9 +305,9 @@ export function ConferiaWorkspace() {
 
               <div className={`grid gap-3 ${run.validationType === "RECONCILIATION" ? "md:grid-cols-5" : "md:grid-cols-4"}`}>
                 <SummaryCard label="Total de campos conferidos" value={run.summary.totalChecked} tone="neutral" />
-                <SummaryCard label="Campos que bateram" value={run.summary.matches ?? run.results.filter((result) => result.status === "MATCH").length} tone="success" />
-                <SummaryCard label="Total de divergências" value={run.summary.divergences} tone="danger" />
-                <SummaryCard label="Total pendente de revisão" value={run.summary.reviewRequired} tone="warning" />
+                <SummaryCard label="Campos conferidos" value={finalResultCounts(run).checked} tone="success" />
+                <SummaryCard label="Divergências pendentes" value={finalResultCounts(run).divergences} tone="danger" />
+                <SummaryCard label="Revisões pendentes" value={finalResultCounts(run).reviews} tone="warning" />
                 {run.validationType === "RECONCILIATION" ? (
                   <SummaryCard label="Campos em fonte ilegível" value={run.summary.unreadable} tone="warning" />
                 ) : null}
@@ -288,7 +331,13 @@ export function ConferiaWorkspace() {
                 <Download className="h-4 w-4" />
                 Exportar relatório
               </button>
-              {run.validationType === "RECONCILIATION" ? <ReconciliationResultsTable results={run.results} sources={run.participatingSources} /> : null}
+              {run.validationType === "RECONCILIATION" ? (
+                <ReconciliationResultsTable
+                  results={run.results}
+                  sources={run.participatingSources}
+                  onReview={handleReview}
+                />
+              ) : null}
             </>
           ) : (
             <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
@@ -328,6 +377,43 @@ function SummaryCard({ label, value, tone }: { label: string; value: number; ton
       <div className={`inline-flex h-9 min-w-12 items-center justify-center rounded-md px-3 text-lg font-bold ${toneClasses[tone]}`}>{value}</div>
       <div className="mt-3 text-sm font-semibold text-slate-700">{label}</div>
     </div>
+  );
+}
+
+function ReviewProgress({ run }: { run: ReconciliationRun }) {
+  const pendingResults = run.results.filter((result) => result.status !== "MATCH");
+  const reviewed = pendingResults.filter((result) => result.humanReview?.status === "APPROVED").length;
+  const unresolved = pendingResults.length - reviewed;
+  const finalChecked = run.summary.matches + reviewed;
+  const progress = run.summary.totalChecked
+    ? Math.round((finalChecked / run.summary.totalChecked) * 100)
+    : 0;
+
+  return (
+    <section className={`border p-5 ${unresolved === 0 ? "border-emerald-200 bg-emerald-50/60" : "border-slate-200 bg-white"}`}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className={`h-5 w-5 ${unresolved === 0 ? "text-emerald-600" : "text-[#2563eb]"}`} />
+            <h2 className="text-sm font-bold text-slate-950">
+              {unresolved === 0 ? "Processo totalmente conferido" : "Revisão humana do processo"}
+            </h2>
+          </div>
+          <p className="mt-1 text-sm text-slate-600">
+            {unresolved === 0
+              ? "Todos os campos foram conferidos automaticamente ou validados por um analista."
+              : `${reviewed} itens validados manualmente · ${unresolved} pendências restantes`}
+          </p>
+        </div>
+        <div className="text-left sm:text-right">
+          <div className="text-2xl font-bold text-slate-950">{progress}%</div>
+          <div className="text-xs font-semibold text-slate-500">conferido</div>
+        </div>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200">
+        <div className={`h-full rounded-full ${unresolved === 0 ? "bg-emerald-500" : "bg-[#2563eb]"}`} style={{ width: `${progress}%` }} />
+      </div>
+    </section>
   );
 }
 
@@ -396,4 +482,28 @@ function formatElapsed(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
   return minutes ? `${minutes}min ${remainingSeconds}s` : `${remainingSeconds}s`;
+}
+
+function reviewStorageKey(runId: string) {
+  return `conferia:reviews:${runId}`;
+}
+
+function finalResultCounts(run: ValidationRun) {
+  if (run.validationType !== "RECONCILIATION") {
+    return {
+      checked: run.summary.matches,
+      divergences: run.summary.divergences,
+      reviews: run.summary.reviewRequired,
+    };
+  }
+
+  return run.results.reduce(
+    (counts, result) => {
+      if (result.status === "MATCH" || result.humanReview?.status === "APPROVED") counts.checked += 1;
+      else if (result.status === "DIVERGENCE") counts.divergences += 1;
+      else counts.reviews += 1;
+      return counts;
+    },
+    { checked: 0, divergences: 0, reviews: 0 },
+  );
 }

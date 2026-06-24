@@ -31,6 +31,10 @@ export async function renderValidationReport(run: ValidationRun) {
 
 function ValidationReportDocument({ run }: { run: ValidationRun }) {
   const matches = run.summary.matches ?? run.results.filter((result) => result.status === "MATCH").length;
+  const manuallyApproved =
+    run.validationType === "RECONCILIATION"
+      ? run.results.filter((result) => result.humanReview?.status === "APPROVED").length
+      : 0;
 
   return (
     <Document>
@@ -51,8 +55,8 @@ function ValidationReportDocument({ run }: { run: ValidationRun }) {
             <Text>Total de campos conferidos</Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{matches}</Text>
-            <Text>Campos que bateram</Text>
+            <Text style={styles.summaryValue}>{matches + manuallyApproved}</Text>
+            <Text>Conferidos no resultado final</Text>
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryValue}>{run.summary.divergences}</Text>
@@ -91,7 +95,15 @@ function ValidationReportDocument({ run }: { run: ValidationRun }) {
                   );
                 })}
                 <Text style={styles.reconciliationStatus}>{statusCopy[result.status]}</Text>
-                <Text style={styles.reconciliationDiagnostic}>{result.observation}</Text>
+                <View style={styles.reconciliationDiagnostic}>
+                  <Text>{result.observation}</Text>
+                  {result.humanReview ? (
+                    <>
+                      <Text style={styles.evidence}>Validado manualmente por {result.humanReview.reviewerName}</Text>
+                      <Text style={styles.evidence}>{result.humanReview.justification}</Text>
+                    </>
+                  ) : null}
+                </View>
               </View>
             ))}
           </>
