@@ -1,7 +1,7 @@
 "use client";
 
 import { FileText, ImageIcon, Paperclip, Clipboard, X } from "lucide-react";
-import { activeDocumentSources, type DocumentSource, type UploadedDocument, type ValidationType } from "@/domain/validation";
+import { activeDocumentSources, documentSourceLabels, type DocumentSource, type UploadedDocument, type ValidationType } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
 
 export type ClientUploadedDocument = UploadedDocument & {
@@ -17,7 +17,7 @@ type FileDropZoneProps = {
 const acceptedCopy: Record<ValidationType, string> = {
   MINUTA: "Print, JPG, PNG ou PDF do contrato",
   ITBI: "Guia DTI/ITBI, contrato e complementares",
-  RECONCILIATION: "Documentos do SIOPI, Minuta e ITBI; confirme a fonte de cada arquivo",
+  RECONCILIATION: "Envie os documentos; a fonte será identificada automaticamente e poderá ser corrigida",
 };
 
 export function FileDropZone({ validationType, documents, onDocumentsChange }: FileDropZoneProps) {
@@ -33,7 +33,7 @@ export function FileDropZone({ validationType, documents, onDocumentsChange }: F
       type: resolveDocumentType(file, validationType),
       mimeType: file.type || "application/octet-stream",
       sizeBytes: file.size,
-      source: validationType === "RECONCILIATION" ? inferDocumentSource(file.name) : undefined,
+      source: validationType === "RECONCILIATION" ? inferDocumentSource(file) : undefined,
       file,
     }));
 
@@ -96,7 +96,7 @@ export function FileDropZone({ validationType, documents, onDocumentsChange }: F
                 >
                   {activeDocumentSources.map((source) => (
                     <option key={source} value={source}>
-                      {source}
+                      {documentSourceLabels[source]}
                     </option>
                   ))}
                 </select>
@@ -129,8 +129,10 @@ function resolveDocumentType(file: File, validationType: ValidationType): Upload
   return validationType === "ITBI" ? "COMPLEMENTARY" : "CONTRACT";
 }
 
-function inferDocumentSource(name: string): DocumentSource {
-  if (/itbi|dti|guia/i.test(name)) return "ITBI";
-  if (/minuta|contrato|instrumento/i.test(name)) return "MINUTA";
+function inferDocumentSource(file: File): DocumentSource {
+  if (/itbi|dti|guia/i.test(file.name)) return "ITBI";
+  if (/minuta|contrato|instrumento/i.test(file.name)) return "MINUTA";
+  if (/siopi|espelho.*proposta|concess[aã]o/i.test(file.name)) return "SIOPI";
+  if (/reserva|outlook/i.test(file.name) || file.type.includes("image")) return "DADOS_RESERVA";
   return "SIOPI";
 }

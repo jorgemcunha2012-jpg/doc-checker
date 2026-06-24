@@ -2,7 +2,7 @@
 
 import { FileSearch, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { activeDocumentSources, type DocumentSource, type FieldComparisonResult, type ReconciliationStatus } from "@/domain/validation";
+import { documentSourceLabels, type DocumentSource, type FieldComparisonResult, type ReconciliationStatus } from "@/domain/validation";
 import { statusCopy } from "@/lib/validation-copy";
 import { StatusBadge } from "./status-badge";
 
@@ -17,7 +17,13 @@ const filters: Array<{ id: Filter; label: string }> = [
   { id: "SOURCE_UNREADABLE", label: "Ilegíveis" },
 ];
 
-export function ReconciliationResultsTable({ results }: { results: FieldComparisonResult[] }) {
+export function ReconciliationResultsTable({
+  results,
+  sources,
+}: {
+  results: FieldComparisonResult[];
+  sources: DocumentSource[];
+}) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [query, setQuery] = useState("");
 
@@ -27,13 +33,13 @@ export function ReconciliationResultsTable({ results }: { results: FieldComparis
         const hasMissing = result.observation.includes("não encontrado na fonte");
         const matchesFilter =
           filter === "ALL" || result.status === filter || (filter === "MISSING" && hasMissing);
-        const sourceText = activeDocumentSources
+        const sourceText = sources
           .map((source) => result.valuesBySource[source]?.value ?? "")
           .join(" ");
         const text = `${result.field.category} ${result.field.label} ${sourceText} ${statusCopy[result.status]} ${result.observation}`.toLowerCase();
         return matchesFilter && text.includes(query.toLowerCase());
       }),
-    [filter, query, results],
+    [filter, query, results, sources],
   );
 
   return (
@@ -68,8 +74,8 @@ export function ReconciliationResultsTable({ results }: { results: FieldComparis
           <thead>
             <tr className="border-b border-slate-200 bg-slate-900 text-xs uppercase text-slate-200">
               <th className="px-4 py-3 font-semibold">Campo</th>
-              {activeDocumentSources.map((source) => (
-                <th key={source} className="px-4 py-3 font-semibold">{source}</th>
+              {sources.map((source) => (
+                <th key={source} className="px-4 py-3 font-semibold">{documentSourceLabels[source]}</th>
               ))}
               <th className="px-4 py-3 font-semibold">Status</th>
               <th className="px-4 py-3 font-semibold">Diagnóstico</th>
@@ -82,7 +88,7 @@ export function ReconciliationResultsTable({ results }: { results: FieldComparis
                   <div className="font-semibold text-slate-950">{result.field.label}</div>
                   <div className="mt-1 text-xs text-slate-500">{result.field.category}</div>
                 </td>
-                {activeDocumentSources.map((source) => (
+                {sources.map((source) => (
                   <td key={source} className="max-w-64 px-4 py-4 text-slate-700">
                     <SourceValueCell source={source} result={result} />
                   </td>

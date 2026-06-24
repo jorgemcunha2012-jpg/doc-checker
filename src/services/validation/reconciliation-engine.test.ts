@@ -30,7 +30,7 @@ test("identifica a única fonte divergente", () => {
 test("encaminha ausência e baixa confiança para revisão", () => {
   const missing = run([value("buyer.cpf", "SIOPI", "12345678900")], ["SIOPI", "MINUTA"]);
   assert.equal(field(missing, "buyer.cpf").status, "REVIEW_REQUIRED");
-  assert.match(field(missing, "buyer.cpf").observation, /MINUTA/);
+  assert.match(field(missing, "buyer.cpf").observation, /Minuta/);
 
   const lowConfidence = run([
     value("buyer.cpf", "SIOPI", "12345678900", 65),

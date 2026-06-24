@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Building2, CheckCircle2, Database, Download, FileCheck2, FileSearch, Layers3, Loader2, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
 import type { ValidationProcess, ValidationRun, ValidationType } from "@/domain/validation";
+import { documentSourceLabels } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
 import { validationTypeCopy } from "@/lib/validation-copy";
 import { ClientUploadedDocument, FileDropZone } from "./file-drop-zone";
@@ -35,7 +36,7 @@ export function ConferiaWorkspace() {
         type: "PRINT",
         mimeType: file.type || "image/png",
         sizeBytes: file.size,
-        source: validationType === "RECONCILIATION" ? "SIOPI" : undefined,
+        source: validationType === "RECONCILIATION" ? "DADOS_RESERVA" : undefined,
         file,
       }));
 
@@ -339,7 +340,7 @@ export function ConferiaWorkspace() {
                 <div className="grid gap-3 md:grid-cols-3">
                   {run.participatingSources.map((source) => (
                     <div key={source} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="text-xs font-bold uppercase text-slate-500">{source}</div>
+                      <div className="text-xs font-bold uppercase text-slate-500">{documentSourceLabels[source]}</div>
                       <div className="mt-2 text-sm text-slate-700">
                         {run.summary.missingBySource[source] ?? 0} ausentes · {run.summary.unreadableBySource[source] ?? 0} ilegíveis
                       </div>
@@ -355,7 +356,7 @@ export function ConferiaWorkspace() {
                 Exportar relatório
               </button>
               {run.validationType === "RECONCILIATION" ? (
-                <ReconciliationResultsTable results={run.results} />
+                <ReconciliationResultsTable results={run.results} sources={run.participatingSources} />
               ) : (
                 <ResultsTable results={run.results} />
               )}

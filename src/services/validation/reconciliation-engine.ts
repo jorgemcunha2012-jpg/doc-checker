@@ -6,6 +6,7 @@ import type {
   ReconciliationRun,
   ReconciliationSourceValue,
 } from "@/domain/validation";
+import { documentSourceLabels } from "@/domain/validation";
 import { getChecklist } from "@/domain/checklists";
 import { normalizeValue } from "@/services/normalization/normalization-service";
 
@@ -30,7 +31,9 @@ export class ReconciliationEngine {
     const missingBySource = Object.fromEntries(
       input.participatingSources.map((source) => [
         source,
-        results.filter((result) => result.observation.includes(`não encontrado na fonte ${source}`)).length,
+        results.filter((result) =>
+          result.observation.includes(`não encontrado na fonte ${documentSourceLabels[source]}`),
+        ).length,
       ]),
     );
     const unreadableBySource = Object.fromEntries(
@@ -106,7 +109,7 @@ export class ReconciliationEngine {
         field,
         valuesBySource,
         "REVIEW_REQUIRED",
-        missing.map((source) => `Campo não encontrado na fonte ${source}.`).join(" "),
+        missing.map((source) => `Campo não encontrado na fonte ${documentSourceLabels[source]}.`).join(" "),
       );
     }
 
@@ -174,7 +177,7 @@ function buildSourceDiagnostic(groups: Array<{ value: string; sources: DocumentS
   const isolated = groups.find((group) => group.sources.length === 1);
   const majority = groups.find((group) => group.sources.length > 1);
   if (isolated && majority) {
-    return `Valor divergente apenas na fonte ${isolated.sources[0]}. ${joinSources(majority.sources)} apresentam valores equivalentes.`;
+    return `Valor divergente apenas na fonte ${documentSourceLabels[isolated.sources[0]]}. ${joinSources(majority.sources)} apresentam valores equivalentes.`;
   }
   return `Valores divergentes entre as fontes: ${groups.map((group) => joinSources(group.sources)).join("; ")}.`;
 }
@@ -239,5 +242,7 @@ function tokenize(value: string) {
 }
 
 function joinSources(sources: DocumentSource[]) {
-  return new Intl.ListFormat("pt-BR", { style: "long", type: "conjunction" }).format(sources);
+  return new Intl.ListFormat("pt-BR", { style: "long", type: "conjunction" }).format(
+    sources.map((source) => documentSourceLabels[source]),
+  );
 }

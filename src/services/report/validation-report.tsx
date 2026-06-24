@@ -1,6 +1,6 @@
 import { Document, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import type { ValidationRun } from "@/domain/validation";
-import { activeDocumentSources } from "@/domain/validation";
+import { documentSourceLabels } from "@/domain/validation";
 import { statusCopy, validationTypeCopy } from "@/lib/validation-copy";
 
 const styles = StyleSheet.create({
@@ -68,8 +68,8 @@ function ValidationReportDocument({ run }: { run: ValidationRun }) {
           <>
             <View style={[styles.row, styles.head]}>
               <Text style={styles.reconciliationField}>Campo</Text>
-              {activeDocumentSources.map((source) => (
-                <Text key={source} style={styles.reconciliationValue}>{source}</Text>
+              {run.participatingSources.map((source) => (
+                <Text key={source} style={styles.reconciliationValue}>{documentSourceLabels[source]}</Text>
               ))}
               <Text style={styles.reconciliationStatus}>Status</Text>
               <Text style={styles.reconciliationDiagnostic}>Diagnóstico</Text>
@@ -77,7 +77,7 @@ function ValidationReportDocument({ run }: { run: ValidationRun }) {
             {run.results.map((result) => (
               <View key={result.field.id} style={styles.row} wrap={false}>
                 <Text style={styles.reconciliationField}>{result.field.label}</Text>
-                {activeDocumentSources.map((source) => {
+                {run.participatingSources.map((source) => {
                   const sourceValue = result.valuesBySource[source];
                   const evidence = sourceValue?.sourceLocation;
                   return (
