@@ -129,9 +129,13 @@ export class DocumentExtractionService {
         try {
           const isPdf = document.mimeType.includes("pdf") || document.name.toLowerCase().endsWith(".pdf");
           if (isPdf) {
-            const text = await tryExtractPdfText(document.buffer);
+            const text = await extractPdfText(document.buffer);
             if (!hasEnoughPdfText(text)) {
-              return { output: null, usedPdfVisionFallback: true };
+              return {
+                output: null,
+                usedPdfVisionFallback: true,
+                error: "O PDF não possui texto extraível suficiente e o OCR visual ainda não está disponível neste fluxo.",
+              };
             }
             return { output: await this.deepSeekProvider.structureText(text, checklist), usedPdfVisionFallback: false };
           }
