@@ -59,6 +59,47 @@ export class OpenAICompatibleClient {
       throw new Error(`${providerName} não retornou conteúdo estruturado.`);
     }
 
-    return JSON.parse(content) as unknown;
+    return parseJsonResponse(content);
   }
+}
+
+function parseJsonResponse(content: string): unknown {
+  let json = content.trim();
+
+  if (json.startsWith("```")) {
+    json = json
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "")
+      .trim();
+  }
+
+  try {
+    return JSON.parse(json) as unknown;
+  } catch (error) {
+    const candidates = [
+      sliceCompleteJson(json, "{", "}"),
+      sliceCompleteJson(json, "[", "]"),
+    ].filter((candidate): candidate is string => candidate !== null);
+
+    for (const candidate of candidates) {
+      try {
+        return JSON.parse(candidate) as unknown;
+      } catch {
+        // Continue looking for a complete JSON object or array.
+      }
+    }
+
+    throw error;
+  }
+}
+
+function sliceCompleteJson(
+  content: string,
+  opening: "{" | "[",
+  closing: "}" | "]",
+) {
+  const start = content.indexOf(opening);
+  const end = content.lastIndexOf(closing);
+
+  return start >= 0 && end > start ? content.slice(start, end + 1) : null;
 }

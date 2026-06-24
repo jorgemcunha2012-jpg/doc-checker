@@ -7,6 +7,8 @@ export async function extractPdfText(buffer: Buffer) {
   pdfGlobals.ImageData ??= canvas.ImageData;
   pdfGlobals.Path2D ??= canvas.Path2D;
 
+  // Keep the fake worker in Next's server trace for deployments such as Vercel.
+  await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const bytes = new Uint8Array(buffer);
   const loadingTask = pdfjs.getDocument({ data: bytes, useWorkerFetch: false });
