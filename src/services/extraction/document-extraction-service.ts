@@ -52,21 +52,18 @@ export class DocumentExtractionService {
         ),
       ),
     );
-    const pdfResults = [];
-
-    // DeepSeek may throttle concurrent large-document requests. Keep PDFs ordered
-    // while image OCR continues independently through Kimi.
-    for (const source of pdfSources) {
-      pdfResults.push(
-        await this.extractDocumentSource(
+    const pdfResultsPromise = mapWithConcurrency(
+      pdfSources,
+      2,
+      (source) =>
+        this.extractDocumentSource(
           source,
           request.documents.filter((document) => document.source === source),
           checklist,
         ),
-      );
-    }
+    );
 
-    const sourceResults = [...pdfResults, ...(await imageResultsPromise)].sort(
+    const sourceResults = [...(await pdfResultsPromise), ...(await imageResultsPromise)].sort(
       (left, right) => participatingSources.indexOf(left.source) - participatingSources.indexOf(right.source),
     );
 
@@ -124,12 +121,20 @@ export class DocumentExtractionService {
     documents: UploadedDocumentPayload[],
     checklist: ExtractionRequest["checklist"],
   ) {
+    const sourceChecklist = checklist.filter(
+      (field) => !field.expectedSources?.length || field.expectedSources.includes(source),
+    );
     const attempts = await Promise.all(
       documents.map(async (document) => {
+        const startedAt = Date.now();
         try {
           const isPdf = document.mimeType.includes("pdf") || document.name.toLowerCase().endsWith(".pdf");
           if (isPdf) {
-            const text = await extractPdfText(document.buffer);
+            const pageSelection = pdfPageSelectionFor(source);
+            const text = await extractPdfText(
+              document.buffer,
+              pageSelection,
+            );
             if (!hasEnoughPdfText(text)) {
               return {
                 output: null,
@@ -137,10 +142,38 @@ export class DocumentExtractionService {
                 error: "O PDF não possui texto extraível suficiente e o OCR visual ainda não está disponível neste fluxo.",
               };
             }
-            return { output: await this.deepSeekProvider.structureText(text, checklist), usedPdfVisionFallback: false };
+            const output = await this.deepSeekProvider.structureText(
+              text,
+              sourceChecklist,
+            );
+            console.info("[ConferIA] Extração concluída", {
+              source,
+              documentName: document.name,
+              durationMs: Date.now() - startedAt,
+              extractedTextCharacters: text.length,
+              requestedFields: sourceChecklist.length,
+              pageSelection,
+            });
+            return {
+              output,
+              usedPdfVisionFallback: false,
+            };
           }
           if (document.mimeType.includes("image")) {
-            return { output: await this.kimiProvider.extractFromImage(document, checklist), usedPdfVisionFallback: false };
+            const output = await this.kimiProvider.extractFromImage(
+              document,
+              sourceChecklist,
+            );
+            console.info("[ConferIA] Extração concluída", {
+              source,
+              documentName: document.name,
+              durationMs: Date.now() - startedAt,
+              requestedFields: sourceChecklist.length,
+            });
+            return {
+              output,
+              usedPdfVisionFallback: false,
+            };
           }
           return { output: null, usedPdfVisionFallback: false, error: "Formato de arquivo não suportado." };
         } catch (error) {
@@ -166,6 +199,38 @@ export class DocumentExtractionService {
       usedPdfVisionFallback: attempts.some((attempt) => attempt.usedPdfVisionFallback),
     };
   }
+}
+
+function pdfPageSelectionFor(source: DocumentSource) {
+  if (source === "MINUTA") return { headPages: 6, tailPages: 2 };
+  if (source === "SIOPI") return { headPages: 15, tailPages: 1 };
+  if (source === "ITBI") return { headPages: 8, tailPages: 1 };
+  return { headPages: 8, tailPages: 2 };
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>,
+) {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex]);
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(concurrency, items.length) },
+      () => worker(),
+    ),
+  );
+  return results;
 }
 
 function sanitizeExtractionError(error: unknown) {

@@ -1,6 +1,14 @@
 export const MIN_PDF_TEXT_CHARACTERS = 250;
 
-export async function extractPdfText(buffer: Buffer) {
+type PdfTextExtractionOptions = {
+  headPages?: number;
+  tailPages?: number;
+};
+
+export async function extractPdfText(
+  buffer: Buffer,
+  options: PdfTextExtractionOptions = {},
+) {
   const canvas = await import("@napi-rs/canvas");
   const pdfGlobals = globalThis as Record<string, unknown>;
   pdfGlobals.DOMMatrix ??= canvas.DOMMatrix;
@@ -14,8 +22,13 @@ export async function extractPdfText(buffer: Buffer) {
   const loadingTask = pdfjs.getDocument({ data: bytes, useWorkerFetch: false });
   const document = await loadingTask.promise;
   const pages: string[] = [];
+  const pageNumbers = selectPageNumbers(
+    document.numPages,
+    options.headPages,
+    options.tailPages,
+  );
 
-  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+  for (const pageNumber of pageNumbers) {
     const page = await document.getPage(pageNumber);
     const textContent = await page.getTextContent();
     const pageText = textContent.items
@@ -34,4 +47,23 @@ export async function extractPdfText(buffer: Buffer) {
 
 export function hasEnoughPdfText(text: string) {
   return text.replace(/\s+/g, "").length >= MIN_PDF_TEXT_CHARACTERS;
+}
+
+function selectPageNumbers(
+  totalPages: number,
+  headPages?: number,
+  tailPages?: number,
+) {
+  if (!headPages && !tailPages) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const selected = new Set<number>();
+  const headLimit = Math.min(totalPages, Math.max(0, headPages ?? 0));
+  const tailStart = Math.max(1, totalPages - Math.max(0, tailPages ?? 0) + 1);
+
+  for (let page = 1; page <= headLimit; page += 1) selected.add(page);
+  for (let page = tailStart; page <= totalPages; page += 1) selected.add(page);
+
+  return [...selected].sort((left, right) => left - right);
 }

@@ -26,7 +26,10 @@ export type OpenAICompatibleConfig = {
 export class OpenAICompatibleClient {
   constructor(private readonly config: OpenAICompatibleConfig) {}
 
-  async completeJson(messages: ChatMessage[]) {
+  async completeJson(
+    messages: ChatMessage[],
+    options: { timeoutMs?: number } = {},
+  ) {
     const { apiKey, baseUrl, model, providerName } = this.config;
 
     if (!apiKey || !baseUrl || !model) {
@@ -35,6 +38,7 @@ export class OpenAICompatibleClient {
 
     const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
+      signal: AbortSignal.timeout(options.timeoutMs ?? 120_000),
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",

@@ -31,7 +31,7 @@ export class KimiProvider implements DocumentExtractionProvider {
           { type: "image_url", image_url: { url: dataUrl } },
         ],
       },
-    ]);
+    ], { timeoutMs: 120_000 });
 
     return coerceExtractionOutput(result, checklist);
   }
