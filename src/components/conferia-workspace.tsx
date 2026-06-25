@@ -8,6 +8,7 @@ import { defaultOrganization } from "@/domain/tenant";
 import { ClientUploadedDocument, FileDropZone } from "./file-drop-zone";
 import { ReconciliationResultsTable } from "./reconciliation-results-table";
 import { LogoutButton } from "./logout-button";
+import Link from "next/link";
 
 const validationType = "RECONCILIATION" as const;
 const usesPersistentReviews = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -259,9 +260,10 @@ export function ConferiaWorkspace({ currentUser }: { currentUser: User }) {
             </div>
           </div>
           <div className="hidden items-center gap-2 text-xs font-semibold text-slate-500 sm:flex">
-            {currentUser.role === "ADMIN" ? <a href="/admin" className="text-blue-600">Painel administrativo</a> : null}
+            {currentUser.role === "ADMIN" ? <Link href="/admin" className="text-blue-600">Painel administrativo</Link> : null}
             <span className="text-slate-300">|</span>
             {currentUser.name}
+            <Link href="/change-password" className="text-blue-600">Alterar senha</Link>
             <LogoutButton />
           </div>
         </div>
