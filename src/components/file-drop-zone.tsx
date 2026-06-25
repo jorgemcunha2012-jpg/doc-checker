@@ -124,6 +124,8 @@ function inferDocumentSource(file: File): DocumentSource {
   if (/itbi|dti|guia/i.test(file.name)) return "ITBI";
   if (/minuta|contrato|instrumento/i.test(file.name)) return "MINUTA";
   if (/siopi|espelho.*proposta|concess[aã]o/i.test(file.name)) return "SIOPI";
+  if (/matr[ií]cula|registro.*im[oó]vel/i.test(file.name)) return "MATRICULA";
+  if (/certid[aã]o|nascimento|casamento|estado.*civil/i.test(file.name)) return "CERTIDAO";
   if (/reserva|outlook/i.test(file.name) || file.type.includes("image")) return "DADOS_RESERVA";
-  return "SIOPI";
+  return "DOCUMENTO_COMPLEMENTAR";
 }

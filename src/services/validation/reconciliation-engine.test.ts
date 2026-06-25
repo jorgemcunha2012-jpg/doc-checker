@@ -30,7 +30,7 @@ test("identifica a única fonte divergente", () => {
 test("encaminha ausência e baixa confiança para revisão", () => {
   const missing = run([value("buyer.cpf", "SIOPI", "12345678900")], ["SIOPI", "MINUTA"]);
   assert.equal(field(missing, "buyer.cpf").status, "REVIEW_REQUIRED");
-  assert.match(field(missing, "buyer.cpf").observation, /Minuta/);
+  assert.match(field(missing, "buyer.cpf").observation, /apenas na fonte Espelho SIOPI/);
 
   const lowConfidence = run([
     value("buyer.cpf", "SIOPI", "12345678900", 65),
@@ -72,8 +72,20 @@ test("mantém processo utilizável quando uma fonte está ilegível e preserva e
   );
 
   const cpf = field(result, "buyer.cpf");
-  assert.equal(cpf.status, "SOURCE_UNREADABLE");
+  assert.equal(cpf.status, "REVIEW_REQUIRED");
   assert.equal(cpf.valuesBySource.MINUTA?.sourceLocation?.page, 2);
+});
+
+test("compara ITBI com qualquer documento complementar que contenha o mesmo campo", () => {
+  const result = run(
+    [
+      value("buyer.cpf", "ITBI", "123.456.789-00"),
+      value("buyer.cpf", "DOCUMENTO_COMPLEMENTAR", "12345678900"),
+    ],
+    ["ITBI", "DOCUMENTO_COMPLEMENTAR"],
+  );
+
+  assert.equal(field(result, "buyer.cpf").status, "MATCH");
 });
 
 function run(

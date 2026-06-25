@@ -1,8 +1,23 @@
 export type ValidationType = "MINUTA" | "ITBI" | "RECONCILIATION";
 
-export type DocumentSource = "SIOPI" | "MINUTA" | "ITBI" | "DADOS_RESERVA" | "MATRICULA" | "CERTIDAO";
+export type DocumentSource =
+  | "SIOPI"
+  | "MINUTA"
+  | "ITBI"
+  | "DADOS_RESERVA"
+  | "MATRICULA"
+  | "CERTIDAO"
+  | "DOCUMENTO_COMPLEMENTAR";
 
-export const activeDocumentSources: DocumentSource[] = ["SIOPI", "MINUTA", "ITBI", "DADOS_RESERVA"];
+export const activeDocumentSources: DocumentSource[] = [
+  "SIOPI",
+  "MINUTA",
+  "ITBI",
+  "DADOS_RESERVA",
+  "MATRICULA",
+  "CERTIDAO",
+  "DOCUMENTO_COMPLEMENTAR",
+];
 
 export const documentSourceLabels: Record<DocumentSource, string> = {
   SIOPI: "Espelho SIOPI",
@@ -11,6 +26,7 @@ export const documentSourceLabels: Record<DocumentSource, string> = {
   DADOS_RESERVA: "Dados da Reserva",
   MATRICULA: "Matrícula",
   CERTIDAO: "Certidão",
+  DOCUMENTO_COMPLEMENTAR: "Documento complementar",
 };
 
 export type ValidationStatus =

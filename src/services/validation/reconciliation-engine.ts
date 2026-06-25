@@ -26,7 +26,7 @@ export class ReconciliationEngine {
   run(organizationId: string, input: ReconciliationInput): ReconciliationRun {
     const checklist = getChecklist("RECONCILIATION").filter((field) => field.itemType === "COMPARISON");
     const results = checklist
-      .filter((field) => this.hasAtLeastTwoExpectedParticipants(field, input.participatingSources))
+      .filter((field) => this.hasEvidenceForField(field, input))
       .map((field) => this.compareField(organizationId, field, input));
 
     const missingBySource = Object.fromEntries(
@@ -40,7 +40,7 @@ export class ReconciliationEngine {
     const unreadableBySource = Object.fromEntries(
       input.participatingSources.map((source) => [
         source,
-        results.filter((result) => result.status === "SOURCE_UNREADABLE" && fieldExpectsSource(result.field, source)).length,
+        results.filter((result) => result.status === "SOURCE_UNREADABLE" && result.valuesBySource[source]).length,
       ]),
     );
 
@@ -64,8 +64,13 @@ export class ReconciliationEngine {
     };
   }
 
-  private hasAtLeastTwoExpectedParticipants(field: ChecklistField, participatingSources: DocumentSource[]) {
-    return participatingSources.filter((source) => fieldExpectsSource(field, source)).length >= 2;
+  private hasEvidenceForField(field: ChecklistField, input: ReconciliationInput) {
+    return input.values.some(
+      (value) =>
+        value.fieldId === field.id &&
+        value.value != null &&
+        String(value.value).trim().length > 0,
+    );
   }
 
   private compareField(
@@ -73,10 +78,21 @@ export class ReconciliationEngine {
     field: ChecklistField,
     input: ReconciliationInput,
   ): FieldComparisonResult {
-    const expectedParticipants = input.participatingSources.filter((source) => fieldExpectsSource(field, source));
+    const evidenceParticipants = input.participatingSources.filter((source) =>
+      input.values.some((value) => value.fieldId === field.id && value.source === source),
+    );
+    const comparisonParticipants = input.participatingSources.filter((source) =>
+      input.values.some(
+        (value) =>
+          value.fieldId === field.id &&
+          value.source === source &&
+          value.value != null &&
+          String(value.value).trim().length > 0,
+      ),
+    );
     const valuesBySource: Partial<Record<DocumentSource, ReconciliationSourceValue>> = {};
 
-    for (const source of expectedParticipants) {
+    for (const source of evidenceParticipants) {
       const extracted = input.values.find((value) => value.fieldId === field.id && value.source === source);
       const rawValue = extracted?.value == null ? null : String(extracted.value).trim();
       valuesBySource[source] = {
@@ -87,21 +103,7 @@ export class ReconciliationEngine {
       };
     }
 
-    const unreadable = expectedParticipants.filter((source) => input.unreadableSources.includes(source));
-    if (unreadable.length) {
-      const technicalDetails = unreadable
-        .map((source) => input.sourceErrors[source])
-        .filter(Boolean);
-      return result(
-        organizationId,
-        field,
-        valuesBySource,
-        "SOURCE_UNREADABLE",
-        `Não foi possível interpretar a fonte ${joinSources(unreadable)}.${technicalDetails.length ? ` Motivo: ${technicalDetails.join(" | ")}` : ""}`,
-      );
-    }
-
-    const conflicts = expectedParticipants.filter((source) => input.conflictedFieldsBySource[source]?.includes(field.id));
+    const conflicts = comparisonParticipants.filter((source) => input.conflictedFieldsBySource[source]?.includes(field.id));
     if (conflicts.length) {
       return result(
         organizationId,
@@ -112,18 +114,17 @@ export class ReconciliationEngine {
       );
     }
 
-    const missing = expectedParticipants.filter((source) => !valuesBySource[source]?.normalizedValue);
-    if (missing.length) {
+    if (comparisonParticipants.length < 2) {
       return result(
         organizationId,
         field,
         valuesBySource,
         "REVIEW_REQUIRED",
-        missing.map((source) => `Campo não encontrado na fonte ${documentSourceLabels[source]}.`).join(" "),
+        `Campo encontrado apenas na fonte ${joinSources(comparisonParticipants)}. É necessário outro arquivo com o mesmo dado para confirmar.`,
       );
     }
 
-    const lowConfidence = expectedParticipants.filter((source) => (valuesBySource[source]?.confidence ?? 0) < LOW_CONFIDENCE_THRESHOLD);
+    const lowConfidence = comparisonParticipants.filter((source) => (valuesBySource[source]?.confidence ?? 0) < LOW_CONFIDENCE_THRESHOLD);
     if (lowConfidence.length) {
       return result(
         organizationId,
@@ -134,25 +135,25 @@ export class ReconciliationEngine {
       );
     }
 
-    const groups = groupByNormalizedValue(expectedParticipants, valuesBySource);
+    const groups = groupByNormalizedValue(comparisonParticipants, valuesBySource);
     if (groups.length === 1) {
-      const rawValues = expectedParticipants.map((source) => valuesBySource[source]?.value ?? "");
+      const rawValues = comparisonParticipants.map((source) => valuesBySource[source]?.value ?? "");
       const observation = new Set(rawValues).size > 1 ? "Valores equivalentes após normalização." : "Todas as fontes conferem.";
       return result(organizationId, field, valuesBySource, "MATCH", observation);
     }
 
-    if (isTextual(field) && allDifferencesAreSmall(expectedParticipants, valuesBySource)) {
-      addDiffTokens(expectedParticipants, valuesBySource);
+    if (isTextual(field) && allDifferencesAreSmall(comparisonParticipants, valuesBySource)) {
+      addDiffTokens(comparisonParticipants, valuesBySource);
       return result(
         organizationId,
         field,
         valuesBySource,
         "REVIEW_REQUIRED",
-        `Há pequena diferença textual entre ${joinSources(expectedParticipants)}; confirme os valores destacados.`,
+        `Há pequena diferença textual entre ${joinSources(comparisonParticipants)}; confirme os valores destacados.`,
       );
     }
 
-    addDiffTokens(expectedParticipants, valuesBySource);
+    addDiffTokens(comparisonParticipants, valuesBySource);
     return result(organizationId, field, valuesBySource, "DIVERGENCE", buildSourceDiagnostic(groups));
   }
 }
@@ -165,10 +166,6 @@ function result(
   observation: string,
 ): FieldComparisonResult {
   return { organizationId, field, valuesBySource, status, observation };
-}
-
-function fieldExpectsSource(field: ChecklistField, source: DocumentSource) {
-  return field.expectedSources?.includes(source) ?? true;
 }
 
 function groupByNormalizedValue(

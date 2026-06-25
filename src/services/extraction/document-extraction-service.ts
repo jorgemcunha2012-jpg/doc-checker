@@ -121,9 +121,9 @@ export class DocumentExtractionService {
     documents: UploadedDocumentPayload[],
     checklist: ExtractionRequest["checklist"],
   ) {
-    const sourceChecklist = checklist.filter(
-      (field) => !field.expectedSources?.length || field.expectedSources.includes(source),
-    );
+    // Every uploaded document is evidence. Document type guides the prompt and
+    // presentation, but must not prevent a field from being extracted.
+    const sourceChecklist = checklist;
     const attempts = await Promise.all(
       documents.map(async (document) => {
         const startedAt = Date.now();
