@@ -2,7 +2,7 @@
 
 import { CheckCircle2, FileSearch, RotateCcw, Search, ShieldCheck, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { documentSourceLabels, type DocumentSource, type FieldComparisonResult, type HumanReview, type ReconciliationStatus } from "@/domain/validation";
+import { documentSourceLabels, type DocumentSource, type FieldComparisonResult, type HumanReview, type ReconciliationStatus, type User } from "@/domain/validation";
 import { statusCopy } from "@/lib/validation-copy";
 import { StatusBadge } from "./status-badge";
 
@@ -21,10 +21,12 @@ export function ReconciliationResultsTable({
   results,
   sources,
   onReview,
+  reviewer,
 }: {
   results: FieldComparisonResult[];
   sources: DocumentSource[];
   onReview: (fieldId: string, review?: HumanReview) => void;
+  reviewer: User;
 }) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [query, setQuery] = useState("");
@@ -154,6 +156,7 @@ export function ReconciliationResultsTable({
             onReview(reviewingResult.field.id, review);
             setReviewingResult(null);
           }}
+          reviewer={reviewer}
         />
       ) : null}
     </section>
@@ -164,10 +167,12 @@ function ReviewDialog({
   result,
   onClose,
   onConfirm,
+  reviewer,
 }: {
   result: FieldComparisonResult;
   onClose: () => void;
   onConfirm: (review: HumanReview) => void;
+  reviewer: User;
 }) {
   const [justification, setJustification] = useState("");
   const canConfirm = justification.trim().length >= 5;
@@ -204,8 +209,8 @@ function ReviewDialog({
               onConfirm({
                 status: "APPROVED",
                 justification: justification.trim(),
-                reviewerId: "usr_conferia_analista",
-                reviewerName: "Analista ConferIA",
+                reviewerId: reviewer.id,
+                reviewerName: reviewer.name,
                 reviewedAt: new Date().toISOString(),
               })
             }

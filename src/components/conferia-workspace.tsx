@@ -2,15 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Building2, Check, CheckCircle2, Download, FileCheck2, FileSearch, Layers3, Loader2, ScanText, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
-import type { HumanReview, ReconciliationRun, ValidationProcess, ValidationRun } from "@/domain/validation";
+import type { HumanReview, ReconciliationRun, User, ValidationProcess, ValidationRun } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
 import { ClientUploadedDocument, FileDropZone } from "./file-drop-zone";
 import { ReconciliationResultsTable } from "./reconciliation-results-table";
+import { LogoutButton } from "./logout-button";
 
 const validationType = "RECONCILIATION" as const;
+const usesPersistentReviews = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
-export function ConferiaWorkspace() {
+export function ConferiaWorkspace({ currentUser }: { currentUser: User }) {
   const [documents, setDocuments] = useState<ClientUploadedDocument[]>([]);
   const [processId, setProcessId] = useState<string | null>(null);
   const [process, setProcess] = useState<ValidationProcess | null>(null);
@@ -208,7 +210,19 @@ export function ConferiaWorkspace() {
     URL.revokeObjectURL(url);
   }
 
-  function handleReview(fieldId: string, review?: HumanReview) {
+  async function handleReview(fieldId: string, review?: HumanReview) {
+    if (usesPersistentReviews && run?.validationType === "RECONCILIATION") {
+      const url = `/api/processes/${run.id}/review${review ? "" : `?fieldId=${encodeURIComponent(fieldId)}`}`;
+      const response = await fetch(url, {
+        method: review ? "PUT" : "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: review ? JSON.stringify({ fieldId, justification: review.justification }) : undefined,
+      });
+      if (response.ok && review) {
+        const payload = await response.json();
+        review = payload.review;
+      }
+    }
     setRun((current) => {
       if (!current || current.validationType !== "RECONCILIATION") return current;
       const next: ReconciliationRun = {
@@ -224,7 +238,9 @@ export function ConferiaWorkspace() {
           .filter((result) => result.humanReview)
           .map((result) => [result.field.id, result.humanReview]),
       );
-      window.localStorage.setItem(reviewStorageKey(next.id), JSON.stringify(reviews));
+      if (!usesPersistentReviews) {
+        window.localStorage.setItem(reviewStorageKey(next.id), JSON.stringify(reviews));
+      }
       return next;
     });
   }
@@ -243,8 +259,10 @@ export function ConferiaWorkspace() {
             </div>
           </div>
           <div className="hidden items-center gap-2 text-xs font-semibold text-slate-500 sm:flex">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Sistema operacional
+            {currentUser.role === "ADMIN" ? <a href="/admin" className="text-blue-600">Painel administrativo</a> : null}
+            <span className="text-slate-300">|</span>
+            {currentUser.name}
+            <LogoutButton />
           </div>
         </div>
       </header>
@@ -336,6 +354,7 @@ export function ConferiaWorkspace() {
                   results={run.results}
                   sources={run.participatingSources}
                   onReview={handleReview}
+                  reviewer={currentUser}
                 />
               ) : null}
             </>

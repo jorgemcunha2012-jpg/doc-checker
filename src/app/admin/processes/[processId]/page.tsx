@@ -1,0 +1,23 @@
+import { notFound, redirect } from "next/navigation";
+import { AdminProcessDetail } from "@/components/admin-process-detail";
+import { getCurrentUser } from "@/lib/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
+
+export default async function AdminProcessPage({ params }: { params: Promise<{ processId: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (user.role !== "ADMIN") redirect("/");
+  const { processId } = await params;
+  const { data: process } = await createSupabaseAdminClient()
+    .from("validation_processes")
+    .select("id, result, final_status, started_at, completed_at, profiles!validation_processes_user_id_fkey(name), process_documents(name, source, size_bytes)")
+    .eq("id", processId)
+    .eq("organization_id", user.organizationId)
+    .single();
+  if (!process?.result) notFound();
+  const { data: reviews } = await createSupabaseAdminClient().from("human_reviews").select("*").eq("process_id", processId);
+  return <AdminProcessDetail process={{
+    ...process,
+    profiles: Array.isArray(process.profiles) ? process.profiles[0] ?? null : process.profiles,
+  }} reviews={reviews ?? []} currentUser={user} />;
+}

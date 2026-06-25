@@ -6,6 +6,7 @@ import type { UploadedDocumentPayload } from "@/services/extraction/types";
 import { ValidationEngine } from "@/services/validation/validation-engine";
 import { ReconciliationEngine } from "@/services/validation/reconciliation-engine";
 import { getValidationProcess, saveValidationProcess, updateValidationProcess } from "./validation-process-store";
+import { audit, persistDocuments, persistProcess, persistResults } from "./process-repository";
 
 export function createValidationProcess(validationType: ValidationType, documents: UploadedDocumentPayload[]) {
   const process = createBaseValidationProcess(validationType, documents);
@@ -16,22 +17,26 @@ export function createValidationProcess(validationType: ValidationType, document
   return process;
 }
 
-export async function createValidationProcessAndWait(validationType: ValidationType, documents: UploadedDocumentPayload[]) {
-  const process = createBaseValidationProcess(validationType, documents);
+export async function createValidationProcessAndWait(validationType: ValidationType, documents: UploadedDocumentPayload[], user = defaultUser) {
+  const process = createBaseValidationProcess(validationType, documents, user);
 
   saveValidationProcess(process);
+  await Promise.all([persistProcess(process), persistDocuments(process.id, process.documents)]);
+  await audit({ id: user.id, organizationId: user.organizationId }, "PROCESS_CREATED", "validation_process", process.id, {
+    documents: process.documents.map((document) => document.name),
+  });
   await processValidation(process.id, validationType, documents);
 
   return getValidationProcess(process.id) ?? process;
 }
 
-function createBaseValidationProcess(validationType: ValidationType, documents: UploadedDocumentPayload[]): ValidationProcess {
+function createBaseValidationProcess(validationType: ValidationType, documents: UploadedDocumentPayload[], user = defaultUser): ValidationProcess {
   const now = new Date().toISOString();
 
   return {
     id: crypto.randomUUID(),
-    organizationId: defaultOrganization.id,
-    userId: defaultUser.id,
+    organizationId: user.organizationId,
+    userId: user.id,
     validationType,
     status: "PENDING",
     documents: documents.map(stripBuffer),
@@ -42,7 +47,7 @@ function createBaseValidationProcess(validationType: ValidationType, documents: 
 
 async function processValidation(processId: string, validationType: ValidationType, documents: UploadedDocumentPayload[]) {
   try {
-    updateValidationProcess(processId, { status: "EXTRACTING" });
+    await updateAndPersist(processId, { status: "EXTRACTING" });
     const checklist = getChecklist(validationType);
     const extractionService = new DocumentExtractionService();
     const result =
@@ -50,9 +55,12 @@ async function processValidation(processId: string, validationType: ValidationTy
         ? await processReconciliation(processId, extractionService, checklist, documents)
         : await processLegacyValidation(processId, extractionService, validationType, checklist, documents);
 
-    updateValidationProcess(processId, { status: "DONE", result });
+    const completed = await updateAndPersist(processId, { status: "DONE", result });
+    if (completed?.result?.validationType === "RECONCILIATION") {
+      await persistResults(processId, completed.result);
+    }
   } catch (error) {
-    updateValidationProcess(processId, {
+    await updateAndPersist(processId, {
       status: "FAILED",
       error: error instanceof Error ? error.message : "Erro inesperado no processamento.",
     });
@@ -67,7 +75,7 @@ async function processLegacyValidation(
   documents: UploadedDocumentPayload[],
 ) {
   const extraction = await extractionService.extract({ validationType, checklist, documents });
-  updateValidationProcess(processId, { status: "COMPARING" });
+  await updateAndPersist(processId, { status: "COMPARING" });
   const engine = new ValidationEngine();
   return engine.run(defaultOrganization.id, validationType, extraction.sourceData, extraction.targetData, extraction.usedPdfVisionFallback);
 }
@@ -83,9 +91,15 @@ async function processReconciliation(
     checklist,
     documents,
   });
-  updateValidationProcess(processId, { status: "COMPARING" });
+  await updateAndPersist(processId, { status: "COMPARING" });
   const engine = new ReconciliationEngine();
-  return engine.run(defaultOrganization.id, extraction);
+  return { ...engine.run(defaultOrganization.id, extraction), id: processId };
+}
+
+async function updateAndPersist(processId: string, patch: Partial<ValidationProcess>) {
+  const process = updateValidationProcess(processId, patch);
+  if (process) await persistProcess(process);
+  return process;
 }
 
 function stripBuffer(document: UploadedDocumentPayload): UploadedDocument {

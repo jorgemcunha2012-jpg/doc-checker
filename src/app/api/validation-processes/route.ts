@@ -3,11 +3,19 @@ import { defaultOrganization } from "@/domain/tenant";
 import { activeDocumentSources, type DocumentSource, type UploadedDocument, type ValidationType } from "@/domain/validation";
 import { createValidationProcessAndWait } from "@/services/process/process-validation";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
+import { requireUser, AuthError } from "@/lib/auth";
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 const ACCEPTED_MIME_TYPES = new Set(["image/png", "image/jpeg", "application/pdf"]);
 
 export async function POST(request: Request) {
+  let currentUser;
+  try {
+    currentUser = await requireUser();
+  } catch (error) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
+    throw error;
+  }
   const contentType = request.headers.get("content-type") ?? "";
 
   if (!contentType.includes("multipart/form-data")) {
@@ -39,7 +47,7 @@ export async function POST(request: Request) {
   }
 
   const documents = await Promise.all(
-    files.map((file, index) => toUploadedDocumentPayload(file, validationType, documentSources?.[index])),
+    files.map((file, index) => toUploadedDocumentPayload(file, validationType, documentSources?.[index], currentUser.organizationId)),
   );
   const documentValidation =
     validationType === "RECONCILIATION" ? validateReconciliationSources(documents) : validateComparisonSides(documents);
@@ -48,7 +56,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: documentValidation }, { status: 400 });
   }
 
-  const validationProcess = await createValidationProcessAndWait(validationType, documents);
+  const validationProcess = await createValidationProcessAndWait(validationType, documents, currentUser);
 
   return NextResponse.json({
     processId: validationProcess.id,
@@ -80,11 +88,12 @@ async function toUploadedDocumentPayload(
   file: File,
   validationType: ValidationType,
   source?: DocumentSource,
+  organizationId = defaultOrganization.id,
 ): Promise<UploadedDocumentPayload> {
   const arrayBuffer = await file.arrayBuffer();
   const metadata: UploadedDocument = {
     id: crypto.randomUUID(),
-    organizationId: defaultOrganization.id,
+    organizationId,
     name: file.name,
     type: resolveDocumentType(file, validationType),
     mimeType: file.type || "application/octet-stream",

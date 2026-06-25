@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import type { ValidationRun } from "@/domain/validation";
 import { renderValidationReport } from "@/services/report/validation-report";
+import { AuthError, requireUser } from "@/lib/auth";
 
 export async function POST(request: Request) {
+  try {
+    await requireUser();
+  } catch (error) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
+    throw error;
+  }
   let run: ValidationRun;
 
   try {
