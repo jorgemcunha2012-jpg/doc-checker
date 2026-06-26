@@ -65,12 +65,8 @@ export class ReconciliationEngine {
   }
 
   private hasEvidenceForField(field: ChecklistField, input: ReconciliationInput) {
-    return input.values.some(
-      (value) =>
-        value.fieldId === field.id &&
-        value.value != null &&
-        String(value.value).trim().length > 0,
-    );
+    return input.participatingSources.some((source) => field.expectedSources?.includes(source)) ||
+      input.values.some((value) => value.fieldId === field.id);
   }
 
   private compareField(
@@ -114,13 +110,35 @@ export class ReconciliationEngine {
       );
     }
 
+    const unreadableExpectedSources = input.unreadableSources.filter((source) => field.expectedSources?.includes(source));
+    if (unreadableExpectedSources.length && comparisonParticipants.length === 0) {
+      return result(
+        organizationId,
+        field,
+        valuesBySource,
+        "SOURCE_UNREADABLE",
+        `Campo não pôde ser conferido porque a fonte ${joinSources(unreadableExpectedSources)} não foi interpretada.`,
+      );
+    }
+
     if (comparisonParticipants.length < 2) {
+      const expectedMissingSources = input.participatingSources.filter(
+        (source) =>
+          field.expectedSources?.includes(source) &&
+          !comparisonParticipants.includes(source) &&
+          !input.unreadableSources.includes(source),
+      );
+      const missingMessage = expectedMissingSources.length
+        ? ` Campo não encontrado na fonte ${joinSources(expectedMissingSources)}.`
+        : "";
       return result(
         organizationId,
         field,
         valuesBySource,
         "REVIEW_REQUIRED",
-        `Campo encontrado apenas na fonte ${joinSources(comparisonParticipants)}. É necessário outro arquivo com o mesmo dado para confirmar.`,
+        comparisonParticipants.length
+          ? `Campo encontrado apenas na fonte ${joinSources(comparisonParticipants)}. É necessário outro arquivo com o mesmo dado para confirmar.${missingMessage}`
+          : `Campo não encontrado nas fontes esperadas para conferência.${missingMessage}`,
       );
     }
 

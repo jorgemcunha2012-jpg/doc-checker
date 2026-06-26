@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { defaultOrganization } from "@/domain/tenant";
 import { activeDocumentSources, type DocumentSource, type UploadedDocument, type ValidationType } from "@/domain/validation";
-import { createValidationProcessAndWait } from "@/services/process/process-validation";
+import { createValidationProcessAndStart } from "@/services/process/process-validation";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
 import { requireUser, AuthError } from "@/lib/auth";
 
@@ -56,13 +57,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: documentValidation }, { status: 400 });
   }
 
-  const validationProcess = await createValidationProcessAndWait(validationType, documents, currentUser);
+  const validationProcess = await createValidationProcessAndStart(validationType, documents, currentUser, (task) => after(task));
 
   return NextResponse.json({
     processId: validationProcess.id,
     status: validationProcess.status,
     process: validationProcess,
-  });
+  }, { status: 202 });
 }
 
 function isAcceptedFile(file: File) {

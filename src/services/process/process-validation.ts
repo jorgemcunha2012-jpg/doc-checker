@@ -30,6 +30,26 @@ export async function createValidationProcessAndWait(validationType: ValidationT
   return getValidationProcess(process.id) ?? process;
 }
 
+export async function createValidationProcessAndStart(
+  validationType: ValidationType,
+  documents: UploadedDocumentPayload[],
+  user = defaultUser,
+  schedule: (task: () => Promise<void>) => void = (task) => {
+    void task();
+  },
+) {
+  const process = createBaseValidationProcess(validationType, documents, user);
+
+  saveValidationProcess(process);
+  await Promise.all([persistProcess(process), persistDocuments(process.id, process.documents)]);
+  await audit({ id: user.id, organizationId: user.organizationId }, "PROCESS_CREATED", "validation_process", process.id, {
+    documents: process.documents.map((document) => document.name),
+  });
+  schedule(() => processValidation(process.id, validationType, documents));
+
+  return process;
+}
+
 function createBaseValidationProcess(validationType: ValidationType, documents: UploadedDocumentPayload[], user = defaultUser): ValidationProcess {
   const now = new Date().toISOString();
 

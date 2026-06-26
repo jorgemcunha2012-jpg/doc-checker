@@ -76,6 +76,22 @@ test("mantém processo utilizável quando uma fonte está ilegível e preserva e
   assert.equal(cpf.valuesBySource.MINUTA?.sourceLocation?.page, 2);
 });
 
+test("não oculta campos esperados quando estão ausentes em todas as fontes", () => {
+  const result = run([], ["SIOPI", "MINUTA"]);
+  const cpf = field(result, "buyer.cpf");
+
+  assert.equal(cpf.status, "REVIEW_REQUIRED");
+  assert.match(cpf.observation, /não encontrado/);
+});
+
+test("marca fonte ilegível mesmo quando nenhum campo foi extraído dela", () => {
+  const result = run([], ["MINUTA"], {}, ["MINUTA"]);
+  const cpf = field(result, "buyer.cpf");
+
+  assert.equal(cpf.status, "SOURCE_UNREADABLE");
+  assert.match(cpf.observation, /não foi interpretada/);
+});
+
 test("compara ITBI com qualquer documento complementar que contenha o mesmo campo", () => {
   const result = run(
     [
