@@ -54,7 +54,7 @@ export class DocumentExtractionService {
     );
     const pdfResultsPromise = mapWithConcurrency(
       pdfSources,
-      3,
+      6,
       (source) =>
         this.extractDocumentSource(
           source,
@@ -121,9 +121,9 @@ export class DocumentExtractionService {
     documents: UploadedDocumentPayload[],
     checklist: ExtractionRequest["checklist"],
   ) {
-    // Every uploaded document is evidence. The source only narrows the first
-    // extraction pass so large PDFs do not pay for unrelated fields.
-    const sourceChecklist = prioritizeChecklistForSource(source, checklist);
+    // Every uploaded document is evidence. Keep the full checklist available
+    // because complementary documents can contain fields outside their label.
+    const sourceChecklist = checklist;
     const attempts = await Promise.all(
       documents.map(async (document) => {
         const startedAt = Date.now();
@@ -202,37 +202,10 @@ export class DocumentExtractionService {
 }
 
 function pdfPageSelectionFor(source: DocumentSource) {
-  if (source === "MINUTA") return { headPages: 4, tailPages: 1 };
-  if (source === "SIOPI") return { headPages: 8 };
-  if (source === "ITBI") return { headPages: 4, tailPages: 1 };
-  if (source === "MATRICULA") return { headPages: 3, tailPages: 1 };
-  if (source === "CERTIDAO") return { headPages: 3 };
-  return { headPages: 5, tailPages: 1 };
-}
-
-function prioritizeChecklistForSource(
-  source: DocumentSource,
-  checklist: ExtractionRequest["checklist"],
-) {
-  const sourceSpecific = checklist.filter((field) => field.expectedSources?.includes(source));
-
-  if (source === "MATRICULA") {
-    return checklist.filter((field) => field.id.startsWith("property."));
-  }
-
-  if (source === "CERTIDAO") {
-    return checklist.filter((field) => field.id.startsWith("buyer."));
-  }
-
-  if (source === "DOCUMENTO_COMPLEMENTAR") {
-    return checklist.filter((field) =>
-      field.id.startsWith("buyer.") ||
-      field.id.startsWith("property.") ||
-      field.id.startsWith("financial."),
-    );
-  }
-
-  return sourceSpecific.length ? sourceSpecific : checklist;
+  if (source === "MINUTA") return { headPages: 6, tailPages: 2 };
+  if (source === "SIOPI") return { headPages: 15, tailPages: 1 };
+  if (source === "ITBI") return { headPages: 8, tailPages: 1 };
+  return { headPages: 8, tailPages: 2 };
 }
 
 async function mapWithConcurrency<T, R>(

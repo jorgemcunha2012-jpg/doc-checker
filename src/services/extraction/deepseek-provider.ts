@@ -31,12 +31,12 @@ export class DeepSeekProvider implements DocumentExtractionProvider {
 }
 
 function compactDocumentText(text: string) {
-  const maximumCharacters = 12_000;
+  const maximumCharacters = 22_000;
   if (text.length <= maximumCharacters) {
     return text;
   }
 
-  const headSize = 9_500;
+  const headSize = 17_000;
   const tailSize = maximumCharacters - headSize;
   return `${text.slice(0, headSize)}\n\n[CONTEÚDO INTERMEDIÁRIO OMITIDO]\n\n${text.slice(-tailSize)}`;
 }
