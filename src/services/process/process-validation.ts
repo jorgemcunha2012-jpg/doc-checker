@@ -63,6 +63,7 @@ async function processValidation(processId: string, validationType: ValidationTy
       await audit({ id: completed.userId, organizationId: completed.organizationId }, "PROCESS_FINISHED", "validation_process", completed.id, {
         documents: completed.documents.map((document) => document.name),
         summary: completed.result?.summary,
+        durationMs: durationMs(completed.createdAt, completed.updatedAt),
       });
     }
   } catch (error) {
@@ -74,6 +75,7 @@ async function processValidation(processId: string, validationType: ValidationTy
       await audit({ id: failed.userId, organizationId: failed.organizationId }, "PROCESS_FAILED", "validation_process", failed.id, {
         documents: failed.documents.map((document) => document.name),
         error: failed.error,
+        durationMs: durationMs(failed.createdAt, failed.updatedAt),
       });
     }
   }
@@ -112,6 +114,13 @@ async function updateAndPersist(processId: string, patch: Partial<ValidationProc
   const process = updateValidationProcess(processId, patch);
   if (process) await persistProcess(process);
   return process;
+}
+
+function durationMs(startedAt: string, completedAt: string) {
+  const start = new Date(startedAt).getTime();
+  const end = new Date(completedAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  return end - start;
 }
 
 function stripBuffer(document: UploadedDocumentPayload): UploadedDocument {

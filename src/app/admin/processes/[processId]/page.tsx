@@ -1,12 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import { AdminProcessDetail } from "@/components/admin-process-detail";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isMasterAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
 export default async function AdminProcessPage({ params }: { params: Promise<{ processId: string }> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role !== "ADMIN") redirect("/");
+  if (!isMasterAdmin(user)) redirect("/admin");
   const { processId } = await params;
   const { data: process } = await createSupabaseAdminClient()
     .from("validation_processes")

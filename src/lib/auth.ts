@@ -47,6 +47,22 @@ export async function requireAdmin() {
   return user;
 }
 
+export async function requireMasterAdmin() {
+  const user = await requireAdmin();
+  if (!isMasterAdmin(user)) throw new AuthError("Acesso restrito ao administrador master.", 403);
+  return user;
+}
+
+export function isMasterAdmin(user: Pick<AuthenticatedUser, "email" | "role">) {
+  if (user.role !== "ADMIN") return false;
+  const emails = (process.env.CONFERIA_MASTER_ADMIN_EMAILS ?? "jorge@conferia.local")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  return emails.includes(user.email.toLowerCase());
+}
+
 export class AuthError extends Error {
   constructor(message: string, readonly status: number) {
     super(message);

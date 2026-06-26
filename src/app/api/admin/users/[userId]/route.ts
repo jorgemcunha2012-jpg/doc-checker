@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { AuthError, requireAdmin } from "@/lib/auth";
+import { AuthError, requireMasterAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
 
 export async function PATCH(request: Request, context: { params: Promise<{ userId: string }> }) {
   try {
-    const admin = await requireAdmin();
+    const admin = await requireMasterAdmin();
     const { userId } = await context.params;
     const { action } = await request.json();
     const supabase = createSupabaseAdminClient();
