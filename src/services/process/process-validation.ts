@@ -59,11 +59,23 @@ async function processValidation(processId: string, validationType: ValidationTy
     if (completed?.result?.validationType === "RECONCILIATION") {
       await persistResults(processId, completed.result);
     }
+    if (completed) {
+      await audit({ id: completed.userId, organizationId: completed.organizationId }, "PROCESS_FINISHED", "validation_process", completed.id, {
+        documents: completed.documents.map((document) => document.name),
+        summary: completed.result?.summary,
+      });
+    }
   } catch (error) {
-    await updateAndPersist(processId, {
+    const failed = await updateAndPersist(processId, {
       status: "FAILED",
       error: error instanceof Error ? error.message : "Erro inesperado no processamento.",
     });
+    if (failed) {
+      await audit({ id: failed.userId, organizationId: failed.organizationId }, "PROCESS_FAILED", "validation_process", failed.id, {
+        documents: failed.documents.map((document) => document.name),
+        error: failed.error,
+      });
+    }
   }
 }
 
