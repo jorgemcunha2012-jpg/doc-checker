@@ -276,7 +276,7 @@ export function ConferiaWorkspace({ currentUser }: { currentUser: User }) {
             Checklist inteligente com IA
           </div>
           <h1 className="mt-3 max-w-3xl text-3xl font-bold text-slate-950 sm:text-4xl">Conferência documental imobiliária</h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">Envie os documentos do processo. A ConferIA identifica cada fonte, extrai as informações e apresenta tudo o que confere, diverge ou precisa de revisão.</p>
+          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">Envie os documentos que deseja verificar. A ConferIA compara os dados das telas com a minuta e demais documentos do processo, destacando o que confere, diverge ou precisa de revisão.</p>
         </div>
       </section>
 
@@ -286,7 +286,7 @@ export function ConferiaWorkspace({ currentUser }: { currentUser: User }) {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-950">Nova conferência</h2>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Adicione pelo menos dois documentos. Você poderá revisar a identificação de cada fonte antes de processar.</p>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Adicione pelo menos duas fontes, como prints das telas e minuta. Outros documentos também podem entrar como apoio da conferência.</p>
               </div>
             </div>
             <button
@@ -482,7 +482,7 @@ function ProcessingPanel({
           );
         })}
       </div>
-      <p className="mt-4 text-xs text-slate-500">A etapa exibida é uma estimativa baseada no tempo de processamento. Documentos extensos podem levar alguns minutos.</p>
+      <p className="mt-4 text-xs text-slate-500">A etapa exibida é uma estimativa. PDFs extensos passam por seleção inteligente de trechos e fallback amplo quando necessário.</p>
     </section>
   );
 }

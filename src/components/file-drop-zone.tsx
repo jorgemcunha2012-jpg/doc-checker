@@ -48,7 +48,7 @@ export function FileDropZone({ validationType, documents, onDocumentsChange }: F
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-slate-950">Documentos do processo</h2>
-          <p className="mt-1 text-sm text-slate-500">PDF, JPG ou PNG. A fonte é identificada automaticamente e pode ser corrigida.</p>
+          <p className="mt-1 text-sm text-slate-500">Envie os documentos que deseja verificar. Prints das telas, minuta e anexos podem ser combinados na mesma conferência.</p>
         </div>
         <div className="rounded-md border border-slate-200 bg-slate-50 p-2 text-slate-500" title="Também aceita Ctrl+V">
           <Clipboard className="h-5 w-5" aria-hidden="true" />
@@ -66,8 +66,8 @@ export function FileDropZone({ validationType, documents, onDocumentsChange }: F
         <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-[#2563eb] shadow-sm ring-1 ring-slate-200">
           <Paperclip className="h-6 w-6" aria-hidden="true" />
         </span>
-        <span className="mt-3 text-sm font-semibold text-slate-900">Adicionar documentos</span>
-        <span className="mt-1 max-w-sm text-xs text-slate-500">Use upload ou cole um print com Ctrl+V quando estiver na área da plataforma.</span>
+        <span className="mt-3 text-sm font-semibold text-slate-900">Adicionar documentos para verificação</span>
+        <span className="mt-1 max-w-sm text-xs text-slate-500">Use upload ou cole prints das telas com Ctrl+V. A fonte pode ser corrigida antes de processar.</span>
       </label>
 
       <div className="mt-4 space-y-2">
