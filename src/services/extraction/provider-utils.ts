@@ -4,7 +4,7 @@ export function checklistPrompt(checklist: ChecklistField[]) {
   return checklist
     .map(
       (field) =>
-        `- ${field.id}: ${field.category} / ${field.label} / item=${field.itemType} / obrigatório=${field.required} / tipo=${field.fieldType}`,
+        `- ${field.id}: ${field.label}; tipo=${field.fieldType}; categoria=${field.category}`,
     )
     .join("\n");
 }

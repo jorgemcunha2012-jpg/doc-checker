@@ -24,19 +24,19 @@ export class DeepSeekProvider implements DocumentExtractionProvider {
         role: "user",
         content: `Texto bruto:\n${compactDocumentText(text)}\n\nCampos esperados:\n${checklistPrompt(checklist)}`,
       },
-    ]);
+    ], { timeoutMs: 75_000 });
 
     return coerceExtractionOutput(result, checklist);
   }
 }
 
 function compactDocumentText(text: string) {
-  const maximumCharacters = 22_000;
+  const maximumCharacters = 12_000;
   if (text.length <= maximumCharacters) {
     return text;
   }
 
-  const headSize = 17_000;
+  const headSize = 9_500;
   const tailSize = maximumCharacters - headSize;
   return `${text.slice(0, headSize)}\n\n[CONTEÚDO INTERMEDIÁRIO OMITIDO]\n\n${text.slice(-tailSize)}`;
 }
