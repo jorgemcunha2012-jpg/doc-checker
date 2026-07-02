@@ -4,9 +4,20 @@ export function checklistPrompt(checklist: ChecklistField[]) {
   return checklist
     .map(
       (field) =>
-        `- ${field.id}: ${field.label}; tipo=${field.fieldType}; categoria=${field.category}`,
+        `- ${field.id}: ${field.label}; tipo=${field.fieldType}; categoria=${field.category}${fieldExtractionHint(field.id) ? `; regra=${fieldExtractionHint(field.id)}` : ""}`,
     )
     .join("\n");
+}
+
+export function fieldExtractionHint(fieldId: string) {
+  return ({
+    "buyer.address":
+      "extrair somente o domicílio/endereço residencial do comprador, adquirente ou cliente na qualificação pessoal; nunca usar endereço do imóvel, empreendimento ou unidade",
+    "seller.address":
+      "extrair somente a sede ou endereço do vendedor/transmitente na qualificação da parte; nunca usar endereço do imóvel",
+    "property.address":
+      "extrair somente a localização física do imóvel objeto do negócio, normalmente na descrição do imóvel, matrícula, empreendimento ou unidade; nunca usar domicílio do comprador ou endereço do vendedor",
+  } as Record<string, string>)[fieldId] ?? "";
 }
 
 export function coerceExtractionOutput(value: unknown, checklist: ChecklistField[]): ProviderExtractionOutput {

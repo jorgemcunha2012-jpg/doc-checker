@@ -19,7 +19,7 @@ export class DeepSeekProvider implements DocumentExtractionProvider {
       {
         role: "system",
         content:
-          "Você estrutura texto bruto de documentos imobiliários. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"value\":string|null,\"confidence\":number,\"sourceLocation\":{\"page\":number|null,\"section\":string|null,\"rawText\":string|null}}]}. rawText deve ser apenas o pequeno trecho que sustenta o valor. Não compare campos.",
+          "Você estrutura texto bruto de documentos imobiliários. Diferencie rigorosamente o endereço residencial das partes do endereço do imóvel objeto do negócio. Use a seção e o sujeito do texto como evidência; nunca copie um endereço para campos semanticamente diferentes por mera proximidade. Se o contexto não identificar o titular do endereço, retorne null e confiança 0. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"value\":string|null,\"confidence\":number,\"sourceLocation\":{\"page\":number|null,\"section\":string|null,\"rawText\":string|null}}]}. rawText deve ser apenas o pequeno trecho que sustenta o valor. Não compare campos.",
       },
       {
         role: "user",
@@ -33,7 +33,7 @@ export class DeepSeekProvider implements DocumentExtractionProvider {
         {
           role: "system",
           content:
-            "Você estrutura texto bruto de documentos imobiliários. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"value\":string|null,\"confidence\":number,\"sourceLocation\":{\"page\":number|null,\"section\":string|null,\"rawText\":string|null}}]}. rawText deve ser apenas o pequeno trecho que sustenta o valor. Não compare campos.",
+            "Você estrutura texto bruto de documentos imobiliários. Diferencie rigorosamente o endereço residencial das partes do endereço do imóvel objeto do negócio. Use a seção e o sujeito do texto como evidência; nunca copie um endereço para campos semanticamente diferentes por mera proximidade. Se o contexto não identificar o titular do endereço, retorne null e confiança 0. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"value\":string|null,\"confidence\":number,\"sourceLocation\":{\"page\":number|null,\"section\":string|null,\"rawText\":string|null}}]}. rawText deve ser apenas o pequeno trecho que sustenta o valor. Não compare campos.",
         },
         {
           role: "user",
