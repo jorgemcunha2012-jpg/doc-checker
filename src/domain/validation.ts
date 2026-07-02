@@ -142,7 +142,7 @@ export type UploadedDocument = {
   id: string;
   organizationId: string;
   name: string;
-  type: "PRINT" | "IMAGE" | "PDF" | "ITBI_GUIDE" | "CONTRACT" | "COMPLEMENTARY";
+  type: "PRINT" | "IMAGE" | "PDF" | "WORD" | "TIFF" | "ITBI_GUIDE" | "CONTRACT" | "COMPLEMENTARY";
   mimeType: string;
   sizeBytes?: number;
   source?: DocumentSource;

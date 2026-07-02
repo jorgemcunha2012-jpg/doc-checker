@@ -63,14 +63,14 @@ export function FileDropZone({ validationType, documents, onDocumentsChange }: F
           className="sr-only"
           type="file"
           multiple
-          accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf"
+          accept=".pdf,.docx,.tif,.tiff,.jpg,.jpeg,.png,image/jpeg,image/png,image/tiff,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           onChange={(event) => handleFiles(event.target.files)}
         />
         <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-[#2563eb] shadow-sm ring-1 ring-slate-200">
           <Paperclip className="h-6 w-6" aria-hidden="true" />
         </span>
         <span className="mt-3 text-sm font-semibold text-slate-900">Adicionar documentos para verificação</span>
-        <span className="mt-1 max-w-sm text-xs text-slate-500">Use upload ou cole prints das telas com Ctrl+V. A fonte pode ser corrigida antes de processar.</span>
+        <span className="mt-1 max-w-sm text-xs text-slate-500">PDF, DOCX, TIFF/TIF, PNG ou JPG. Também é possível colar prints com Ctrl+V.</span>
       </label>
 
       <div className="mt-4 space-y-2">
@@ -125,7 +125,9 @@ function DocumentPreview({ document, onClose }: { document: ClientUploadedDocume
     return () => URL.revokeObjectURL(objectUrl);
   }, [document.file]);
 
-  const isImage = document.mimeType.includes("image");
+  const isTiff = document.mimeType === "image/tiff" || /\.tiff?$/i.test(document.name);
+  const isDocx = document.mimeType.includes("wordprocessingml") || /\.docx$/i.test(document.name);
+  const isImage = document.mimeType.includes("image") && !isTiff;
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/80 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label={`Visualização de ${document.name}`}>
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 rounded-t-lg bg-white px-4 py-3">
@@ -143,6 +145,12 @@ function DocumentPreview({ document, onClose }: { document: ClientUploadedDocume
         ) : isImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt={document.name} className="max-h-full max-w-full object-contain" />
+        ) : isTiff || isDocx ? (
+          <div className="max-w-md px-6 text-center">
+            <FileText className="mx-auto h-10 w-10 text-slate-400" />
+            <p className="mt-3 text-sm font-bold text-slate-700">Pré-visualização não disponível neste navegador</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">O arquivo será processado normalmente e ficará disponível no histórico para consulta.</p>
+          </div>
         ) : (
           <iframe src={url} title={document.name} className="h-full min-h-[70vh] w-full border-0" />
         )}
@@ -157,7 +165,11 @@ function resolveDocumentType(file: File, validationType: ValidationType): Upload
   }
 
   if (file.type.includes("image")) {
-    return "IMAGE";
+    return file.type === "image/tiff" || /\.tiff?$/i.test(file.name) ? "TIFF" : "IMAGE";
+  }
+
+  if (file.type.includes("wordprocessingml") || /\.docx$/i.test(file.name)) {
+    return "WORD";
   }
 
   if (file.type.includes("pdf")) {

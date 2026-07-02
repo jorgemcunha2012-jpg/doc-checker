@@ -9,7 +9,13 @@ import { developmentUnitValues } from "@/domain/development";
 import { getDevelopmentUnit } from "@/services/development/development-repository";
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
-const ACCEPTED_MIME_TYPES = new Set(["image/png", "image/jpeg", "application/pdf"]);
+const ACCEPTED_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/tiff",
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
 
 export async function POST(request: Request) {
   let currentUser;
@@ -87,14 +93,14 @@ export async function POST(request: Request) {
 function isAcceptedFile(file: File) {
   const name = file.name.toLowerCase();
   const mimeType = file.type || "application/octet-stream";
-  const acceptedExtension = name.endsWith(".pdf") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg");
+  const acceptedExtension = [".pdf", ".png", ".jpg", ".jpeg", ".docx", ".tif", ".tiff"].some((extension) => name.endsWith(extension));
 
   return file.size <= MAX_FILE_SIZE_BYTES && (ACCEPTED_MIME_TYPES.has(mimeType) || acceptedExtension);
 }
 
 function validateComparisonSides(documents: UploadedDocumentPayload[]) {
-  const hasSource = documents.some((document) => document.type === "PRINT" || document.type === "IMAGE");
-  const hasTarget = documents.some((document) => document.type === "PDF" || document.type === "CONTRACT" || document.type === "ITBI_GUIDE" || document.type === "COMPLEMENTARY");
+  const hasSource = documents.some((document) => document.type === "PRINT" || document.type === "IMAGE" || document.type === "TIFF");
+  const hasTarget = documents.some((document) => document.type === "PDF" || document.type === "WORD" || document.type === "CONTRACT" || document.type === "ITBI_GUIDE" || document.type === "COMPLEMENTARY");
 
   if (!hasSource || !hasTarget) {
     return "Envie ao menos uma imagem/print do dado do cliente e um documento de destino para comparação.";
@@ -157,7 +163,11 @@ function resolveDocumentType(file: File, validationType: ValidationType): Upload
   }
 
   if (file.type.includes("image")) {
-    return "IMAGE";
+    return /tiff?$/i.test(name) || file.type === "image/tiff" ? "TIFF" : "IMAGE";
+  }
+
+  if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || name.endsWith(".docx")) {
+    return "WORD";
   }
 
   if (file.type.includes("pdf") || name.endsWith(".pdf")) {

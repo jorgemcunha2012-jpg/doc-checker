@@ -4,6 +4,8 @@ import { normalizeValue } from "@/services/normalization/normalization-service";
 import { DeepSeekProvider } from "./deepseek-provider";
 import { KimiProvider } from "./kimi-provider";
 import { extractPdfText, hasEnoughPdfText } from "./pdf-text-service";
+import { extractDocxText } from "./word-text-service";
+import { convertTiffToPngPages } from "./tiff-image-service";
 import type { ExtractionRequest, ExtractionResult, ReconciliationExtractionResult, UploadedDocumentPayload } from "./types";
 
 export class DocumentExtractionService {
@@ -14,9 +16,9 @@ export class DocumentExtractionService {
 
   async extract(request: ExtractionRequest): Promise<ExtractionResult> {
     const checklist = getChecklist(request.validationType);
-    const sourceDocuments = request.documents.filter((document) => document.type === "PRINT" || document.type === "IMAGE");
+    const sourceDocuments = request.documents.filter((document) => document.type === "PRINT" || document.type === "IMAGE" || document.type === "TIFF");
     const targetDocuments = request.documents.filter(
-      (document) => document.type === "PDF" || document.type === "CONTRACT" || document.type === "ITBI_GUIDE" || document.type === "COMPLEMENTARY",
+      (document) => document.type === "PDF" || document.type === "WORD" || document.type === "CONTRACT" || document.type === "ITBI_GUIDE" || document.type === "COMPLEMENTARY",
     );
 
     const [sourceData, targetExtraction] = await Promise.all([
@@ -86,7 +88,7 @@ export class DocumentExtractionService {
       return emptyOutput(checklist);
     }
 
-    const outputs = await Promise.all(documents.map((document) => this.kimiProvider.extractFromImage(document, checklist)));
+    const outputs = await Promise.all(documents.map((document) => this.extractVisualDocument(document, checklist)));
     return mergeOutputs(outputs, checklist);
   }
 
@@ -108,8 +110,10 @@ export class DocumentExtractionService {
           usedPdfVisionFallback = true;
           outputs.push(emptyOutput(checklist));
         }
+      } else if (isDocx(document)) {
+        outputs.push(await this.deepSeekProvider.structureText(await extractDocxText(document.buffer), checklist));
       } else if (document.mimeType.includes("image")) {
-        outputs.push(await this.kimiProvider.extractFromImage(document, checklist));
+        outputs.push(await this.extractVisualDocument(document, checklist));
       }
     }
 
@@ -159,11 +163,21 @@ export class DocumentExtractionService {
               usedPdfVisionFallback: false,
             };
           }
-          if (document.mimeType.includes("image")) {
-            const output = await this.kimiProvider.extractFromImage(
-              document,
-              sourceChecklist,
-            );
+          if (isDocx(document)) {
+            const text = await extractDocxText(document.buffer);
+            if (!text.trim()) return { output: null, usedPdfVisionFallback: false, error: "O documento Word não possui texto extraível." };
+            const output = await this.deepSeekProvider.structureText(text, sourceChecklist);
+            console.info("[ConferIA] Extração concluída", {
+              source,
+              documentName: document.name,
+              durationMs: Date.now() - startedAt,
+              extractedTextCharacters: text.length,
+              requestedFields: sourceChecklist.length,
+            });
+            return { output, usedPdfVisionFallback: false };
+          }
+          if (document.mimeType.includes("image") || isTiff(document)) {
+            const output = await this.extractVisualDocument(document, sourceChecklist);
             console.info("[ConferIA] Extração concluída", {
               source,
               documentName: document.name,
@@ -198,6 +212,38 @@ export class DocumentExtractionService {
       error: attempts.find((attempt) => attempt.error)?.error,
       usedPdfVisionFallback: attempts.some((attempt) => attempt.usedPdfVisionFallback),
     };
+  }
+
+  private async extractVisualDocument(
+    document: UploadedDocumentPayload,
+    checklist: ExtractionRequest["checklist"],
+  ) {
+    if (!isTiff(document)) return this.kimiProvider.extractFromImage(document, checklist);
+    const pages = await convertTiffToPngPages(document.buffer);
+    const outputs = await Promise.all(
+      pages.map((buffer, index) =>
+        this.kimiProvider.extractFromImage(
+          {
+            ...document,
+            id: `${document.id}_page_${index + 1}`,
+            name: `${document.name} - página ${index + 1}`,
+            mimeType: "image/png",
+            buffer,
+          },
+          checklist,
+        ).then((output) => ({
+          fields: output.fields.map((field) => ({
+            ...field,
+            sourceLocation: field.sourceLocation
+              ? { ...field.sourceLocation, page: index + 1 }
+              : field.value
+                ? { page: index + 1 }
+                : undefined,
+          })),
+        })),
+      ),
+    );
+    return mergeOutputs(outputs, checklist);
   }
 }
 
@@ -239,6 +285,16 @@ function sanitizeExtractionError(error: unknown) {
     .replace(/Bearer\s+\S+/gi, "Bearer [oculto]")
     .replace(/sk-[A-Za-z0-9_-]+/g, "[chave oculta]")
     .slice(0, 500);
+}
+
+function isDocx(document: UploadedDocumentPayload) {
+  return document.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    document.name.toLowerCase().endsWith(".docx");
+}
+
+function isTiff(document: UploadedDocumentPayload) {
+  const name = document.name.toLowerCase();
+  return document.mimeType === "image/tiff" || name.endsWith(".tif") || name.endsWith(".tiff");
 }
 
 async function tryExtractPdfText(buffer: Buffer) {
