@@ -6,7 +6,7 @@ import type { UploadedDocumentPayload } from "@/services/extraction/types";
 import { ValidationEngine } from "@/services/validation/validation-engine";
 import { ReconciliationEngine } from "@/services/validation/reconciliation-engine";
 import { getValidationProcess, saveValidationProcess, updateValidationProcess } from "./validation-process-store";
-import { audit, persistDocuments, persistProcess, persistResults } from "./process-repository";
+import { audit, persistDocuments, persistOriginalDocuments, persistProcess, persistResults } from "./process-repository";
 
 export function createValidationProcess(validationType: ValidationType, documents: UploadedDocumentPayload[]) {
   const process = createBaseValidationProcess(validationType, documents);
@@ -22,6 +22,7 @@ export async function createValidationProcessAndWait(validationType: ValidationT
 
   saveValidationProcess(process);
   await Promise.all([persistProcess(process), persistDocuments(process.id, process.documents)]);
+  if (!(await storeOriginalsOrFail(process.id, documents))) return getValidationProcess(process.id) ?? process;
   await audit({ id: user.id, organizationId: user.organizationId }, "PROCESS_CREATED", "validation_process", process.id, {
     documents: process.documents.map((document) => document.name),
   });
@@ -43,6 +44,7 @@ export async function createValidationProcessAndStart(
 
   saveValidationProcess(process);
   await Promise.all([persistProcess(process), persistDocuments(process.id, process.documents)]);
+  if (!(await storeOriginalsOrFail(process.id, documents))) return getValidationProcess(process.id) ?? process;
   await audit({ id: user.id, organizationId: user.organizationId }, "PROCESS_CREATED", "validation_process", process.id, {
     documents: process.documents.map((document) => document.name),
   });
@@ -158,6 +160,19 @@ function durationMs(startedAt: string, completedAt: string) {
   const end = new Date(completedAt).getTime();
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
   return end - start;
+}
+
+async function storeOriginalsOrFail(processId: string, documents: UploadedDocumentPayload[]) {
+  try {
+    await persistOriginalDocuments(processId, documents);
+    return true;
+  } catch (error) {
+    await updateAndPersist(processId, {
+      status: "FAILED",
+      error: error instanceof Error ? error.message : "Não foi possível armazenar os documentos originais.",
+    });
+    return false;
+  }
 }
 
 function stripBuffer(document: UploadedDocumentPayload): UploadedDocument {

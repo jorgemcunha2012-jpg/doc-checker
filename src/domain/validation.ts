@@ -146,6 +146,7 @@ export type UploadedDocument = {
   mimeType: string;
   sizeBytes?: number;
   source?: DocumentSource;
+  storagePath?: string;
 };
 
 export type ValidationSummary = {

@@ -274,6 +274,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false }: { curre
           </div>
           {!publicAccess ? <div className="hidden items-center gap-2 text-xs font-semibold text-slate-500 sm:flex">
             {currentUser.role === "ADMIN" ? <Link href="/admin" className="text-blue-600">Painel administrativo</Link> : null}
+            <Link href={{ pathname: "/history" }} className="text-blue-600">Histórico</Link>
             <span className="text-slate-300">|</span>
             {currentUser.name}
             <Link href="/change-password" className="text-blue-600">Alterar senha</Link>

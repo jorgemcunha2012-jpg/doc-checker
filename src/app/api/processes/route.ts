@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const supabase = createSupabaseAdminClient();
     let query = supabase
       .from("validation_processes")
-      .select("id, user_id, processing_status, final_status, summary, error, started_at, completed_at, profiles!validation_processes_user_id_fkey(name), process_documents(name, source)")
+      .select("id, user_id, processing_status, final_status, summary, error, started_at, completed_at, profiles!validation_processes_user_id_fkey(name), process_documents(id, name, source, storage_path)")
       .eq("organization_id", user.organizationId)
       .order("started_at", { ascending: false })
       .limit(100);
@@ -20,7 +20,17 @@ export async function GET(request: Request) {
     if (analyst && isMasterAdmin(user)) query = query.eq("user_id", analyst);
     const { data, error } = await query;
     if (error) throw error;
-    return NextResponse.json({ processes: data });
+    return NextResponse.json({
+      processes: (data ?? []).map((process) => ({
+        ...process,
+        process_documents: process.process_documents.map((document) => ({
+          id: document.id,
+          name: document.name,
+          source: document.source,
+          available: Boolean(document.storage_path),
+        })),
+      })),
+    });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error(error);

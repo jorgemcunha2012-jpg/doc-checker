@@ -2,6 +2,7 @@ import type { AuthenticatedUser } from "@/lib/auth";
 import type { HumanReview, ReconciliationRun, UploadedDocument, ValidationProcess } from "@/domain/validation";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import type { UploadedDocumentPayload } from "@/services/extraction/types";
 
 export async function persistProcess(process: ValidationProcess) {
   if (!isSupabaseConfigured()) return;
@@ -35,8 +36,28 @@ export async function persistDocuments(processId: string, documents: UploadedDoc
       source: document.source ?? null,
       mime_type: document.mimeType,
       size_bytes: document.sizeBytes ?? null,
+      storage_path: document.storagePath ?? null,
     })),
   );
+}
+
+export async function persistOriginalDocuments(processId: string, documents: UploadedDocumentPayload[]) {
+  if (!isSupabaseConfigured()) return;
+  const supabase = createSupabaseAdminClient();
+  await Promise.all(documents.map(async (document) => {
+    const storagePath = `${document.organizationId}/${processId}/${document.id}-${safeFileName(document.name)}`;
+    const { error } = await supabase.storage.from("process-documents").upload(storagePath, document.buffer, {
+      contentType: document.mimeType,
+      upsert: false,
+    });
+    if (error) throw new Error(`Não foi possível armazenar ${document.name}: ${error.message}`);
+    const { error: updateError } = await supabase
+      .from("process_documents")
+      .update({ storage_path: storagePath })
+      .eq("id", document.id)
+      .eq("process_id", processId);
+    if (updateError) throw new Error(`Não foi possível vincular ${document.name}: ${updateError.message}`);
+  }));
 }
 
 export async function persistResults(processId: string, run: ReconciliationRun) {
@@ -130,4 +151,13 @@ function finalStatus(process: ValidationProcess) {
   return process.result.results.some((result) => result.status !== "MATCH")
     ? "PENDING_REVIEW"
     : "FULLY_CHECKED";
+}
+
+function safeFileName(name: string) {
+  return name
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120) || "documento";
 }
