@@ -103,7 +103,7 @@ export function ReconciliationResultsTable({
                   {result.humanReview?.status === "APPROVED" ? (
                     <div>
                       <span className="inline-flex min-w-32 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
-                        Conferido
+                        Verificado
                       </span>
                       <div className="mt-1 text-[11px] text-slate-400">Automático: {statusCopy[result.status]}</div>
                     </div>
@@ -119,7 +119,7 @@ export function ReconciliationResultsTable({
                     <div className="mt-3 border-l-2 border-emerald-500 pl-3">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
                         <ShieldCheck className="h-3.5 w-3.5" />
-                        Validado manualmente
+                        {result.status === "DIVERGENCE" ? "Divergência ignorada" : "Validado manualmente"}
                       </div>
                       <p className="mt-1 text-xs leading-5 text-slate-600">{result.humanReview.justification}</p>
                       <div className="mt-1 text-[11px] text-slate-400">
@@ -139,7 +139,7 @@ export function ReconciliationResultsTable({
                       onClick={() => setReviewingResult(result)}
                     >
                       <CheckCircle2 className="h-3.5 w-3.5" />
-                      Validar item
+                      {result.status === "DIVERGENCE" ? "Ignorar divergência" : "Marcar como verificado"}
                     </button>
                   ) : null}
                 </td>
@@ -182,8 +182,12 @@ function ReviewDialog({
       <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
         <div className="flex items-start justify-between border-b border-slate-200 p-5">
           <div>
-            <h2 id="review-title" className="text-lg font-bold text-slate-950">Validar “{result.field.label}”</h2>
-            <p className="mt-1 text-sm text-slate-500">A divergência automática continuará registrada no histórico.</p>
+            <h2 id="review-title" className="text-lg font-bold text-slate-950">
+              {result.status === "DIVERGENCE" ? `Ignorar divergência em “${result.field.label}”` : `Verificar “${result.field.label}”`}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              A decisão automática e os valores originais continuarão registrados para auditoria e evolução das regras.
+            </p>
           </div>
           <button className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={onClose} title="Fechar">
             <X className="h-5 w-5" />
@@ -195,7 +199,7 @@ function ReviewDialog({
           <textarea
             id="review-justification"
             className="mt-2 min-h-28 w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-blue-100"
-            placeholder="Ex.: diferença de formatação conferida no documento original."
+            placeholder="Ex.: diferença apenas de redação; os dados representam a mesma informação."
             value={justification}
             onChange={(event) => setJustification(event.target.value)}
           />
@@ -216,7 +220,7 @@ function ReviewDialog({
             }
           >
             <ShieldCheck className="h-4 w-4" />
-            Confirmar validação
+            {result.status === "DIVERGENCE" ? "Ignorar e verificar" : "Confirmar verificação"}
           </button>
         </div>
       </div>
