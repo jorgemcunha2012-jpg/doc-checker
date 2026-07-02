@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText, ImageIcon, Paperclip, Clipboard, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { FileText, ImageIcon, Paperclip, Clipboard, Eye, X } from "lucide-react";
 import { uploadDocumentSources, documentSourceLabels, type DocumentSource, type UploadedDocument, type ValidationType } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
 
@@ -15,6 +16,8 @@ type FileDropZoneProps = {
 };
 
 export function FileDropZone({ validationType, documents, onDocumentsChange }: FileDropZoneProps) {
+  const [previewDocument, setPreviewDocument] = useState<ClientUploadedDocument | null>(null);
+
   function handleFiles(files: FileList | null) {
     if (!files?.length) {
       return;
@@ -92,6 +95,14 @@ export function FileDropZone({ validationType, documents, onDocumentsChange }: F
                   </option>
                 ))}
               </select>
+              <button
+                className="rounded-md p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700"
+                onClick={() => setPreviewDocument(document)}
+                title="Visualizar documento"
+                aria-label={`Visualizar ${document.name}`}
+              >
+                <Eye className="h-4 w-4" />
+              </button>
               <button className="rounded-md p-1.5 text-slate-500 hover:bg-white hover:text-slate-900" onClick={() => removeDocument(document.id)} title="Remover">
                 <X className="h-4 w-4" />
               </button>
@@ -100,7 +111,43 @@ export function FileDropZone({ validationType, documents, onDocumentsChange }: F
         ))}
       </div>
       </div>
+      {previewDocument ? <DocumentPreview document={previewDocument} onClose={() => setPreviewDocument(null)} /> : null}
     </section>
+  );
+}
+
+function DocumentPreview({ document, onClose }: { document: ClientUploadedDocument; onClose: () => void }) {
+  const [url, setUrl] = useState("");
+
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(document.file);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [document.file]);
+
+  const isImage = document.mimeType.includes("image");
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/80 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label={`Visualização de ${document.name}`}>
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 rounded-t-lg bg-white px-4 py-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-bold text-slate-950">{document.name}</div>
+          <div className="text-xs text-slate-500">{documentSourceLabels[document.source ?? "DOCUMENTO_COMPLEMENTAR"]}</div>
+        </div>
+        <button className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950" onClick={onClose} title="Fechar visualização">
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 items-center justify-center overflow-auto rounded-b-lg bg-slate-100">
+        {!url ? (
+          <span className="text-sm font-semibold text-slate-500">Preparando visualização...</span>
+        ) : isImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt={document.name} className="max-h-full max-w-full object-contain" />
+        ) : (
+          <iframe src={url} title={document.name} className="h-full min-h-[70vh] w-full border-0" />
+        )}
+      </div>
+    </div>
   );
 }
 
