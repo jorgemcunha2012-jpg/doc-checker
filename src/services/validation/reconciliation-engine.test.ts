@@ -104,6 +104,21 @@ test("compara ITBI com qualquer documento complementar que contenha o mesmo camp
   assert.equal(field(result, "buyer.cpf").status, "MATCH");
 });
 
+test("usa cadastro do empreendimento como referência de unidade e normaliza área", () => {
+  const result = run(
+    [
+      value("property.tower", "CADASTRO_EMPREENDIMENTO", "23"),
+      value("property.tower", "MINUTA", "Torre 23"),
+      value("property.privateArea", "CADASTRO_EMPREENDIMENTO", "45,62 m²"),
+      value("property.privateArea", "MINUTA", "45.6200m2"),
+    ],
+    ["CADASTRO_EMPREENDIMENTO", "MINUTA"],
+  );
+
+  assert.equal(field(result, "property.privateArea").status, "MATCH");
+  assert.equal(field(result, "property.tower").status, "MATCH");
+});
+
 function run(
   values: ExtractedFieldValue[],
   participatingSources: DocumentSource[] = ["SIOPI", "MINUTA", "ITBI"],

@@ -1,7 +1,7 @@
 "use client";
 
 import { FileText, ImageIcon, Paperclip, Clipboard, X } from "lucide-react";
-import { activeDocumentSources, documentSourceLabels, type DocumentSource, type UploadedDocument, type ValidationType } from "@/domain/validation";
+import { uploadDocumentSources, documentSourceLabels, type DocumentSource, type UploadedDocument, type ValidationType } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
 
 export type ClientUploadedDocument = UploadedDocument & {
@@ -86,7 +86,7 @@ export function FileDropZone({ validationType, documents, onDocumentsChange }: F
                 value={document.source ?? "SIOPI"}
                 onChange={(event) => updateDocumentSource(document.id, event.target.value as DocumentSource)}
               >
-                {activeDocumentSources.map((source) => (
+                {uploadDocumentSources.map((source) => (
                   <option key={source} value={source}>
                     {documentSourceLabels[source]}
                   </option>

@@ -29,6 +29,10 @@ export function normalizeValue(value: string, fieldType: FieldType) {
       return onlyDigits(value);
     case "valor_monetario":
       return normalizeMoney(value);
+    case "area":
+      return normalizeArea(value);
+    case "identificador_imovel":
+      return normalizePropertyIdentifier(value);
     case "data":
       return normalizeDate(value);
     case "email":
@@ -39,6 +43,20 @@ export function normalizeValue(value: string, fieldType: FieldType) {
     default:
       return normalizeText(value);
   }
+}
+
+function normalizePropertyIdentifier(value: string) {
+  return normalizeText(value)
+    .replace(/\b(TORRE|BLOCO|APARTAMENTO|APTO|UNIDADE)\b/g, "")
+    .replace(/[^\p{L}\p{N}]/gu, "")
+    .replace(/^0+(?=\d)/, "");
+}
+
+function normalizeArea(value: string) {
+  const match = value.replace(/\s/g, "").replace(",", ".").match(/\d+(?:\.\d+)?/);
+  if (!match) return normalizeText(value);
+  const numeric = Number.parseFloat(match[0]);
+  return Number.isFinite(numeric) ? numeric.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") : normalizeText(value);
 }
 
 function onlyDigits(value: string) {

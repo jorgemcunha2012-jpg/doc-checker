@@ -1,5 +1,5 @@
 import { defaultOrganization, defaultUser } from "@/domain/tenant";
-import type { UploadedDocument, ValidationProcess, ValidationType } from "@/domain/validation";
+import type { ExtractedFieldValue, UploadedDocument, ValidationProcess, ValidationType } from "@/domain/validation";
 import { getChecklist } from "@/domain/checklists";
 import { DocumentExtractionService } from "@/services/extraction/document-extraction-service";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
@@ -37,6 +37,7 @@ export async function createValidationProcessAndStart(
   schedule: (task: () => Promise<void>) => void = (task) => {
     void task();
   },
+  referenceValues: ExtractedFieldValue[] = [],
 ) {
   const process = createBaseValidationProcess(validationType, documents, user);
 
@@ -45,7 +46,7 @@ export async function createValidationProcessAndStart(
   await audit({ id: user.id, organizationId: user.organizationId }, "PROCESS_CREATED", "validation_process", process.id, {
     documents: process.documents.map((document) => document.name),
   });
-  schedule(() => processValidation(process.id, validationType, documents));
+  schedule(() => processValidation(process.id, validationType, documents, referenceValues));
 
   return process;
 }
@@ -65,14 +66,19 @@ function createBaseValidationProcess(validationType: ValidationType, documents: 
   };
 }
 
-async function processValidation(processId: string, validationType: ValidationType, documents: UploadedDocumentPayload[]) {
+async function processValidation(
+  processId: string,
+  validationType: ValidationType,
+  documents: UploadedDocumentPayload[],
+  referenceValues: ExtractedFieldValue[] = [],
+) {
   try {
     await updateAndPersist(processId, { status: "EXTRACTING" });
     const checklist = getChecklist(validationType);
     const extractionService = new DocumentExtractionService();
     const result =
       validationType === "RECONCILIATION"
-        ? await processReconciliation(processId, extractionService, checklist, documents)
+        ? await processReconciliation(processId, extractionService, checklist, documents, referenceValues)
         : await processLegacyValidation(processId, extractionService, validationType, checklist, documents);
 
     const completed = await updateAndPersist(processId, { status: "DONE", result });
@@ -119,6 +125,7 @@ async function processReconciliation(
   extractionService: DocumentExtractionService,
   checklist: ReturnType<typeof getChecklist>,
   documents: UploadedDocumentPayload[],
+  referenceValues: ExtractedFieldValue[] = [],
 ) {
   const extraction = await extractionService.extractReconciliation({
     validationType: "RECONCILIATION",
@@ -127,7 +134,17 @@ async function processReconciliation(
   });
   await updateAndPersist(processId, { status: "COMPARING" });
   const engine = new ReconciliationEngine();
-  return { ...engine.run(defaultOrganization.id, extraction), id: processId };
+  const hasReference = referenceValues.length > 0;
+  return {
+    ...engine.run(defaultOrganization.id, {
+      ...extraction,
+      values: [...extraction.values, ...referenceValues],
+      participatingSources: hasReference
+        ? [...extraction.participatingSources, "CADASTRO_EMPREENDIMENTO"]
+        : extraction.participatingSources,
+    }),
+    id: processId,
+  };
 }
 
 async function updateAndPersist(processId: string, patch: Partial<ValidationProcess>) {

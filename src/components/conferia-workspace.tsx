@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, Check, CheckCircle2, Download, FileCheck2, FileSearch, Layers3, Loader2, ScanText, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
+import { AlertTriangle, Building2, Check, CheckCircle2, Clock3, Download, FileCheck2, FileSearch, Layers3, Loader2, ScanText, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
 import type { HumanReview, ReconciliationRun, User, ValidationProcess, ValidationRun } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
@@ -9,6 +9,7 @@ import { ClientUploadedDocument, FileDropZone } from "./file-drop-zone";
 import { ReconciliationResultsTable } from "./reconciliation-results-table";
 import { LogoutButton } from "./logout-button";
 import Link from "next/link";
+import type { Development } from "@/domain/development";
 
 const validationType = "RECONCILIATION" as const;
 const usesPersistentReviews = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -21,6 +22,15 @@ export function ConferiaWorkspace({ currentUser }: { currentUser: User }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [processingStartedAt, setProcessingStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [developments, setDevelopments] = useState<Development[]>([]);
+  const [developmentId, setDevelopmentId] = useState("");
+  const [developmentUnitId, setDevelopmentUnitId] = useState("");
+
+  useEffect(() => {
+    void fetch("/api/developments")
+      .then((response) => response.ok ? response.json() : { developments: [] })
+      .then((payload) => setDevelopments(payload.developments ?? []));
+  }, []);
 
   useEffect(() => {
     if (!run || run.validationType !== "RECONCILIATION") return;
@@ -121,7 +131,9 @@ export function ConferiaWorkspace({ currentUser }: { currentUser: User }) {
     return () => window.clearInterval(interval);
   }, [processId]);
 
-  const hasDocuments = new Set(documents.map((document) => document.source).filter(Boolean)).size >= 2;
+  const selectedDevelopment = developments.find((development) => development.id === developmentId);
+  const hasDocuments =
+    new Set(documents.map((document) => document.source).filter(Boolean)).size + (developmentUnitId ? 1 : 0) >= 2;
   const isProcessing = isSubmitting || process?.status === "PENDING" || process?.status === "EXTRACTING" || process?.status === "COMPARING";
 
   const processSteps = useMemo(
@@ -145,6 +157,7 @@ export function ConferiaWorkspace({ currentUser }: { currentUser: User }) {
     formData.set("validationType", validationType);
     documents.forEach((document) => formData.append("documents", document.file, document.name));
     formData.set("documentSources", JSON.stringify(documents.map((document) => document.source ?? "SIOPI")));
+    if (developmentUnitId) formData.set("developmentUnitId", developmentUnitId);
 
     const response = await fetch("/api/validation-processes", {
       method: "POST",
@@ -264,6 +277,7 @@ export function ConferiaWorkspace({ currentUser }: { currentUser: User }) {
             <span className="text-slate-300">|</span>
             {currentUser.name}
             <Link href="/change-password" className="text-blue-600">Alterar senha</Link>
+            {currentUser.role === "ADMIN" ? <a href="/developments" className="text-blue-600">Empreendimentos</a> : null}
             <LogoutButton />
           </div>
         </div>
@@ -300,8 +314,30 @@ export function ConferiaWorkspace({ currentUser }: { currentUser: User }) {
           </div>
 
           <FileDropZone validationType={validationType} documents={documents} onDocumentsChange={setDocuments} />
+          {documents.length ? <AnalysisEstimate documents={documents} /> : null}
 
-          {isProcessing ? <ProcessingPanel steps={processSteps} elapsedSeconds={elapsedSeconds} documentCount={documents.length} /> : null}
+          <section className="border border-slate-200 bg-white p-5 sm:p-6">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-base font-bold text-slate-950">Referência do empreendimento</h2>
+              <p className="text-sm text-slate-500">Opcional. Selecione a unidade para conferir torre, apartamento, área privativa, empreendimento e matrícula contra os documentos enviados.</p>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-bold text-slate-600">Empreendimento
+                <select className="mt-1 block min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900" value={developmentId} onChange={(event) => { setDevelopmentId(event.target.value); setDevelopmentUnitId(""); }}>
+                  <option value="">Sem cadastro mestre</option>
+                  {developments.map((development) => <option key={development.id} value={development.id}>{development.name}</option>)}
+                </select>
+              </label>
+              <label className="text-xs font-bold text-slate-600">Torre e unidade
+                <select disabled={!selectedDevelopment} className="mt-1 block min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 disabled:bg-slate-100" value={developmentUnitId} onChange={(event) => setDevelopmentUnitId(event.target.value)}>
+                  <option value="">Selecione a unidade</option>
+                  {selectedDevelopment?.units.map((unit) => <option key={unit.id} value={unit.id}>Torre {unit.tower} · Apto {unit.unit} · {unit.privateArea} m²</option>)}
+                </select>
+              </label>
+            </div>
+          </section>
+
+          {isProcessing ? <ProcessingPanel steps={processSteps} elapsedSeconds={elapsedSeconds} documents={documents} /> : null}
           {process?.status === "FAILED" ? <ProcessError message={process.error} /> : null}
 
           {run ? (
@@ -441,12 +477,13 @@ function ReviewProgress({ run }: { run: ReconciliationRun }) {
 function ProcessingPanel({
   steps,
   elapsedSeconds,
-  documentCount,
+  documents,
 }: {
   steps: Array<{ icon: typeof FileSearch; label: string; threshold: number }>;
   elapsedSeconds: number;
-  documentCount: number;
+  documents: ClientUploadedDocument[];
 }) {
+  const estimate = estimateAnalysis(documents);
   const activeIndex = Math.min(
     steps.length - 1,
     steps.findLastIndex((step) => elapsedSeconds >= step.threshold),
@@ -461,7 +498,8 @@ function ProcessingPanel({
             <Loader2 className="h-4 w-4 animate-spin text-[#2563eb]" />
             Conferência em andamento
           </div>
-          <p className="mt-1 text-sm text-slate-600">{documentCount} documentos em processamento · {formatElapsed(elapsedSeconds)}</p>
+          <p className="mt-1 text-sm text-slate-600">{documents.length} documentos em processamento · {formatElapsed(elapsedSeconds)}</p>
+          <p className="mt-1 text-xs font-semibold text-blue-700">Tempo estimado: {estimate.label}</p>
         </div>
         <span className="text-xs font-semibold text-slate-500">Não feche esta página</span>
       </div>
@@ -482,9 +520,39 @@ function ProcessingPanel({
           );
         })}
       </div>
-      <p className="mt-4 text-xs text-slate-500">A etapa exibida é uma estimativa. PDFs extensos passam por seleção inteligente de trechos e fallback amplo quando necessário.</p>
+      <p className="mt-4 text-xs text-slate-500">
+        {elapsedSeconds > estimate.maxSeconds
+          ? "O processamento ultrapassou a estimativa. Isso pode acontecer quando um PDF é escaneado, muito extenso ou exige nova tentativa de leitura."
+          : "A etapa e o prazo são estimativas. O tempo pode variar conforme legibilidade, quantidade de páginas e resposta dos provedores de IA."}
+      </p>
     </section>
   );
+}
+
+function AnalysisEstimate({ documents }: { documents: ClientUploadedDocument[] }) {
+  const estimate = estimateAnalysis(documents);
+  return (
+    <div className="flex items-start gap-3 border border-slate-200 bg-slate-50 px-4 py-3">
+      <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+      <div>
+        <div className="text-sm font-bold text-slate-800">Estimativa para estes arquivos: {estimate.label}</div>
+        <p className="mt-1 text-xs leading-5 text-slate-500">
+          PDFs com texto interno são processados mais rapidamente. PDFs escaneados precisam de leitura visual/OCR e podem levar alguns minutos.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function estimateAnalysis(documents: ClientUploadedDocument[]) {
+  const pdfs = documents.filter((document) => document.mimeType.includes("pdf") || document.name.toLowerCase().endsWith(".pdf"));
+  const images = documents.length - pdfs.length;
+  const hasLargePdf = pdfs.some((document) => (document.sizeBytes ?? 0) >= 3 * 1024 * 1024);
+
+  if (hasLargePdf) return { label: "2 a 6 minutos", maxSeconds: 360 };
+  if (pdfs.length && images) return { label: "1 a 3 minutos", maxSeconds: 180 };
+  if (pdfs.length) return { label: "40 segundos a 2 minutos", maxSeconds: 120 };
+  return { label: images > 2 ? "1 a 3 minutos" : "30 segundos a 2 minutos", maxSeconds: images > 2 ? 180 : 120 };
 }
 
 function ProcessError({ message }: { message?: string }) {

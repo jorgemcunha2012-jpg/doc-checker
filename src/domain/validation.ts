@@ -5,6 +5,7 @@ export type DocumentSource =
   | "MINUTA"
   | "ITBI"
   | "DADOS_RESERVA"
+  | "CADASTRO_EMPREENDIMENTO"
   | "MATRICULA"
   | "CERTIDAO"
   | "DOCUMENTO_COMPLEMENTAR";
@@ -14,16 +15,22 @@ export const activeDocumentSources: DocumentSource[] = [
   "MINUTA",
   "ITBI",
   "DADOS_RESERVA",
+  "CADASTRO_EMPREENDIMENTO",
   "MATRICULA",
   "CERTIDAO",
   "DOCUMENTO_COMPLEMENTAR",
 ];
+
+export const uploadDocumentSources = activeDocumentSources.filter(
+  (source) => source !== "CADASTRO_EMPREENDIMENTO",
+);
 
 export const documentSourceLabels: Record<DocumentSource, string> = {
   SIOPI: "Espelho SIOPI",
   MINUTA: "Minuta",
   ITBI: "ITBI",
   DADOS_RESERVA: "Dados da Reserva",
+  CADASTRO_EMPREENDIMENTO: "Cadastro do Empreendimento",
   MATRICULA: "Matrícula",
   CERTIDAO: "Certidão",
   DOCUMENTO_COMPLEMENTAR: "Documento complementar",
@@ -46,6 +53,8 @@ export type FieldType =
   | "cpf"
   | "cnpj"
   | "valor_monetario"
+  | "area"
+  | "identificador_imovel"
   | "data"
   | "endereco"
   | "rg"

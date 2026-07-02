@@ -5,6 +5,8 @@ import { activeDocumentSources, type DocumentSource, type UploadedDocument, type
 import { createValidationProcessAndStart } from "@/services/process/process-validation";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
 import { requireUser, AuthError } from "@/lib/auth";
+import { developmentUnitValues } from "@/domain/development";
+import { getDevelopmentUnit } from "@/services/development/development-repository";
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 const ACCEPTED_MIME_TYPES = new Set(["image/png", "image/jpeg", "application/pdf"]);
@@ -51,13 +53,29 @@ export async function POST(request: Request) {
     files.map((file, index) => toUploadedDocumentPayload(file, validationType, documentSources?.[index], currentUser.organizationId)),
   );
   const documentValidation =
-    validationType === "RECONCILIATION" ? validateReconciliationSources(documents) : validateComparisonSides(documents);
+    validationType === "RECONCILIATION" ? validateReconciliationSources(documents, formData.get("developmentUnitId")) : validateComparisonSides(documents);
 
   if (documentValidation) {
     return NextResponse.json({ error: documentValidation }, { status: 400 });
   }
 
-  const validationProcess = await createValidationProcessAndStart(validationType, documents, currentUser, (task) => after(task));
+  const developmentUnitId = formData.get("developmentUnitId");
+  const selectedDevelopment = typeof developmentUnitId === "string" && developmentUnitId
+    ? await getDevelopmentUnit(currentUser.organizationId, developmentUnitId)
+    : null;
+  if (developmentUnitId && !selectedDevelopment) {
+    return NextResponse.json({ error: "A unidade selecionada não foi encontrada." }, { status: 400 });
+  }
+  const referenceValues = selectedDevelopment
+    ? developmentUnitValues(selectedDevelopment.development, selectedDevelopment.unit)
+    : [];
+  const validationProcess = await createValidationProcessAndStart(
+    validationType,
+    documents,
+    currentUser,
+    (task) => after(task),
+    referenceValues,
+  );
 
   return NextResponse.json({
     processId: validationProcess.id,
@@ -125,9 +143,10 @@ function parseDocumentSources(value: FormDataEntryValue | null, expectedLength: 
   }
 }
 
-function validateReconciliationSources(documents: UploadedDocumentPayload[]) {
+function validateReconciliationSources(documents: UploadedDocumentPayload[], developmentUnitId: FormDataEntryValue | null) {
   const sources = new Set(documents.map((document) => document.source).filter(Boolean));
-  return sources.size < 2 ? "Envie documentos de pelo menos duas fontes distintas para reconciliar." : null;
+  const sourceCount = sources.size + (typeof developmentUnitId === "string" && developmentUnitId ? 1 : 0);
+  return sourceCount < 2 ? "Envie documentos de pelo menos duas fontes ou selecione uma unidade do cadastro mestre." : null;
 }
 
 function resolveDocumentType(file: File, validationType: ValidationType): UploadedDocument["type"] {

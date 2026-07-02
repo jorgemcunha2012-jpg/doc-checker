@@ -28,7 +28,7 @@ export class OpenAICompatibleClient {
 
   async completeJson(
     messages: ChatMessage[],
-    options: { timeoutMs?: number } = {},
+    options: { timeoutMs?: number; maxTokens?: number } = {},
   ) {
     const { apiKey, baseUrl, model, providerName } = this.config;
 
@@ -47,6 +47,7 @@ export class OpenAICompatibleClient {
         model,
         messages,
         temperature: 1,
+        ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
         response_format: { type: "json_object" },
       }),
     });
