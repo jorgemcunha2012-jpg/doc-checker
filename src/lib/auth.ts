@@ -9,6 +9,18 @@ export type AuthenticatedUser = User & {
 };
 
 export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
+  if (isPublicAccessEnabled()) {
+    return {
+      id: process.env.CONFERIA_PUBLIC_USER_ID ?? defaultUser.id,
+      organizationId: process.env.CONFERIA_ORGANIZATION_ID ?? defaultUser.organizationId,
+      name: "Acesso público",
+      email: "publico@conferia.local",
+      role: "ANALISTA",
+      active: true,
+      mustChangePassword: false,
+    };
+  }
+
   if (!isSupabaseConfigured()) {
     return { ...defaultUser, active: true, mustChangePassword: false };
   }
@@ -33,6 +45,10 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
     active: profile.active,
     mustChangePassword: profile.must_change_password,
   };
+}
+
+export function isPublicAccessEnabled() {
+  return process.env.CONFERIA_AUTH_DISABLED === "true";
 }
 
 export async function requireUser() {

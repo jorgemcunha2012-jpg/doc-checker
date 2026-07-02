@@ -14,7 +14,7 @@ import type { Development } from "@/domain/development";
 const validationType = "RECONCILIATION" as const;
 const usesPersistentReviews = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
-export function ConferiaWorkspace({ currentUser }: { currentUser: User }) {
+export function ConferiaWorkspace({ currentUser, publicAccess = false }: { currentUser: User; publicAccess?: boolean }) {
   const [documents, setDocuments] = useState<ClientUploadedDocument[]>([]);
   const [processId, setProcessId] = useState<string | null>(null);
   const [process, setProcess] = useState<ValidationProcess | null>(null);
@@ -272,14 +272,14 @@ export function ConferiaWorkspace({ currentUser }: { currentUser: User }) {
               <div className="text-xs font-medium text-slate-500">Conferência documental imobiliária</div>
             </div>
           </div>
-          <div className="hidden items-center gap-2 text-xs font-semibold text-slate-500 sm:flex">
+          {!publicAccess ? <div className="hidden items-center gap-2 text-xs font-semibold text-slate-500 sm:flex">
             {currentUser.role === "ADMIN" ? <Link href="/admin" className="text-blue-600">Painel administrativo</Link> : null}
             <span className="text-slate-300">|</span>
             {currentUser.name}
             <Link href="/change-password" className="text-blue-600">Alterar senha</Link>
             {currentUser.role === "ADMIN" ? <a href="/developments" className="text-blue-600">Empreendimentos</a> : null}
             <LogoutButton />
-          </div>
+          </div> : null}
         </div>
       </header>
 
