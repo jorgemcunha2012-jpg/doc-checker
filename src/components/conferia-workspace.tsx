@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, Check, CheckCircle2, Clock3, Download, FileCheck2, FileSearch, Layers3, Loader2, ScanText, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
+import { AlertTriangle, Building2, Check, CheckCircle2, Clock3, Download, FileCheck2, FilePlus2, FileSearch, Layers3, Loader2, ScanText, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
 import type { HumanReview, ReconciliationRun, User, ValidationProcess, ValidationRun } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
@@ -224,6 +224,19 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false }: { curre
     URL.revokeObjectURL(url);
   }
 
+  function handleNewValidation() {
+    setDocuments([]);
+    setProcessId(null);
+    setProcess(null);
+    setRun(null);
+    setIsSubmitting(false);
+    setProcessingStartedAt(null);
+    setElapsedSeconds(0);
+    setDevelopmentId("");
+    setDevelopmentUnitId("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function handleReview(fieldId: string, review?: HumanReview) {
     if (usesPersistentReviews && run?.validationType === "RECONCILIATION") {
       const url = `/api/processes/${run.id}/review${review ? "" : `?fieldId=${encodeURIComponent(fieldId)}`}`;
@@ -381,13 +394,22 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false }: { curre
                   ))}
                 </div>
               ) : null}
-              <button
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                onClick={handleExportReport}
-              >
-                <Download className="h-4 w-4" />
-                Exportar relatório
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700"
+                  onClick={handleNewValidation}
+                >
+                  <FilePlus2 className="h-4 w-4" />
+                  Nova conferência
+                </button>
+                <button
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                  onClick={handleExportReport}
+                >
+                  <Download className="h-4 w-4" />
+                  Exportar relatório
+                </button>
+              </div>
               {run.validationType === "RECONCILIATION" ? (
                 <ReconciliationResultsTable
                   results={run.results}
