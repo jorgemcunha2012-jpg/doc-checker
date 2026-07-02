@@ -25,6 +25,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false }: { curre
   const [developments, setDevelopments] = useState<Development[]>([]);
   const [developmentId, setDevelopmentId] = useState("");
   const [developmentUnitId, setDevelopmentUnitId] = useState("");
+  const [reportFilter, setReportFilter] = useState<"ALL" | "DIVERGENCES" | "PENDING" | "CHECKED">("ALL");
 
   useEffect(() => {
     void fetch("/api/developments")
@@ -208,7 +209,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false }: { curre
     const response = await fetch("/api/reports/validation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(run),
+      body: JSON.stringify({ run, filter: reportFilter }),
     });
 
     if (!response.ok) {
@@ -219,7 +220,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false }: { curre
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `conferia-${run.id}.pdf`;
+    link.download = `conferia-${run.id}-${reportFilter.toLowerCase()}.pdf`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -402,6 +403,17 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false }: { curre
                   <FilePlus2 className="h-4 w-4" />
                   Nova conferência
                 </button>
+                <select
+                  aria-label="Filtro do relatório"
+                  className="min-h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+                  value={reportFilter}
+                  onChange={(event) => setReportFilter(event.target.value as typeof reportFilter)}
+                >
+                  <option value="ALL">Relatório completo</option>
+                  <option value="DIVERGENCES">Somente divergências pendentes</option>
+                  <option value="PENDING">Todas as pendências</option>
+                  <option value="CHECKED">Somente itens conferidos</option>
+                </select>
                 <button
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
                   onClick={handleExportReport}
