@@ -110,7 +110,7 @@ function ValidationReportDocument({ run, filter }: { run: ValidationRun; filter:
                   {result.humanReview ? (
                     <>
                       <Text style={styles.evidence}>Validado manualmente por {result.humanReview.reviewerName}</Text>
-                      <Text style={styles.evidence}>{result.humanReview.justification}</Text>
+                      {result.humanReview.justification ? <Text style={styles.evidence}>{result.humanReview.justification}</Text> : null}
                     </>
                   ) : null}
                 </View>

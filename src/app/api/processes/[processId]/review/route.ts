@@ -12,8 +12,8 @@ export async function PUT(request: Request, context: { params: Promise<{ process
     if (typeof fieldId !== "string" || !fieldId.trim()) {
       return NextResponse.json({ error: "Campo obrigatório." }, { status: 400 });
     }
-    if (typeof justification !== "string" || justification.trim().length < 5 || justification.trim().length > 1000) {
-      return NextResponse.json({ error: "Informe uma justificativa entre 5 e 1.000 caracteres." }, { status: 400 });
+    if (justification != null && (typeof justification !== "string" || justification.trim().length > 1000)) {
+      return NextResponse.json({ error: "A observação deve ter no máximo 1.000 caracteres." }, { status: 400 });
     }
     const supabase = createSupabaseAdminClient();
     const { data: process } = await supabase.from("validation_processes").select("user_id, organization_id").eq("id", processId).single();
@@ -32,7 +32,7 @@ export async function PUT(request: Request, context: { params: Promise<{ process
     }
     const review: HumanReview = {
       status: "APPROVED",
-      justification: justification.trim(),
+      justification: typeof justification === "string" ? justification.trim() : "",
       reviewerId: user.id,
       reviewerName: user.name,
       reviewedAt: new Date().toISOString(),

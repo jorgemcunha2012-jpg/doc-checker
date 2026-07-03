@@ -121,7 +121,9 @@ export function ReconciliationResultsTable({
                         <ShieldCheck className="h-3.5 w-3.5" />
                         {result.status === "DIVERGENCE" ? "Divergência ignorada" : "Validado manualmente"}
                       </div>
-                      <p className="mt-1 text-xs leading-5 text-slate-600">{result.humanReview.justification}</p>
+                      {result.humanReview.justification ? (
+                        <p className="mt-1 text-xs leading-5 text-slate-600">{result.humanReview.justification}</p>
+                      ) : null}
                       <div className="mt-1 text-[11px] text-slate-400">
                         {result.humanReview.reviewerName} · {formatReviewDate(result.humanReview.reviewedAt)}
                       </div>
@@ -175,7 +177,6 @@ function ReviewDialog({
   reviewer: User;
 }) {
   const [justification, setJustification] = useState("");
-  const canConfirm = justification.trim().length >= 5;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4" role="dialog" aria-modal="true" aria-labelledby="review-title">
@@ -195,7 +196,7 @@ function ReviewDialog({
         </div>
         <div className="p-5">
           <div className="rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">{result.observation}</div>
-          <label className="mt-4 block text-sm font-bold text-slate-800" htmlFor="review-justification">Justificativa</label>
+          <label className="mt-4 block text-sm font-bold text-slate-800" htmlFor="review-justification">Observação <span className="font-normal text-slate-400">(opcional)</span></label>
           <textarea
             id="review-justification"
             className="mt-2 min-h-28 w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-blue-100"
@@ -208,7 +209,6 @@ function ReviewDialog({
           <button className="min-h-10 rounded-md px-4 text-sm font-bold text-slate-600 hover:bg-slate-100" onClick={onClose}>Cancelar</button>
           <button
             className="inline-flex min-h-10 items-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-            disabled={!canConfirm}
             onClick={() =>
               onConfirm({
                 status: "APPROVED",
