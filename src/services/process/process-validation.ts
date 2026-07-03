@@ -90,11 +90,19 @@ async function processValidation(
       await persistResults(processId, completed.result);
     }
     if (completed) {
+      const elapsedMs = durationMs(completed.createdAt, completed.updatedAt);
       await audit({ id: completed.userId, organizationId: completed.organizationId }, "PROCESS_FINISHED", "validation_process", completed.id, {
         documents: completed.documents.map((document) => document.name),
         summary: completed.result?.summary,
-        durationMs: durationMs(completed.createdAt, completed.updatedAt),
+        durationMs: elapsedMs,
       });
+      if (elapsedMs != null && elapsedMs >= 10 * 60 * 1000) {
+        await audit({ id: completed.userId, organizationId: completed.organizationId }, "PROCESS_SLOW", "validation_process", completed.id, {
+          documents: completed.documents.map((document) => document.name),
+          durationMs: elapsedMs,
+          thresholdMs: 10 * 60 * 1000,
+        });
+      }
     }
   } catch (error) {
     const failed = await updateAndPersist(processId, {
