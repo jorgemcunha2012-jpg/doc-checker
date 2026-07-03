@@ -1,10 +1,10 @@
-import type { ChecklistField, ProviderExtractionOutput } from "@/domain/validation";
+import type { ChecklistField, ExtractedField, ProviderExtractionOutput } from "@/domain/validation";
 
 export function checklistPrompt(checklist: ChecklistField[]) {
   return checklist
     .map(
       (field) =>
-        `- ${field.id}: ${field.label}; tipo=${field.fieldType}; categoria=${field.category}${fieldExtractionHint(field.id) ? `; regra=${fieldExtractionHint(field.id)}` : ""}`,
+        `- ${field.id}: ${field.label}; tipo=${field.fieldType}; categoria=${field.category}${field.allowMultiple ? "; repetível por participante; retorne uma entrada por pessoa e use o mesmo participantId em todos os campos da mesma pessoa" : ""}${fieldExtractionHint(field.id) ? `; regra=${fieldExtractionHint(field.id)}` : ""}`,
     )
     .join("\n");
 }
@@ -27,22 +27,35 @@ export function coerceExtractionOutput(value: unknown, checklist: ChecklistField
       value?: unknown;
       confidence?: unknown;
       sourceLocation?: { page?: unknown; section?: unknown; rawText?: unknown };
+      participantId?: unknown;
     }>;
   };
   const allowedIds = new Set(checklist.map((field) => field.id));
   const fields = Array.isArray(objectValue.fields) ? objectValue.fields : [];
 
   return {
-    fields: checklist.map((field) => {
-      const found = fields.find((item) => item.fieldId === field.id && allowedIds.has(field.id));
-      return {
+    fields: checklist.flatMap((field): ExtractedField[] => {
+      const found = fields.filter((item) => item.fieldId === field.id && allowedIds.has(field.id));
+      const candidates = field.allowMultiple ? found : found.slice(0, 1);
+      if (!candidates.length) {
+        return [{ fieldId: field.id, value: null, confidence: 0, sourceLocation: undefined, participantId: undefined }];
+      }
+      return candidates.map((item, index) => ({
         fieldId: field.id,
-        value: typeof found?.value === "string" || typeof found?.value === "number" ? String(found.value) : null,
-        confidence: clampConfidence(found?.confidence),
-        sourceLocation: coerceSourceLocation(found?.sourceLocation),
-      };
+        value: typeof item.value === "string" || typeof item.value === "number" ? String(item.value) : null,
+        confidence: clampConfidence(item.confidence),
+        sourceLocation: coerceSourceLocation(item.sourceLocation),
+        participantId: field.allowMultiple ? coerceParticipantId(item.participantId, index) : undefined,
+      }));
     }),
   };
+}
+
+function coerceParticipantId(value: unknown, index: number) {
+  const normalized = typeof value === "string"
+    ? value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_").slice(0, 60)
+    : "";
+  return normalized || `buyer_${index + 1}`;
 }
 
 function coerceSourceLocation(value: { page?: unknown; section?: unknown; rawText?: unknown } | undefined) {

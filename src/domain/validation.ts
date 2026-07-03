@@ -98,6 +98,9 @@ export type ChecklistField = {
   scopeCondition?: string;
   allowMultiple?: boolean;
   expectedSources?: DocumentSource[];
+  baseFieldId?: string;
+  participantId?: string;
+  participantLabel?: string;
 };
 
 export type ExtractedField = {
@@ -105,6 +108,7 @@ export type ExtractedField = {
   value: string | null;
   confidence: number;
   sourceLocation?: SourceLocation;
+  participantId?: string;
 };
 
 export type SourceLocation = {

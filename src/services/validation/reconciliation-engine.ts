@@ -24,7 +24,10 @@ export type ReconciliationInput = {
 
 export class ReconciliationEngine {
   run(organizationId: string, input: ReconciliationInput): ReconciliationRun {
-    const checklist = getChecklist("RECONCILIATION").filter((field) => field.itemType === "COMPARISON");
+    const checklist = expandParticipantFields(
+      getChecklist("RECONCILIATION").filter((field) => field.itemType === "COMPARISON"),
+      input.values,
+    );
     const results = checklist
       .filter((field) => this.hasEvidenceForField(field, input))
       .map((field) => this.compareField(organizationId, field, input));
@@ -66,7 +69,7 @@ export class ReconciliationEngine {
 
   private hasEvidenceForField(field: ChecklistField, input: ReconciliationInput) {
     return input.participatingSources.some((source) => field.expectedSources?.includes(source)) ||
-      input.values.some((value) => value.fieldId === field.id);
+      input.values.some((value) => matchesFieldValue(value, field));
   }
 
   private compareField(
@@ -75,12 +78,12 @@ export class ReconciliationEngine {
     input: ReconciliationInput,
   ): FieldComparisonResult {
     const evidenceParticipants = input.participatingSources.filter((source) =>
-      input.values.some((value) => value.fieldId === field.id && value.source === source),
+      input.values.some((value) => matchesFieldValue(value, field) && value.source === source),
     );
     const comparisonParticipants = input.participatingSources.filter((source) =>
       input.values.some(
         (value) =>
-          value.fieldId === field.id &&
+          matchesFieldValue(value, field) &&
           value.source === source &&
           value.value != null &&
           String(value.value).trim().length > 0,
@@ -89,7 +92,7 @@ export class ReconciliationEngine {
     const valuesBySource: Partial<Record<DocumentSource, ReconciliationSourceValue>> = {};
 
     for (const source of evidenceParticipants) {
-      const extracted = input.values.find((value) => value.fieldId === field.id && value.source === source);
+      const extracted = input.values.find((value) => matchesFieldValue(value, field) && value.source === source);
       const rawValue = extracted?.value == null ? null : String(extracted.value).trim();
       valuesBySource[source] = {
         value: rawValue || null,
@@ -99,7 +102,8 @@ export class ReconciliationEngine {
       };
     }
 
-    const conflicts = comparisonParticipants.filter((source) => input.conflictedFieldsBySource[source]?.includes(field.id));
+    const conflictId = field.participantId ? `${field.baseFieldId ?? field.id}::${field.participantId}` : field.id;
+    const conflicts = comparisonParticipants.filter((source) => input.conflictedFieldsBySource[source]?.includes(conflictId));
     if (conflicts.length) {
       return result(
         organizationId,
@@ -174,6 +178,40 @@ export class ReconciliationEngine {
     addDiffTokens(comparisonParticipants, valuesBySource);
     return result(organizationId, field, valuesBySource, "DIVERGENCE", buildSourceDiagnostic(groups));
   }
+}
+
+function expandParticipantFields(checklist: ChecklistField[], values: ExtractedFieldValue[]) {
+  const participantIds = [...new Set(values.map((value) => value.participantId).filter((value): value is string => Boolean(value)))];
+  if (!participantIds.length) return checklist;
+
+  const participantNames = new Map(
+    participantIds.map((participantId, index) => {
+      const name = values.find(
+        (value) => value.participantId === participantId && value.fieldId === "buyer.name" && value.value,
+      )?.value;
+      return [participantId, name ? String(name) : `Comprador ${index + 1}`];
+    }),
+  );
+
+  const repeatedFields = checklist.filter((field) => field.allowMultiple);
+  const identificationFields = checklist.filter((field) => !field.allowMultiple && field.category === "Identificação do contrato");
+  const remainingFields = checklist.filter((field) => !field.allowMultiple && field.category !== "Identificação do contrato");
+  const participantFields = participantIds.flatMap((participantId) =>
+    repeatedFields.map((field) => ({
+      ...field,
+      id: `${field.id}::${participantId}`,
+      baseFieldId: field.id,
+      participantId,
+      participantLabel: participantNames.get(participantId),
+      label: `${field.label} · ${participantNames.get(participantId)}`,
+    })),
+  );
+  return [...identificationFields, ...participantFields, ...remainingFields];
+}
+
+function matchesFieldValue(value: ExtractedFieldValue, field: ChecklistField) {
+  return value.fieldId === (field.baseFieldId ?? field.id) &&
+    (!field.participantId || value.participantId === field.participantId);
 }
 
 function result(

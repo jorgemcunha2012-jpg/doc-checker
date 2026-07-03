@@ -1,4 +1,5 @@
 import { getChecklist } from "@/domain/checklists";
+import { createHash } from "node:crypto";
 import type { DocumentSource, ExtractedFieldValue, ProviderExtractionOutput } from "@/domain/validation";
 import { normalizeValue } from "@/services/normalization/normalization-service";
 import { DeepSeekProvider } from "./deepseek-provider";
@@ -70,7 +71,7 @@ export class DocumentExtractionService {
     );
 
     return {
-      values: sourceResults.flatMap((result) => result.values),
+      values: alignParticipantIdentities(sourceResults.flatMap((result) => result.values)),
       participatingSources,
       unreadableSources: sourceResults.filter((result) => result.unreadable).map((result) => result.source),
       sourceErrors: Object.fromEntries(
@@ -334,24 +335,83 @@ function consolidateSourceOutputs(
   checklist: ExtractionRequest["checklist"],
 ) {
   const conflictedFields: string[] = [];
-  const values: ExtractedFieldValue[] = checklist.map((field) => {
+  const values: ExtractedFieldValue[] = checklist.flatMap((field): ExtractedFieldValue[] => {
     const candidates = outputs
       .flatMap((output) => output.fields)
       .filter((candidate) => candidate.fieldId === field.id && candidate.value != null && String(candidate.value).trim());
+    if (field.allowMultiple) {
+      const grouped = new Map<string, typeof candidates>();
+      for (const candidate of candidates) {
+        const participantId = candidate.participantId ?? "buyer_1";
+        grouped.set(participantId, [...(grouped.get(participantId) ?? []), candidate]);
+      }
+      if (!grouped.size) {
+        return [{ fieldId: field.id, source, value: null, confidence: 0, sourceLocation: undefined, participantId: undefined }];
+      }
+      return [...grouped.entries()].map(([participantId, participantCandidates]) => {
+        const distinctValues = new Set(
+          participantCandidates.map((candidate) => normalizeValue(String(candidate.value), field.fieldType)),
+        );
+        if (distinctValues.size > 1) conflictedFields.push(`${field.id}::${participantId}`);
+        const best = participantCandidates.sort((left, right) => right.confidence - left.confidence)[0];
+        return {
+          fieldId: field.id,
+          participantId,
+          source,
+          value: best?.value ?? null,
+          confidence: best?.confidence ?? 0,
+          sourceLocation: best?.sourceLocation,
+        };
+      });
+    }
     const distinctValues = new Set(
       candidates.map((candidate) => normalizeValue(String(candidate.value), field.fieldType)),
     );
     if (distinctValues.size > 1) conflictedFields.push(field.id);
     const best = candidates.sort((left, right) => right.confidence - left.confidence)[0];
 
-    return {
+    return [{
       fieldId: field.id,
       source,
       value: best?.value ?? null,
       confidence: best?.confidence ?? 0,
       sourceLocation: best?.sourceLocation,
-    };
+    }];
   });
 
   return { values, conflictedFields };
+}
+
+function alignParticipantIdentities(values: ExtractedFieldValue[]) {
+  const participantValues = values.filter((value) => value.participantId);
+  const identities = new Map<string, { cpf?: string; name?: string }>();
+  for (const value of participantValues) {
+    const key = `${value.source}::${value.participantId}`;
+    const identity = identities.get(key) ?? {};
+    if (value.fieldId === "buyer.cpf" && value.value) identity.cpf = normalizeValue(String(value.value), "cpf");
+    if (value.fieldId === "buyer.name" && value.value) identity.name = normalizeValue(String(value.value), "texto");
+    identities.set(key, identity);
+  }
+
+  const canonicalByName = new Map<string, string>();
+  for (const identity of identities.values()) {
+    if (identity.cpf && identity.name) canonicalByName.set(identity.name, participantKey(`cpf:${identity.cpf}`));
+  }
+
+  return values.map((value) => {
+    if (!value.participantId) return value;
+    const identity = identities.get(`${value.source}::${value.participantId}`);
+    const canonical = identity?.cpf
+      ? participantKey(`cpf:${identity.cpf}`)
+      : identity?.name && canonicalByName.get(identity.name)
+        ? canonicalByName.get(identity.name)
+        : identity?.name
+          ? participantKey(`name:${identity.name}`)
+          : `${value.source.toLowerCase()}_${value.participantId}`;
+    return { ...value, participantId: canonical };
+  });
+}
+
+function participantKey(identity: string) {
+  return `participant_${createHash("sha256").update(identity).digest("hex").slice(0, 16)}`;
 }

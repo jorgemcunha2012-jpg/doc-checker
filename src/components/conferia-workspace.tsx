@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, Check, CheckCircle2, Clock3, Download, FileCheck2, FilePlus2, FileSearch, Layers3, Loader2, ScanText, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
+import { AlertTriangle, Building2, Check, CheckCircle2, Clock3, Download, FileCheck2, FilePlus2, FileSearch, Layers3, Loader2, ScanText, ShieldCheck, Sparkles, UploadCloud, UsersRound } from "lucide-react";
 import type { HumanReview, ReconciliationRun, User, ValidationProcess, ValidationRun } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
@@ -358,6 +358,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false }: { curre
           {run ? (
             <>
               {run.validationType === "RECONCILIATION" ? <ReviewProgress run={run} /> : null}
+              {run.validationType === "RECONCILIATION" ? <ParticipantSummary run={run} /> : null}
               {run.usedPdfVisionFallback ? (
                 <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -506,6 +507,28 @@ function ReviewProgress({ run }: { run: ReconciliationRun }) {
         <div className={`h-full rounded-full ${unresolved === 0 ? "bg-emerald-500" : "bg-[#2563eb]"}`} style={{ width: `${progress}%` }} />
       </div>
     </section>
+  );
+}
+
+function ParticipantSummary({ run }: { run: ReconciliationRun }) {
+  const participants = Array.from(
+    new Map(
+      run.results
+        .filter((result) => result.field.participantId)
+        .map((result) => [result.field.participantId, result.field.participantLabel ?? "Comprador"]),
+    ).values(),
+  );
+  if (!participants.length) return null;
+  return (
+    <div className="flex items-start gap-3 border border-blue-200 bg-blue-50 px-4 py-3">
+      <UsersRound className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+      <div>
+        <div className="text-sm font-bold text-slate-900">
+          {participants.length} {participants.length === 1 ? "comprador identificado" : "compradores identificados"}
+        </div>
+        <div className="mt-1 text-xs text-slate-600">{participants.join(" · ")}</div>
+      </div>
+    </div>
   );
 }
 

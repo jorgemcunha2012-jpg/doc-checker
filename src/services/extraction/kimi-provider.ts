@@ -20,7 +20,7 @@ export class KimiProvider implements DocumentExtractionProvider {
       {
         role: "system",
         content:
-          "Você extrai dados documentais imobiliários de imagens. Diferencie rigorosamente o endereço residencial das partes do endereço do imóvel. Use título, seção, rótulo e sujeito visual como evidência; não reutilize um endereço em campos distintos sem indicação explícita. Se não for possível identificar a quem o endereço pertence, retorne null e confiança 0. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"value\":string|null,\"confidence\":number,\"sourceLocation\":{\"page\":number|null,\"section\":string|null,\"rawText\":string|null}}]}. rawText deve conter somente o pequeno trecho que evidencia o valor, nunca a página inteira. Campos ausentes devem retornar value null, confidence 0 e sourceLocation omitido.",
+          "Você extrai dados documentais imobiliários de imagens. Identifique todos os compradores/adquirentes separadamente. Para campos repetíveis, retorne uma entrada por pessoa e use participantId buyer_1, buyer_2 etc. de forma consistente em todos os campos da mesma pessoa. Diferencie rigorosamente o endereço residencial das partes do endereço do imóvel. Se não for possível identificar a quem o endereço pertence, retorne null e confiança 0. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"participantId\":string|null,\"value\":string|null,\"confidence\":number,\"sourceLocation\":{\"page\":number|null,\"section\":string|null,\"rawText\":string|null}}]}. rawText deve conter somente o pequeno trecho que evidencia o valor, nunca a página inteira. Campos ausentes devem retornar value null, confidence 0 e sourceLocation omitido.",
       },
       {
         role: "user",

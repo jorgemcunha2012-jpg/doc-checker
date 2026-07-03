@@ -119,6 +119,29 @@ test("usa cadastro do empreendimento como referência de unidade e normaliza ár
   assert.equal(field(result, "property.tower").status, "MATCH");
 });
 
+test("separa e confere dois compradores pelo identificador de participante", () => {
+  const maria = "cpf_11111111111";
+  const joao = "cpf_22222222222";
+  const result = run(
+    [
+      value("buyer.name", "SIOPI", "Maria Silva", 95, maria),
+      value("buyer.cpf", "SIOPI", "111.111.111-11", 95, maria),
+      value("buyer.name", "MINUTA", "Maria Silva", 95, maria),
+      value("buyer.cpf", "MINUTA", "11111111111", 95, maria),
+      value("buyer.name", "SIOPI", "João Souza", 95, joao),
+      value("buyer.cpf", "SIOPI", "222.222.222-22", 95, joao),
+      value("buyer.name", "MINUTA", "João Souza", 95, joao),
+      value("buyer.cpf", "MINUTA", "22222222222", 95, joao),
+    ],
+    ["SIOPI", "MINUTA"],
+  );
+
+  assert.equal(field(result, `buyer.cpf::${maria}`).status, "MATCH");
+  assert.equal(field(result, `buyer.cpf::${joao}`).status, "MATCH");
+  assert.match(field(result, `buyer.name::${maria}`).field.label, /Maria Silva/);
+  assert.match(field(result, `buyer.name::${joao}`).field.label, /João Souza/);
+});
+
 function run(
   values: ExtractedFieldValue[],
   participatingSources: DocumentSource[] = ["SIOPI", "MINUTA", "ITBI"],
@@ -140,12 +163,14 @@ function value(
   source: DocumentSource,
   fieldValue: string | null,
   confidence = 95,
+  participantId?: string,
 ): ExtractedFieldValue {
   return {
     fieldId,
     source,
     value: fieldValue,
     confidence,
+    participantId,
     sourceLocation: fieldValue ? { page: 1, rawText: fieldValue } : undefined,
   };
 }
