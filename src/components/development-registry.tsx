@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, Building2, FileUp, Loader2, Plus, Save, Trash2 } from "lucide-react";
-import Link from "next/link";
+import { Building2, FileUp, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import type { Development, DevelopmentExtraction } from "@/domain/development";
 
-export function DevelopmentRegistry() {
+export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
   const [developments, setDevelopments] = useState<Development[]>([]);
   const [extraction, setExtraction] = useState<DevelopmentExtraction | null>(null);
   const [sourceDocumentName, setSourceDocumentName] = useState("");
@@ -68,24 +67,12 @@ export function DevelopmentRegistry() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-6 w-6 text-blue-600" />
-            <div>
-              <h1 className="font-bold text-slate-950">Cadastro de empreendimentos</h1>
-              <p className="text-xs text-slate-500">Base mestre para conferência documental</p>
-            </div>
-          </div>
-          <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-950">
-            <ArrowLeft className="h-4 w-4" /> Voltar
-          </Link>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-7xl space-y-6 px-5 py-8">
-        <section className="border border-slate-200 bg-white p-6">
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div className="flex items-center gap-3">
+        <Building2 className="h-6 w-6 text-[#0faaa2]" />
+        <div><h1 className="text-2xl font-bold text-slate-950">Empreendimentos</h1><p className="mt-1 text-sm text-slate-500">Base mestre utilizada nas conferências documentais.</p></div>
+      </div>
+        {canManage ? <section className="border border-slate-200 bg-white p-6">
           <h2 className="text-lg font-bold text-slate-950">Novo empreendimento</h2>
           <p className="mt-1 text-sm text-slate-500">Envie a matrícula mestre. A IA lista torre, apartamento e área; revise antes de salvar.</p>
           <label className="mt-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700">
@@ -103,9 +90,9 @@ export function DevelopmentRegistry() {
             <Plus className="h-4 w-4" /> Criar manualmente
           </button>
           {error ? <p className="mt-3 text-sm font-semibold text-red-600">{error}</p> : null}
-        </section>
+        </section> : null}
 
-        {extraction ? (
+        {canManage && extraction ? (
           <section className="border border-slate-200 bg-white p-6">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div className="grid flex-1 gap-3 sm:grid-cols-3">
@@ -155,8 +142,7 @@ export function DevelopmentRegistry() {
             {!developments.length ? <p className="py-8 text-center text-sm text-slate-500">Nenhum empreendimento cadastrado.</p> : null}
           </div>
         </section>
-      </div>
-    </main>
+    </div>
   );
 }
 

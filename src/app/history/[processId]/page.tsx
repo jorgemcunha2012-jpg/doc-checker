@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { AdminProcessDetail } from "@/components/admin-process-detail";
 import { getCurrentUser, isMasterAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { AppShell } from "@/components/app-shell";
 
 export default async function HistoryProcessPage({ params }: { params: Promise<{ processId: string }> }) {
   const user = await getCurrentUser();
@@ -17,8 +18,8 @@ export default async function HistoryProcessPage({ params }: { params: Promise<{
   const { data: process } = await query.maybeSingle();
   if (!process?.result) notFound();
   const { data: reviews } = await createSupabaseAdminClient().from("human_reviews").select("*").eq("process_id", processId);
-  return <AdminProcessDetail process={{
+  return <AppShell user={user}><AdminProcessDetail process={{
     ...process,
     profiles: Array.isArray(process.profiles) ? process.profiles[0] ?? null : process.profiles,
-  }} reviews={reviews ?? []} currentUser={user} backHref="/history" />;
+  }} reviews={reviews ?? []} currentUser={user} backHref="/history" embedded /></AppShell>;
 }

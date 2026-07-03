@@ -14,7 +14,7 @@ import type { Development } from "@/domain/development";
 const validationType = "RECONCILIATION" as const;
 const usesPersistentReviews = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
-export function ConferiaWorkspace({ currentUser, publicAccess = false }: { currentUser: User; publicAccess?: boolean }) {
+export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded = false }: { currentUser: User; publicAccess?: boolean; embedded?: boolean }) {
   const [documents, setDocuments] = useState<ClientUploadedDocument[]>([]);
   const [processId, setProcessId] = useState<string | null>(null);
   const [process, setProcess] = useState<ValidationProcess | null>(null);
@@ -274,8 +274,8 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false }: { curre
   }
 
   return (
-    <main className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
+    <main className={embedded ? "" : "min-h-screen"}>
+      {!embedded ? <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2563eb] text-white">
@@ -296,9 +296,9 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false }: { curre
             <LogoutButton />
           </div> : null}
         </div>
-      </header>
+      </header> : null}
 
-      <section className="border-b border-slate-200 bg-[#f8fafc]">
+      <section className={embedded ? "mb-6" : "border-b border-slate-200 bg-[#f8fafc]"}>
         <div className="mx-auto max-w-7xl px-5 py-9 sm:py-12">
           <div className="inline-flex items-center gap-2 text-xs font-bold uppercase text-[#2563eb]">
             <Sparkles className="h-4 w-4" />
@@ -309,7 +309,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false }: { curre
         </div>
       </section>
 
-      <div className="mx-auto max-w-7xl px-5 py-8">
+      <div className={`mx-auto max-w-7xl ${embedded ? "" : "px-5 py-8"}`}>
         <section className="space-y-5">
           <div className="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

@@ -13,16 +13,16 @@ type HistoryProcess = {
   process_documents: Array<{ id: string; name: string; source?: string; available: boolean }>;
 };
 
-export function ProcessHistory({ showAnalyst }: { showAnalyst: boolean }) {
+export function ProcessHistory({ showAnalyst, status }: { showAnalyst: boolean; status?: string }) {
   const [processes, setProcesses] = useState<HistoryProcess[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void fetch("/api/processes")
+    void fetch(`/api/processes${status ? `?status=${encodeURIComponent(status)}` : ""}`)
       .then((response) => response.json())
       .then((payload) => setProcesses(payload.processes ?? []))
       .finally(() => setLoading(false));
-  }, []);
+  }, [status]);
 
   if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>;
   return (
