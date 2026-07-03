@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Building2, ChevronLeft, FileClock, FilePlus2, LayoutDashboard, Menu, ShieldAlert, Users, X } from "lucide-react";
+import { ChevronLeft, FileClock, FilePlus2, LayoutDashboard, Menu, ShieldAlert, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { User } from "@/domain/validation";
@@ -12,7 +12,6 @@ const navigation = [
   { href: "/validation", label: "Nova conferência", icon: FilePlus2 },
   { href: "/history", label: "Histórico", icon: FileClock },
   { href: "/pending", label: "Pendências", icon: ShieldAlert },
-  { href: "/developments", label: "Empreendimentos", icon: Building2 },
 ] as const;
 
 export function AppShell({ user, children }: { user: User; children: ReactNode }) {

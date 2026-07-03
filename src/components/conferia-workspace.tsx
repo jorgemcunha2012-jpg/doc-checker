@@ -315,7 +315,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-950">Nova conferência</h2>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Adicione pelo menos duas fontes, como prints das telas e minuta. Outros documentos também podem entrar como apoio da conferência.</p>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Selecione uma base de empreendimento e envie os documentos do comprador. Sem uma base cadastrada, utilize ao menos duas fontes documentais.</p>
               </div>
             </div>
             <button
@@ -328,13 +328,11 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
             </button>
           </div>
 
-          <FileDropZone validationType={validationType} documents={documents} onDocumentsChange={setDocuments} />
-          {documents.length ? <AnalysisEstimate documents={documents} /> : null}
-
           <section className="border border-slate-200 bg-white p-5 sm:p-6">
             <div className="flex flex-col gap-1">
-              <h2 className="text-base font-bold text-slate-950">Referência do empreendimento</h2>
-              <p className="text-sm text-slate-500">Opcional. Selecione a unidade para conferir torre, apartamento, área privativa, empreendimento e matrícula contra os documentos enviados.</p>
+              <div className="text-xs font-bold uppercase text-[#0f8f88]">Etapa 1</div>
+              <h2 className="text-base font-bold text-slate-950">Base do empreendimento</h2>
+              <p className="text-sm text-slate-500">Selecione a unidade de referência. Torre, apartamento, área privativa, empreendimento e matrícula serão conferidos contra os documentos do comprador.</p>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-bold text-slate-600">Empreendimento
@@ -350,7 +348,21 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
                 </select>
               </label>
             </div>
+            {currentUser.role === "ADMIN" ? (
+              <a href="/developments" className="mt-4 inline-flex min-h-9 items-center text-sm font-bold text-[#0f8f88] hover:text-[#0b736e]">
+                Cadastrar nova base de empreendimento
+              </a>
+            ) : null}
           </section>
+
+          <FileDropZone
+            validationType={validationType}
+            documents={documents}
+            onDocumentsChange={setDocuments}
+            title="Etapa 2 · Documentos do comprador"
+            description="Envie telas, minuta, ITBI, matrícula, certidões e demais documentos específicos desta conferência."
+          />
+          {documents.length ? <AnalysisEstimate documents={documents} /> : null}
 
           {isProcessing ? <ProcessingPanel steps={processSteps} elapsedSeconds={elapsedSeconds} documents={documents} /> : null}
           {process?.status === "FAILED" ? <ProcessError message={process.error} /> : null}

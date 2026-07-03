@@ -13,9 +13,17 @@ type FileDropZoneProps = {
   validationType: ValidationType;
   documents: ClientUploadedDocument[];
   onDocumentsChange: (documents: ClientUploadedDocument[]) => void;
+  title?: string;
+  description?: string;
 };
 
-export function FileDropZone({ validationType, documents, onDocumentsChange }: FileDropZoneProps) {
+export function FileDropZone({
+  validationType,
+  documents,
+  onDocumentsChange,
+  title = "Documentos do processo",
+  description = "Envie os documentos que deseja verificar. Prints das telas, minuta e anexos podem ser combinados na mesma conferência.",
+}: FileDropZoneProps) {
   const [previewDocument, setPreviewDocument] = useState<ClientUploadedDocument | null>(null);
 
   function handleFiles(files: FileList | null) {
@@ -50,8 +58,8 @@ export function FileDropZone({ validationType, documents, onDocumentsChange }: F
       <div className="p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-base font-bold text-slate-950">Documentos do processo</h2>
-          <p className="mt-1 text-sm text-slate-500">Envie os documentos que deseja verificar. Prints das telas, minuta e anexos podem ser combinados na mesma conferência.</p>
+          <h2 className="text-base font-bold text-slate-950">{title}</h2>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
         </div>
         <div className="rounded-md border border-slate-200 bg-slate-50 p-2 text-slate-500" title="Também aceita Ctrl+V">
           <Clipboard className="h-5 w-5" aria-hidden="true" />
