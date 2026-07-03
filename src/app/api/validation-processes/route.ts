@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { defaultOrganization } from "@/domain/tenant";
-import { activeDocumentSources, type DocumentSource, type UploadedDocument, type ValidationType } from "@/domain/validation";
+import { uploadDocumentSources, type DocumentSource, type UploadedDocument, type ValidationType } from "@/domain/validation";
 import { createValidationProcessAndStart } from "@/services/process/process-validation";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
 import { requireUser, AuthError } from "@/lib/auth";
@@ -9,6 +9,9 @@ import { developmentUnitValues } from "@/domain/development";
 import { getDevelopmentUnit } from "@/services/development/development-repository";
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
+const MAX_TOTAL_SIZE_BYTES = 60 * 1024 * 1024;
+const MAX_FILES = 20;
+export const maxDuration = 300;
 const ACCEPTED_MIME_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -44,7 +47,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Envie ao menos um documento." }, { status: 400 });
   }
 
-  const invalidFile = files.find((file) => !isAcceptedFile(file));
+  if (files.length > MAX_FILES || files.reduce((total, file) => total + file.size, 0) > MAX_TOTAL_SIZE_BYTES) {
+    return NextResponse.json({ error: "Envie no máximo 20 arquivos e 60 MB por conferência." }, { status: 400 });
+  }
+
+  const acceptedFiles = await Promise.all(files.map(isAcceptedFile));
+  const invalidFile = files.find((_, index) => !acceptedFiles[index]);
 
   if (invalidFile) {
     return NextResponse.json({ error: `Arquivo inválido ou muito grande: ${invalidFile.name}` }, { status: 400 });
@@ -90,12 +98,27 @@ export async function POST(request: Request) {
   }, { status: 202 });
 }
 
-function isAcceptedFile(file: File) {
+async function isAcceptedFile(file: File) {
   const name = file.name.toLowerCase();
-  const mimeType = file.type || "application/octet-stream";
-  const acceptedExtension = [".pdf", ".png", ".jpg", ".jpeg", ".docx", ".tif", ".tiff"].some((extension) => name.endsWith(extension));
+  if (file.size <= 0 || file.size > MAX_FILE_SIZE_BYTES) return false;
+  const bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  const signatures = {
+    pdf: bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46,
+    png: bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47,
+    jpeg: bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
+    zip: bytes[0] === 0x50 && bytes[1] === 0x4b && [0x03, 0x05, 0x07].includes(bytes[2]),
+    tiff:
+      (bytes[0] === 0x49 && bytes[1] === 0x49 && bytes[2] === 0x2a && bytes[3] === 0x00) ||
+      (bytes[0] === 0x4d && bytes[1] === 0x4d && bytes[2] === 0x00 && bytes[3] === 0x2a),
+  };
+  const validContent =
+    (name.endsWith(".pdf") && signatures.pdf) ||
+    (name.endsWith(".png") && signatures.png) ||
+    ((name.endsWith(".jpg") || name.endsWith(".jpeg")) && signatures.jpeg) ||
+    (name.endsWith(".docx") && signatures.zip) ||
+    ((name.endsWith(".tif") || name.endsWith(".tiff")) && signatures.tiff);
 
-  return file.size <= MAX_FILE_SIZE_BYTES && (ACCEPTED_MIME_TYPES.has(mimeType) || acceptedExtension);
+  return validContent;
 }
 
 function validateComparisonSides(documents: UploadedDocumentPayload[]) {
@@ -121,7 +144,7 @@ async function toUploadedDocumentPayload(
     organizationId,
     name: file.name,
     type: resolveDocumentType(file, validationType),
-    mimeType: file.type || "application/octet-stream",
+    mimeType: canonicalMimeType(file),
     sizeBytes: file.size,
     source,
   };
@@ -132,6 +155,16 @@ async function toUploadedDocumentPayload(
   };
 }
 
+function canonicalMimeType(file: File) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) return "application/pdf";
+  if (name.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (name.endsWith(".tif") || name.endsWith(".tiff")) return "image/tiff";
+  if (name.endsWith(".png")) return "image/png";
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+  return ACCEPTED_MIME_TYPES.has(file.type) ? file.type : "application/octet-stream";
+}
+
 function parseDocumentSources(value: FormDataEntryValue | null, expectedLength: number) {
   if (typeof value !== "string") return null;
   try {
@@ -139,7 +172,10 @@ function parseDocumentSources(value: FormDataEntryValue | null, expectedLength: 
     if (
       !Array.isArray(sources) ||
       sources.length !== expectedLength ||
-      !sources.every((source): source is DocumentSource => activeDocumentSources.includes(source as DocumentSource))
+      !sources.every(
+        (source): source is DocumentSource =>
+          typeof source === "string" && uploadDocumentSources.some((candidate) => candidate === source),
+      )
     ) {
       return null;
     }

@@ -1,4 +1,4 @@
-import { defaultOrganization, defaultUser } from "@/domain/tenant";
+import { defaultUser } from "@/domain/tenant";
 import type { ExtractedFieldValue, UploadedDocument, ValidationProcess, ValidationType } from "@/domain/validation";
 import { getChecklist } from "@/domain/checklists";
 import { DocumentExtractionService } from "@/services/extraction/document-extraction-service";
@@ -77,11 +77,13 @@ async function processValidation(
   try {
     await updateAndPersist(processId, { status: "EXTRACTING" });
     const checklist = getChecklist(validationType);
+    const process = getValidationProcess(processId);
+    if (!process) throw new Error("Processo não encontrado durante o processamento.");
     const extractionService = new DocumentExtractionService();
     const result =
       validationType === "RECONCILIATION"
-        ? await processReconciliation(processId, extractionService, checklist, documents, referenceValues)
-        : await processLegacyValidation(processId, extractionService, validationType, checklist, documents);
+        ? await processReconciliation(processId, process.organizationId, extractionService, checklist, documents, referenceValues)
+        : await processLegacyValidation(processId, process.organizationId, extractionService, validationType, checklist, documents);
 
     const completed = await updateAndPersist(processId, { status: "DONE", result });
     if (completed?.result?.validationType === "RECONCILIATION") {
@@ -111,6 +113,7 @@ async function processValidation(
 
 async function processLegacyValidation(
   processId: string,
+  organizationId: string,
   extractionService: DocumentExtractionService,
   validationType: "MINUTA" | "ITBI",
   checklist: ReturnType<typeof getChecklist>,
@@ -119,11 +122,12 @@ async function processLegacyValidation(
   const extraction = await extractionService.extract({ validationType, checklist, documents });
   await updateAndPersist(processId, { status: "COMPARING" });
   const engine = new ValidationEngine();
-  return engine.run(defaultOrganization.id, validationType, extraction.sourceData, extraction.targetData, extraction.usedPdfVisionFallback);
+  return engine.run(organizationId, validationType, extraction.sourceData, extraction.targetData, extraction.usedPdfVisionFallback);
 }
 
 async function processReconciliation(
   processId: string,
+  organizationId: string,
   extractionService: DocumentExtractionService,
   checklist: ReturnType<typeof getChecklist>,
   documents: UploadedDocumentPayload[],
@@ -138,7 +142,7 @@ async function processReconciliation(
   const engine = new ReconciliationEngine();
   const hasReference = referenceValues.length > 0;
   return {
-    ...engine.run(defaultOrganization.id, {
+    ...engine.run(organizationId, {
       ...extraction,
       values: [...extraction.values, ...referenceValues],
       participatingSources: hasReference

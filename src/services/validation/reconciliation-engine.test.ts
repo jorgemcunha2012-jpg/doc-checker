@@ -72,7 +72,7 @@ test("mantém processo utilizável quando uma fonte está ilegível e preserva e
   );
 
   const cpf = field(result, "buyer.cpf");
-  assert.equal(cpf.status, "REVIEW_REQUIRED");
+  assert.equal(cpf.status, "SOURCE_UNREADABLE");
   assert.equal(cpf.valuesBySource.MINUTA?.sourceLocation?.page, 2);
 });
 

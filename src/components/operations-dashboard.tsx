@@ -18,11 +18,16 @@ type DashboardProcess = {
 export function OperationsDashboard({ user }: { user: User }) {
   const [processes, setProcesses] = useState<DashboardProcess[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     void fetch("/api/processes")
-      .then((response) => response.json())
-      .then((payload) => setProcesses(payload.processes ?? []))
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error ?? "Falha ao carregar o dashboard.");
+        setProcesses(payload.processes ?? []);
+      })
+      .catch((reason) => setError(reason instanceof Error ? reason.message : "Falha ao carregar o dashboard."))
       .finally(() => setLoading(false));
   }, []);
 
@@ -51,7 +56,9 @@ export function OperationsDashboard({ user }: { user: User }) {
         </Link>
       </section>
 
-      {loading ? <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-[#0faaa2]" /></div> : (
+      {loading ? <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-[#0faaa2]" /></div> : error ? (
+        <div className="border border-rose-200 bg-rose-50 p-5 text-sm font-semibold text-rose-700">{error}</div>
+      ) : (
         <>
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Metric icon={Clock3} label="Operações ativas" value={metrics.active} tone="teal" />
@@ -84,7 +91,6 @@ export function OperationsDashboard({ user }: { user: User }) {
               <div className="flex items-center gap-2"><Timer className="h-5 w-5 text-[#0faaa2]" /><h2 className="font-bold text-slate-950">Eficiência</h2></div>
               <div className="mt-8 text-4xl font-bold text-slate-950">{formatDuration(metrics.averageMs)}</div>
               <div className="mt-2 text-sm text-slate-500">Tempo médio por conferência</div>
-              <div className="mt-8 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full w-3/4 rounded-full bg-[#0faaa2]" /></div>
               <p className="mt-4 text-xs leading-5 text-slate-500">Calculado com base nos processos concluídos disponíveis no histórico.</p>
             </div>
           </section>

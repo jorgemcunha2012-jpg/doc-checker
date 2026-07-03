@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AuthError, requireUser } from "@/lib/auth";
+import { AuthError, isMasterAdmin, requireUser } from "@/lib/auth";
 import type { HumanReview } from "@/domain/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { saveHumanReview } from "@/services/process/process-repository";
@@ -9,14 +9,30 @@ export async function PUT(request: Request, context: { params: Promise<{ process
     const user = await requireUser();
     const { processId } = await context.params;
     const { fieldId, justification } = await request.json();
+    if (typeof fieldId !== "string" || !fieldId.trim()) {
+      return NextResponse.json({ error: "Campo obrigatório." }, { status: 400 });
+    }
+    if (typeof justification !== "string" || justification.trim().length < 5 || justification.trim().length > 1000) {
+      return NextResponse.json({ error: "Informe uma justificativa entre 5 e 1.000 caracteres." }, { status: 400 });
+    }
     const supabase = createSupabaseAdminClient();
     const { data: process } = await supabase.from("validation_processes").select("user_id, organization_id").eq("id", processId).single();
-    if (!process || process.organization_id !== user.organizationId || (user.role !== "ADMIN" && process.user_id !== user.id)) {
+    if (!process || process.organization_id !== user.organizationId || (!isMasterAdmin(user) && process.user_id !== user.id)) {
       return NextResponse.json({ error: "Processo não encontrado." }, { status: 404 });
+    }
+    const { data: validationResult, error: validationResultError } = await supabase
+      .from("validation_results")
+      .select("field_id")
+      .eq("process_id", processId)
+      .eq("field_id", fieldId)
+      .maybeSingle();
+    if (validationResultError) throw validationResultError;
+    if (!validationResult) {
+      return NextResponse.json({ error: "Campo de conferência não encontrado." }, { status: 404 });
     }
     const review: HumanReview = {
       status: "APPROVED",
-      justification,
+      justification: justification.trim(),
       reviewerId: user.id,
       reviewerName: user.name,
       reviewedAt: new Date().toISOString(),
@@ -37,7 +53,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ proc
     const fieldId = new URL(request.url).searchParams.get("fieldId");
     if (!fieldId) return NextResponse.json({ error: "Campo obrigatório." }, { status: 400 });
     const { data: process } = await createSupabaseAdminClient().from("validation_processes").select("user_id, organization_id").eq("id", processId).single();
-    if (!process || process.organization_id !== user.organizationId || (user.role !== "ADMIN" && process.user_id !== user.id)) {
+    if (!process || process.organization_id !== user.organizationId || (!isMasterAdmin(user) && process.user_id !== user.id)) {
       return NextResponse.json({ error: "Processo não encontrado." }, { status: 404 });
     }
     await saveHumanReview(processId, fieldId, undefined, user);

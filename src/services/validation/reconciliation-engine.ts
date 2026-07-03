@@ -115,13 +115,13 @@ export class ReconciliationEngine {
     }
 
     const unreadableExpectedSources = input.unreadableSources.filter((source) => field.expectedSources?.includes(source));
-    if (unreadableExpectedSources.length && comparisonParticipants.length === 0) {
+    if (unreadableExpectedSources.length) {
       return result(
         organizationId,
         field,
         valuesBySource,
         "SOURCE_UNREADABLE",
-        `Campo não pôde ser conferido porque a fonte ${joinSources(unreadableExpectedSources)} não foi interpretada.`,
+        `Campo não pôde ser conferido completamente porque a fonte ${joinSources(unreadableExpectedSources)} não foi interpretada.`,
       );
     }
 

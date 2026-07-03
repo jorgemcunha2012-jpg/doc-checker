@@ -16,15 +16,23 @@ type HistoryProcess = {
 export function ProcessHistory({ showAnalyst, status }: { showAnalyst: boolean; status?: string }) {
   const [processes, setProcesses] = useState<HistoryProcess[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
+    setLoading(true);
+    setError("");
     void fetch(`/api/processes${status ? `?status=${encodeURIComponent(status)}` : ""}`)
-      .then((response) => response.json())
-      .then((payload) => setProcesses(payload.processes ?? []))
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error ?? "Falha ao carregar o histórico.");
+        setProcesses(payload.processes ?? []);
+      })
+      .catch((reason) => setError(reason instanceof Error ? reason.message : "Falha ao carregar o histórico."))
       .finally(() => setLoading(false));
   }, [status]);
 
   if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>;
+  if (error) return <div className="border border-rose-200 bg-rose-50 p-5 text-sm font-semibold text-rose-700">{error}</div>;
   return (
     <div className="divide-y divide-slate-100 border border-slate-200 bg-white">
       {processes.map((process) => (

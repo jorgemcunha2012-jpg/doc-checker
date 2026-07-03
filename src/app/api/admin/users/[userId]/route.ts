@@ -9,12 +9,25 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     const { userId } = await context.params;
     const { action } = await request.json();
     const supabase = createSupabaseAdminClient();
+    const { data: target, error: targetError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .eq("organization_id", admin.organizationId)
+      .maybeSingle();
+    if (targetError) throw targetError;
+    if (!target) return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
 
     if (action === "RESET_PASSWORD") {
       const password = `Cf!${crypto.randomUUID().replaceAll("-", "").slice(0, 14)}9a`;
       const { error } = await supabase.auth.admin.updateUserById(userId, { password });
       if (error) throw error;
-      await supabase.from("profiles").update({ must_change_password: true, updated_at: new Date().toISOString() }).eq("id", userId).eq("organization_id", admin.organizationId);
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ must_change_password: true, updated_at: new Date().toISOString() })
+        .eq("id", userId)
+        .eq("organization_id", admin.organizationId);
+      if (profileError) throw profileError;
       await audit(admin, "PASSWORD_RESET", "profile", userId);
       return NextResponse.json({ temporaryPassword: password });
     }
