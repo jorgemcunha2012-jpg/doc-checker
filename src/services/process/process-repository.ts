@@ -15,7 +15,14 @@ export async function persistProcess(process: ValidationProcess) {
     processing_status: process.status,
     final_status: finalStatus(process),
     result: process.result ?? null,
-    summary: process.result?.summary ?? null,
+    summary: process.result
+      ? {
+          ...process.result.summary,
+          ...(process.result.validationType === "RECONCILIATION"
+            ? { extractionQualityBySource: process.result.extractionQualityBySource }
+            : {}),
+        }
+      : null,
     error: process.error ?? null,
     started_at: process.createdAt,
     completed_at: process.status === "DONE" || process.status === "FAILED" ? process.updatedAt : null,

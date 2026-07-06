@@ -2,6 +2,7 @@ import type {
   ChecklistField,
   DocumentSource,
   ExtractedFieldValue,
+  ExtractionQualityReport,
   FieldComparisonResult,
   ReconciliationRun,
   ReconciliationSourceValue,
@@ -19,6 +20,7 @@ export type ReconciliationInput = {
   unreadableSources: DocumentSource[];
   sourceErrors: Partial<Record<DocumentSource, string>>;
   conflictedFieldsBySource: Partial<Record<DocumentSource, string[]>>;
+  qualityBySource?: Partial<Record<DocumentSource, ExtractionQualityReport>>;
   usedPdfVisionFallback: boolean;
 };
 
@@ -54,6 +56,7 @@ export class ReconciliationEngine {
       checklist,
       results,
       participatingSources: input.participatingSources,
+      extractionQualityBySource: input.qualityBySource,
       usedPdfVisionFallback: input.usedPdfVisionFallback,
       summary: {
         totalChecked: results.length,

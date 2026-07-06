@@ -35,3 +35,20 @@ test("preenche financiamento padronizado quando o provider omite o campo", () =>
   assert.equal(financing?.confidence, 100);
   assert.match(financing?.sourceLocation?.rawText ?? "", /B\.4\.1/);
 });
+
+test("preenche recursos próprios e valor total da composição padronizada", () => {
+  const checklist = getChecklist("RECONCILIATION");
+  const output = {
+    fields: checklist.map((field) => ({ fieldId: field.id, value: null, confidence: 0 })),
+  };
+  const text = [
+    "B.4 - VALOR DE COMPOSIÇÃO DOS RECURSOS:",
+    "O valor destinado à aquisição do imóvel é R$ 237.000,00, composto pelos valores abaixo:",
+    "B.4.2 - Valor dos recursos próprios: | R$ 50.607,09",
+  ].join("\n");
+
+  const enriched = enrichStandardFinancialFields(output, text, checklist);
+
+  assert.equal(enriched.fields.find((field) => field.fieldId === "financial.downPayment")?.value, "R$ 50.607,09");
+  assert.equal(enriched.fields.find((field) => field.fieldId === "financial.totalValue")?.value, "R$ 237.000,00");
+});

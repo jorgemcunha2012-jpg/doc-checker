@@ -8,6 +8,7 @@ import { extractPdfText, hasEnoughPdfText } from "./pdf-text-service";
 import { extractDocxText } from "./word-text-service";
 import { convertTiffToPngPages } from "./tiff-image-service";
 import type { ExtractionRequest, ExtractionResult, ReconciliationExtractionResult, UploadedDocumentPayload } from "./types";
+import { buildExtractionQuality, missingCriticalFields } from "./extraction-quality-service";
 
 export class DocumentExtractionService {
   constructor(
@@ -80,6 +81,7 @@ export class DocumentExtractionService {
       conflictedFieldsBySource: Object.fromEntries(
         sourceResults.filter((result) => result.conflictedFields.length).map((result) => [result.source, result.conflictedFields]),
       ),
+      qualityBySource: Object.fromEntries(sourceResults.map((result) => [result.source, result.quality])),
       usedPdfVisionFallback: sourceResults.some((result) => result.usedPdfVisionFallback),
     };
   }
@@ -147,10 +149,7 @@ export class DocumentExtractionService {
                 error: "O PDF não possui texto extraível suficiente e o OCR visual ainda não está disponível neste fluxo.",
               };
             }
-            const output = await this.deepSeekProvider.structureText(
-              text,
-              sourceChecklist,
-            );
+            const extraction = await this.extractTextWithRecovery(text, sourceChecklist, source);
             console.info("[ConferIA] Extração concluída", {
               source,
               documentName: document.name,
@@ -160,14 +159,15 @@ export class DocumentExtractionService {
               pageSelection,
             });
             return {
-              output,
+              output: extraction.output,
+              recoveredFields: extraction.recoveredFields,
               usedPdfVisionFallback: false,
             };
           }
           if (isDocx(document)) {
             const text = await extractDocxText(document.buffer);
             if (!text.trim()) return { output: null, usedPdfVisionFallback: false, error: "O documento Word não possui texto extraível." };
-            const output = await this.deepSeekProvider.structureText(text, sourceChecklist);
+            const extraction = await this.extractTextWithRecovery(text, sourceChecklist, source);
             console.info("[ConferIA] Extração concluída", {
               source,
               documentName: document.name,
@@ -175,7 +175,7 @@ export class DocumentExtractionService {
               extractedTextCharacters: text.length,
               requestedFields: sourceChecklist.length,
             });
-            return { output, usedPdfVisionFallback: false };
+            return { output: extraction.output, recoveredFields: extraction.recoveredFields, usedPdfVisionFallback: false };
           }
           if (document.mimeType.includes("image") || isTiff(document)) {
             const output = await this.extractVisualDocument(document, sourceChecklist);
@@ -187,10 +187,11 @@ export class DocumentExtractionService {
             });
             return {
               output,
+              recoveredFields: [],
               usedPdfVisionFallback: false,
             };
           }
-          return { output: null, usedPdfVisionFallback: false, error: "Formato de arquivo não suportado." };
+          return { output: null, recoveredFields: [], usedPdfVisionFallback: false, error: "Formato de arquivo não suportado." };
         } catch (error) {
           const errorMessage = sanitizeExtractionError(error);
           console.error("[ConferIA] Falha de extração por documento", {
@@ -198,21 +199,58 @@ export class DocumentExtractionService {
             documentName: document.name,
             error: errorMessage,
           });
-          return { output: null, usedPdfVisionFallback: false, error: errorMessage };
+          return { output: null, recoveredFields: [], usedPdfVisionFallback: false, error: errorMessage };
         }
       }),
     );
     const outputs = attempts.flatMap((attempt) => (attempt.output ? [attempt.output] : []));
     const consolidated = consolidateSourceOutputs(source, outputs, checklist);
+    const recoveredFields = [...new Set(attempts.flatMap((attempt) => attempt.recoveredFields ?? []))];
+    const unreadable = outputs.length === 0;
 
     return {
       source,
       values: consolidated.values,
       conflictedFields: consolidated.conflictedFields,
-      unreadable: outputs.length === 0,
+      unreadable,
       error: attempts.find((attempt) => attempt.error)?.error,
       usedPdfVisionFallback: attempts.some((attempt) => attempt.usedPdfVisionFallback),
+      quality: buildExtractionQuality(source, consolidated.values, checklist, recoveredFields, unreadable),
     };
+  }
+
+  private async extractTextWithRecovery(
+    text: string,
+    checklist: ExtractionRequest["checklist"],
+    source: DocumentSource,
+  ) {
+    const initial = await this.deepSeekProvider.structureText(text, checklist);
+    const missing = missingCriticalFields(source, initial, checklist);
+    if (!missing.length) return { output: initial, recoveredFields: [] };
+
+    try {
+      const recovery = await this.deepSeekProvider.structureText(text, missing);
+      const recoveredFields = missing
+        .filter((field) => recovery.fields.some((value) => value.fieldId === field.id && value.value != null && String(value.value).trim()))
+        .map((field) => field.id);
+
+      console.info("[ConferIA] Recuperação direcionada concluída", {
+        source,
+        requestedFields: missing.map((field) => field.id),
+        recoveredFields,
+      });
+      return {
+        output: mergeRecoveryOutput(initial, recovery, checklist),
+        recoveredFields,
+      };
+    } catch (error) {
+      console.warn("[ConferIA] Recuperação direcionada indisponível; extração inicial preservada", {
+        source,
+        requestedFields: missing.map((field) => field.id),
+        error: sanitizeExtractionError(error),
+      });
+      return { output: initial, recoveredFields: [] };
+    }
   }
 
   private async extractVisualDocument(
@@ -325,6 +363,22 @@ function mergeOutputs(outputs: ProviderExtractionOutput[], checklist: Extraction
       const best = candidates.sort((a, b) => b.confidence - a.confidence)[0];
 
       return best ?? { fieldId: field.id, value: null, confidence: 0 };
+    }),
+  };
+}
+
+function mergeRecoveryOutput(
+  initial: ProviderExtractionOutput,
+  recovery: ProviderExtractionOutput,
+  checklist: ExtractionRequest["checklist"],
+): ProviderExtractionOutput {
+  return {
+    fields: checklist.flatMap((field) => {
+      const initialValues = initial.fields.filter((value) => value.fieldId === field.id);
+      const hasInitialValue = initialValues.some((value) => value.value != null && String(value.value).trim());
+      if (hasInitialValue) return initialValues;
+      const recoveredValues = recovery.fields.filter((value) => value.fieldId === field.id);
+      return recoveredValues.length ? recoveredValues : initialValues;
     }),
   };
 }

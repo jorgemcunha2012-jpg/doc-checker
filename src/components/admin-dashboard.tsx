@@ -2,9 +2,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Copy, KeyRound, Loader2, Plus, Power, RefreshCw, Users } from "lucide-react";
 import Link from "next/link";
+import type { DocumentSource, ExtractionQualityReport } from "@/domain/validation";
 
 type ManagedUser = { id: string; name: string; email: string; role: string; active: boolean; must_change_password: boolean };
-type ManagedProcess = { id: string; processing_status: string; final_status: string; error?: string | null; started_at: string; completed_at: string | null; profiles: { name: string } | null; process_documents: Array<{ name: string }> };
+type ManagedProcess = {
+  id: string;
+  processing_status: string;
+  final_status: string;
+  error?: string | null;
+  summary?: { extractionQualityBySource?: Partial<Record<DocumentSource, ExtractionQualityReport>> } | null;
+  started_at: string;
+  completed_at: string | null;
+  profiles: { name: string } | null;
+  process_documents: Array<{ name: string }>;
+};
 type AuditEvent = {
   id: string;
   event_type: string;
@@ -119,6 +130,16 @@ function processAnomaly(process: ManagedProcess) {
   if (durationMs >= 10 * 60 * 1000) {
     return {
       label: process.final_status === "IN_PROGRESS" ? "Processamento acima do esperado" : "Processo concluído lentamente",
+      severity: "warning" as const,
+      durationMs,
+    };
+  }
+  const incompleteSources = Object.values(process.summary?.extractionQualityBySource ?? {})
+    .filter((report) => report?.status === "PARTIAL" || report?.status === "FAILED");
+  if (incompleteSources.length) {
+    const lowestCoverage = Math.min(...incompleteSources.map((report) => report?.coverage ?? 0));
+    return {
+      label: `Extração incompleta em ${incompleteSources.length} fonte(s) · menor cobertura ${lowestCoverage}%`,
       severity: "warning" as const,
       durationMs,
     };

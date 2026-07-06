@@ -121,6 +121,18 @@ export type ExtractedFieldValue = ExtractedField & {
   source: DocumentSource;
 };
 
+export type ExtractionQualityStatus = "COMPLETE" | "PARTIAL" | "FAILED" | "NOT_ASSESSED";
+
+export type ExtractionQualityReport = {
+  source: DocumentSource;
+  status: ExtractionQualityStatus;
+  expectedCriticalFields: string[];
+  extractedCriticalFields: string[];
+  missingCriticalFields: string[];
+  recoveredFields: string[];
+  coverage: number;
+};
+
 export type ProviderExtractionOutput = {
   fields: ExtractedField[];
 };
@@ -213,6 +225,7 @@ export type ReconciliationRun = {
   summary: ReconciliationSummary;
   usedPdfVisionFallback: boolean;
   participatingSources: DocumentSource[];
+  extractionQualityBySource?: Partial<Record<DocumentSource, ExtractionQualityReport>>;
 };
 
 export type ValidationRun = LegacyValidationRun | ReconciliationRun;

@@ -10,6 +10,7 @@ import { ReconciliationResultsTable } from "./reconciliation-results-table";
 import { LogoutButton } from "./logout-button";
 import Link from "next/link";
 import type { Development } from "@/domain/development";
+import { ExtractionQualityPanel } from "./extraction-quality-panel";
 
 const validationType = "RECONCILIATION" as const;
 const usesPersistentReviews = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -436,12 +437,15 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
                 </button>
               </div>
               {run.validationType === "RECONCILIATION" ? (
-                <ReconciliationResultsTable
-                  results={run.results}
-                  sources={run.participatingSources}
-                  onReview={handleReview}
-                  reviewer={currentUser}
-                />
+                <>
+                  <ExtractionQualityPanel reports={run.extractionQualityBySource} checklist={run.checklist} />
+                  <ReconciliationResultsTable
+                    results={run.results}
+                    sources={run.participatingSources}
+                    onReview={handleReview}
+                    reviewer={currentUser}
+                  />
+                </>
               ) : null}
             </>
           ) : (

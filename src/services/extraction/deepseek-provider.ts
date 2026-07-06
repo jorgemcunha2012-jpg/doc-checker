@@ -96,7 +96,7 @@ export function enrichStandardFinancialFields(
 ) {
   const standardItems: Record<string, string> = {
     "financial.financing": "B.4.1",
-    "financial.entry": "B.4.2",
+    "financial.downPayment": "B.4.2",
     "financial.fgts": "B.4.3",
     "financial.subsidy": "B.4.5",
   };
@@ -105,9 +105,13 @@ export function enrichStandardFinancialFields(
   return {
     fields: output.fields.map((field) => {
       const item = standardItems[field.fieldId];
-      if (!item || field.value || !allowedIds.has(field.fieldId)) return field;
-      const line = text.split(/\r?\n/).find((candidate) => candidate.includes(item) && /R\$\s*[\d.,]+/.test(candidate));
-      const value = line?.match(/R\$\s*[\d.,]+/)?.[0];
+      if (field.value || !allowedIds.has(field.fieldId)) return field;
+      const line = item
+        ? text.split(/\r?\n/).find((candidate) => candidate.includes(item) && /R\$\s*[\d.,]+/.test(candidate))
+        : field.fieldId === "financial.totalValue"
+          ? text.split(/\r?\n/).find((candidate) => /valor destinado.+\s+é R\$\s*[\d.,]+/i.test(candidate))
+          : undefined;
+      const value = line?.match(/R\$\s*\d[\d.]*,\d{2}|R\$\s*\d+(?:\.\d{2})?/)?.[0];
       if (!value || !line) return field;
       return {
         ...field,

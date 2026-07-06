@@ -94,6 +94,9 @@ async function processValidation(
       await audit({ id: completed.userId, organizationId: completed.organizationId }, "PROCESS_FINISHED", "validation_process", completed.id, {
         documents: completed.documents.map((document) => document.name),
         summary: completed.result?.summary,
+        extractionQualityBySource: completed.result?.validationType === "RECONCILIATION"
+          ? completed.result.extractionQualityBySource
+          : undefined,
         durationMs: elapsedMs,
       });
       if (elapsedMs != null && elapsedMs >= 10 * 60 * 1000) {
