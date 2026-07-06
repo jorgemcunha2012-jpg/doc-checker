@@ -27,7 +27,7 @@ export class DeepSeekProvider implements DocumentExtractionProvider {
       },
     ], { timeoutMs: 75_000 });
 
-    const output = coerceExtractionOutput(result, checklist);
+    const output = enrichStandardFinancialFields(coerceExtractionOutput(result, checklist), text, checklist);
     if (focusedText.length < text.length && shouldRetryWithBroaderContext(output, checklist)) {
       const broaderResult = await this.client.completeJson([
         {
@@ -41,14 +41,14 @@ export class DeepSeekProvider implements DocumentExtractionProvider {
         },
       ], { timeoutMs: 95_000 });
 
-      return coerceExtractionOutput(broaderResult, checklist);
+      return enrichStandardFinancialFields(coerceExtractionOutput(broaderResult, checklist), text, checklist);
     }
 
     return output;
   }
 }
 
-function focusDocumentText(text: string, checklist: ChecklistField[]) {
+export function focusDocumentText(text: string, checklist: ChecklistField[]) {
   const maximumCharacters = 13_500;
   if (text.length <= maximumCharacters) {
     return text;
@@ -69,9 +69,15 @@ function focusDocumentText(text: string, checklist: ChecklistField[]) {
   selected.set(0, text.slice(0, 3_500));
   selected.set(Number.MAX_SAFE_INTEGER, text.slice(-2_000));
 
+  for (const domainKeywords of keywordGroupsByDomain(checklist)) {
+    const best = windows
+      .map((window, index) => ({ index, text: window, score: scoreWindow(window, domainKeywords) }))
+      .sort((left, right) => right.score - left.score || left.index - right.index)[0];
+    if (best?.score > 0) selectWithinBudget(selected, best.index, best.text, maximumCharacters);
+  }
+
   for (const window of scored) {
-    if (currentLength([...selected.values()]) >= maximumCharacters) break;
-    selected.set(window.index, window.text);
+    selectWithinBudget(selected, window.index, window.text, maximumCharacters);
   }
 
   const focused = [...selected.entries()]
@@ -81,6 +87,54 @@ function focusDocumentText(text: string, checklist: ChecklistField[]) {
     .join("\n\n[TRECHO RELEVANTE]\n\n");
 
   return focused.length > maximumCharacters ? focused.slice(0, maximumCharacters) : focused;
+}
+
+export function enrichStandardFinancialFields(
+  output: ProviderExtractionOutput,
+  text: string,
+  checklist: ChecklistField[],
+) {
+  const standardItems: Record<string, string> = {
+    "financial.financing": "B.4.1",
+    "financial.entry": "B.4.2",
+    "financial.fgts": "B.4.3",
+    "financial.subsidy": "B.4.5",
+  };
+  const allowedIds = new Set(checklist.map((field) => field.id));
+
+  return {
+    fields: output.fields.map((field) => {
+      const item = standardItems[field.fieldId];
+      if (!item || field.value || !allowedIds.has(field.fieldId)) return field;
+      const line = text.split(/\r?\n/).find((candidate) => candidate.includes(item) && /R\$\s*[\d.,]+/.test(candidate));
+      const value = line?.match(/R\$\s*[\d.,]+/)?.[0];
+      if (!value || !line) return field;
+      return {
+        ...field,
+        value,
+        confidence: 100,
+        sourceLocation: {
+          section: "Composição dos recursos",
+          rawText: line.slice(0, 500),
+        },
+      };
+    }),
+  };
+}
+
+function keywordGroupsByDomain(checklist: ChecklistField[]) {
+  const groups = new Map<string, string[]>();
+  for (const field of checklist) {
+    const domain = field.id.split(".")[0];
+    groups.set(domain, [...(groups.get(domain) ?? []), ...fieldKeywords(field)]);
+  }
+  return [...groups.values()];
+}
+
+function selectWithinBudget(selected: Map<number, string>, index: number, text: string, maximumCharacters: number) {
+  if (selected.has(index)) return;
+  if (currentLength([...selected.values()]) + text.length > maximumCharacters) return;
+  selected.set(index, text);
 }
 
 function shouldRetryWithBroaderContext(output: ProviderExtractionOutput, checklist: ChecklistField[]) {
