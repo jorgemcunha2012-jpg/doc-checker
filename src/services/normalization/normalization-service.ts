@@ -67,10 +67,28 @@ function normalizeMoney(value: string) {
   const cleaned = value
     .replace(/R\$/gi, "")
     .replace(/\s/g, "")
-    .replace(/\./g, "")
-    .replace(",", ".");
-  const numeric = Number.parseFloat(cleaned);
+    .replace(/[^\d,.-]/g, "");
+  const lastDot = cleaned.lastIndexOf(".");
+  const lastComma = cleaned.lastIndexOf(",");
+  const decimalSeparator = moneyDecimalSeparator(cleaned, lastDot, lastComma);
+  const normalized = [...cleaned]
+    .map((character, index) => {
+      if (character !== "." && character !== ",") return character;
+      return index === decimalSeparator ? "." : "";
+    })
+    .join("");
+  const numeric = Number.parseFloat(normalized);
   return Number.isFinite(numeric) ? numeric.toFixed(2) : normalizeText(value);
+}
+
+function moneyDecimalSeparator(value: string, lastDot: number, lastComma: number) {
+  if (lastDot >= 0 && lastComma >= 0) return Math.max(lastDot, lastComma);
+  const separatorIndex = Math.max(lastDot, lastComma);
+  if (separatorIndex < 0) return -1;
+  const separator = value[separatorIndex];
+  const occurrences = [...value].filter((character) => character === separator).length;
+  const decimalDigits = value.length - separatorIndex - 1;
+  return occurrences === 1 && decimalDigits === 2 ? separatorIndex : -1;
 }
 
 function normalizeText(value: string) {
