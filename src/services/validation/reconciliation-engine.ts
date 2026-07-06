@@ -4,12 +4,13 @@ import type {
   ExtractedFieldValue,
   ExtractionQualityReport,
   FieldComparisonResult,
+  LearnedEquivalenceRule,
   ReconciliationRun,
   ReconciliationSourceValue,
 } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
 import { getChecklist } from "@/domain/checklists";
-import { normalizeValue } from "@/services/normalization/normalization-service";
+import { acceptedEquivalenceObservation, normalizeFieldValue } from "@/services/validation/supervised-learning-service";
 
 const LOW_CONFIDENCE_THRESHOLD = 70;
 const SIMILAR_TEXT_THRESHOLD = 0.86;
@@ -21,6 +22,7 @@ export type ReconciliationInput = {
   sourceErrors: Partial<Record<DocumentSource, string>>;
   conflictedFieldsBySource: Partial<Record<DocumentSource, string[]>>;
   qualityBySource?: Partial<Record<DocumentSource, ExtractionQualityReport>>;
+  learnedEquivalences?: LearnedEquivalenceRule[];
   usedPdfVisionFallback: boolean;
 };
 
@@ -99,7 +101,7 @@ export class ReconciliationEngine {
       const rawValue = extracted?.value == null ? null : String(extracted.value).trim();
       valuesBySource[source] = {
         value: rawValue || null,
-        normalizedValue: normalizeValue(rawValue ?? "", field.fieldType),
+        normalizedValue: normalizeFieldValue(rawValue ?? "", field),
         confidence: extracted?.confidence ?? 0,
         sourceLocation: extracted?.sourceLocation,
       };
@@ -129,6 +131,16 @@ export class ReconciliationEngine {
     }
 
     if (comparisonParticipants.length < 2) {
+      const expectedParticipants = input.participatingSources.filter((source) => field.expectedSources?.includes(source));
+      const acceptedObservation = acceptedEquivalenceObservation(
+        field,
+        valuesBySource,
+        expectedParticipants.length ? expectedParticipants : input.participatingSources,
+        input.learnedEquivalences,
+      );
+      if (acceptedObservation) {
+        return result(organizationId, field, valuesBySource, "MATCH", acceptedObservation);
+      }
       const expectedMissingSources = input.participatingSources.filter(
         (source) =>
           field.expectedSources?.includes(source) &&
@@ -165,6 +177,16 @@ export class ReconciliationEngine {
       const rawValues = comparisonParticipants.map((source) => valuesBySource[source]?.value ?? "");
       const observation = new Set(rawValues).size > 1 ? "Valores equivalentes após normalização." : "Todas as fontes conferem.";
       return result(organizationId, field, valuesBySource, "MATCH", observation);
+    }
+
+    const acceptedObservation = acceptedEquivalenceObservation(
+      field,
+      valuesBySource,
+      comparisonParticipants,
+      input.learnedEquivalences,
+    );
+    if (acceptedObservation) {
+      return result(organizationId, field, valuesBySource, "MATCH", acceptedObservation);
     }
 
     if (isTextual(field) && allDifferencesAreSmall(comparisonParticipants, valuesBySource)) {

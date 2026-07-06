@@ -7,6 +7,7 @@ import { ValidationEngine } from "@/services/validation/validation-engine";
 import { ReconciliationEngine } from "@/services/validation/reconciliation-engine";
 import { getValidationProcess, saveValidationProcess, updateValidationProcess } from "./validation-process-store";
 import { audit, persistDocuments, persistOriginalDocuments, persistProcess, persistResults } from "./process-repository";
+import { loadLearnedEquivalences } from "./learning-repository";
 
 export function createValidationProcess(validationType: ValidationType, documents: UploadedDocumentPayload[]) {
   const process = createBaseValidationProcess(validationType, documents);
@@ -152,6 +153,7 @@ async function processReconciliation(
   await updateAndPersist(processId, { status: "COMPARING" });
   const engine = new ReconciliationEngine();
   const hasReference = referenceValues.length > 0;
+  const learnedEquivalences = await loadLearnedEquivalences(organizationId);
   return {
     ...engine.run(organizationId, {
       ...extraction,
@@ -159,6 +161,7 @@ async function processReconciliation(
       participatingSources: hasReference
         ? [...extraction.participatingSources, "CADASTRO_EMPREENDIMENTO"]
         : extraction.participatingSources,
+      learnedEquivalences,
     }),
     id: processId,
   };

@@ -210,6 +210,17 @@ export type FieldComparisonResult = {
   humanReview?: HumanReview;
 };
 
+export type LearnedEquivalenceRule = {
+  organizationId: string;
+  fieldId: string;
+  fieldType: FieldType;
+  ruleKind: "MARITAL_STATUS_GENDER" | "OPTIONAL_ZERO" | "TEXT_ALIAS";
+  signature: string;
+  normalizedValues: string[];
+  exampleValues: Record<string, string | null>;
+  occurrenceCount: number;
+};
+
 export type ReconciliationSummary = ValidationSummary & {
   unreadable: number;
   missingBySource: Partial<Record<DocumentSource, number>>;

@@ -3,6 +3,7 @@ import type { HumanReview, ReconciliationRun, UploadedDocument, ValidationProces
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
+import { learnFromApprovedReview } from "./learning-repository";
 
 export async function persistProcess(process: ValidationProcess) {
   if (!isSupabaseConfigured()) return;
@@ -131,11 +132,24 @@ export async function saveHumanReview(
       { onConflict: "process_id,field_id" },
     );
     if (error) throw new Error(`Falha ao salvar revisão: ${error.message}`);
+    await learnApprovedPattern(processId, fieldId, actor);
   }
   await audit(actor, review ? "REVIEW_APPROVED" : "REVIEW_REVOKED", "validation_result", `${processId}:${fieldId}`, {
     justification: review?.justification,
   });
   await refreshFinalStatus(processId);
+}
+
+async function learnApprovedPattern(processId: string, fieldId: string, actor: AuthenticatedUser) {
+  const { data: process, error } = await createSupabaseAdminClient()
+    .from("validation_processes")
+    .select("result")
+    .eq("id", processId)
+    .single();
+  if (error) throw new Error(`Falha ao consultar processo para aprendizado: ${error.message}`);
+  const result = process?.result?.results?.find((item: ReconciliationRun["results"][number]) => item.field.id === fieldId);
+  if (!result) return;
+  await learnFromApprovedReview(processId, result, actor);
 }
 
 export async function audit(

@@ -119,6 +119,28 @@ test("usa cadastro do empreendimento como referência de unidade e normaliza ár
   assert.equal(field(result, "property.tower").status, "MATCH");
 });
 
+test("trata variações gramaticais seguras de estado civil como equivalentes", () => {
+  const result = run(
+    [
+      value("buyer.maritalStatus", "MINUTA", "solteiro"),
+      value("buyer.maritalStatus", "DADOS_RESERVA", "Solteiro(a)"),
+    ],
+    ["MINUTA", "DADOS_RESERVA"],
+  );
+
+  assert.equal(field(result, "buyer.maritalStatus").status, "MATCH");
+});
+
+test("trata zero e vazio como equivalentes apenas em campos financeiros opcionais", () => {
+  const result = run(
+    [value("financial.fgts", "MINUTA", "R$ 0,00")],
+    ["MINUTA", "SIOPI"],
+  );
+
+  assert.equal(field(result, "financial.fgts").status, "MATCH");
+  assert.match(field(result, "financial.fgts").observation, /campo opcional/);
+});
+
 test("separa e confere dois compradores pelo identificador de participante", () => {
   const maria = "cpf_11111111111";
   const joao = "cpf_22222222222";
