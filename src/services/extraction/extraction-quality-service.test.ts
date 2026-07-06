@@ -24,7 +24,7 @@ test("identifica campo crítico ausente e registra recuperação", () => {
     ...output.fields.map((field) => ({ ...field, source: "MINUTA" as const })),
     { ...extracted("financial.financing", "150000"), source: "MINUTA" },
   ];
-  const quality = buildExtractionQuality("MINUTA", values, checklist, ["financial.financing"], false);
+  const quality = buildExtractionQuality("MINUTA", values, checklist, ["financial.financing"], [], [], false);
 
   assert.equal(quality.status, "COMPLETE");
   assert.equal(quality.coverage, 100);
@@ -38,6 +38,8 @@ test("marca cobertura parcial sem derrubar a conferência", () => {
     [{ ...extracted("buyer.name", "Maria"), source: "MINUTA" }],
     checklist,
     [],
+    [],
+    [],
     false,
   );
 
@@ -46,6 +48,32 @@ test("marca cobertura parcial sem derrubar a conferência", () => {
   assert.ok(quality.missingCriticalFields.includes("financial.financing"));
 });
 
-function extracted(fieldId: string, value: string) {
-  return { fieldId, value, confidence: 95 };
+test("sinaliza baixa confiança e conflito interno em campo crítico", () => {
+  const checklist = getChecklist("RECONCILIATION");
+  const quality = buildExtractionQuality(
+    "MINUTA",
+    [
+      { ...extracted("buyer.name", "Maria"), source: "MINUTA" },
+      { ...extracted("buyer.cpf", "12345678900", 55), source: "MINUTA" },
+      { ...extracted("property.development", "Condomínio"), source: "MINUTA" },
+      { ...extracted("property.unit", "101"), source: "MINUTA" },
+      { ...extracted("property.tower", "1"), source: "MINUTA" },
+      { ...extracted("financial.financing", "150000"), source: "MINUTA" },
+      { ...extracted("financial.totalValue", "200000"), source: "MINUTA" },
+    ],
+    checklist,
+    [],
+    ["financial.financing"],
+    ["buyer.cpf"],
+    false,
+  );
+
+  assert.equal(quality.status, "PARTIAL");
+  assert.deepEqual(quality.lowConfidenceCriticalFields, ["buyer.cpf"]);
+  assert.deepEqual(quality.ambiguousCriticalFields, ["buyer.cpf"]);
+  assert.deepEqual(quality.deterministicFields, ["financial.financing"]);
+});
+
+function extracted(fieldId: string, value: string, confidence = 95) {
+  return { fieldId, value, confidence };
 }

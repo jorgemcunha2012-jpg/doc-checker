@@ -1,0 +1,109 @@
+import type { ChecklistField, DocumentSource, ExtractedField, ProviderExtractionOutput } from "@/domain/validation";
+
+type MatchDefinition = {
+  fieldId: string;
+  section: string;
+  confidence: number;
+  patterns: RegExp[];
+};
+
+const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
+  MINUTA: [
+    money("financial.financing", "Composição dos recursos", 100, [/B\.4\.1[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i]),
+    money("financial.downPayment", "Composição dos recursos", 100, [/B\.4\.2[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i]),
+    money("financial.fgts", "Composição dos recursos", 100, [/B\.4\.3[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i]),
+    money("financial.subsidy", "Composição dos recursos", 100, [/B\.4\.5[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i]),
+    money("financial.totalValue", "Valor do contrato", 98, [
+      /valor destinado[^.\n\r]*?\s+é\s*(R\$\s*\d[\d.,]*)/i,
+      /valor (?:total|do imóvel|da venda)[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+    ]),
+    text("property.unit", "Descrição do imóvel", 92, [
+      /\b(?:unidade|apartamento|apto)\s*(?:n[ºo.]*)?\s*([A-Z0-9-]{1,12})\b/i,
+    ]),
+    text("property.tower", "Descrição do imóvel", 92, [
+      /\b(?:torre|bloco)\s*(?:n[ºo.]*)?\s*([A-Z0-9-]{1,12})\b/i,
+    ]),
+    text("property.registration", "Descrição do imóvel", 90, [
+      /\bmatr[ií]cula\s*(?:n[ºo.]*)?\s*([A-Z0-9./-]{2,30})\b/i,
+    ]),
+  ],
+  DADOS_RESERVA: [
+    text("buyer.name", "Dados da reserva", 92, [/cliente:\s*([^\n\r]+)/i]),
+    text("buyer.email", "Dados da reserva", 96, [/e-?mail:\s*([^\s\n\r]+@[^\s\n\r]+)/i]),
+    text("buyer.phone", "Dados da reserva", 94, [/telefone:\s*([+()\d\s.-]{8,24})/i]),
+    text("property.development", "Dados da reserva", 92, [/unidade:\s*([^/\n\r]+?)(?:\s*\/\s*torre|\s*\/\s*\d|\n|\r)/i]),
+    text("property.tower", "Dados da reserva", 94, [/\/\s*torre\s*([A-Z0-9-]{1,12})/i]),
+    text("property.unit", "Dados da reserva", 94, [/\/\s*torre\s*[A-Z0-9-]{1,12}\s*\/\s*([A-Z0-9-]{1,12})/i]),
+    text("property.registration", "Dados da reserva", 88, [/matr[ií]cula:\s*([A-Z0-9./-]+)/i]),
+  ],
+  SIOPI: [
+    text("buyer.cpf", "Espelho SIOPI", 94, [/\bCPF\b[^\d]*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i]),
+    text("buyer.name", "Espelho SIOPI", 90, [/(?:cliente|proponente|comprador)[^\n\r:]*:\s*([^\n\r]+)/i]),
+    money("financial.financing", "Espelho SIOPI", 94, [/valor (?:do )?financiamento[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i]),
+    money("financial.totalValue", "Espelho SIOPI", 94, [/valor (?:total|do imóvel|da venda)[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i]),
+  ],
+  ITBI: [
+    text("buyer.cpf", "ITBI", 94, [/\bCPF\b[^\d]*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i]),
+    text("seller.cnpj", "ITBI", 94, [/\bCNPJ\b[^\d]*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i]),
+    money("financial.financing", "ITBI", 92, [/valor financiado[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i]),
+    money("financial.totalValue", "ITBI", 92, [/valor (?:total|declarado|do imóvel)[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i]),
+  ],
+  MATRICULA: [
+    text("property.registration", "Matrícula", 94, [/\bmatr[ií]cula\s*(?:n[ºo.]*)?\s*([A-Z0-9./-]{2,30})\b/i]),
+    text("property.privateArea", "Matrícula", 90, [/área privativa[^\d]*(\d+[\d.,]*\s*m[²2]?)/i]),
+    text("property.totalArea", "Matrícula", 88, [/área total[^\d]*(\d+[\d.,]*\s*m[²2]?)/i]),
+    text("property.idealFraction", "Matrícula", 88, [/fração ideal[^\d]*(\d+[\d.,]*)/i]),
+  ],
+};
+
+export function extractDeterministicFields(
+  text: string,
+  checklist: ChecklistField[],
+  source: DocumentSource,
+): ProviderExtractionOutput {
+  const allowed = new Set(checklist.map((field) => field.id));
+  const definitions = sourceDefinitions[source] ?? [];
+  const fields = checklist.map((field): ExtractedField => {
+    if (!allowed.has(field.id)) return empty(field.id);
+    const definition = definitions.find((item) => item.fieldId === field.id);
+    const match = definition ? firstMatch(text, definition.patterns) : null;
+    if (!definition || !match) return empty(field.id);
+    return {
+      fieldId: field.id,
+      value: cleanValue(match.value),
+      confidence: definition.confidence,
+      sourceLocation: {
+        section: definition.section,
+        rawText: match.rawText.slice(0, 500),
+      },
+    };
+  });
+
+  return { fields };
+}
+
+function firstMatch(text: string, patterns: RegExp[]) {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const value = match?.[1]?.trim();
+    if (value) return { value, rawText: match[0] };
+  }
+  return null;
+}
+
+function cleanValue(value: string) {
+  return value.replace(/\s+/g, " ").replace(/[.;,]\s*$/, "").trim();
+}
+
+function money(fieldId: string, section: string, confidence: number, patterns: RegExp[]): MatchDefinition {
+  return { fieldId, section, confidence, patterns };
+}
+
+function text(fieldId: string, section: string, confidence: number, patterns: RegExp[]): MatchDefinition {
+  return { fieldId, section, confidence, patterns };
+}
+
+function empty(fieldId: string): ExtractedField {
+  return { fieldId, value: null, confidence: 0 };
+}

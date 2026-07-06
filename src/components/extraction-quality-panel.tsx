@@ -35,19 +35,36 @@ export function ExtractionQualityPanel({
                 {report.coverage}% de cobertura
               </span>
             </div>
-            {report.recoveredFields.length ? (
+            {(report.recoveredFields ?? []).length ? (
               <div className="mt-3 flex items-start gap-2 text-xs leading-5 text-blue-700">
                 <RefreshCw className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                Recuperados automaticamente: {report.recoveredFields.map((fieldId) => labels.get(fieldId) ?? fieldId).join(", ")}.
+                Recuperados automaticamente: {(report.recoveredFields ?? []).map((fieldId) => labels.get(fieldId) ?? fieldId).join(", ")}.
               </div>
             ) : null}
-            {report.missingCriticalFields.length ? (
+            {(report.deterministicFields ?? []).length ? (
+              <div className="mt-3 flex items-start gap-2 text-xs leading-5 text-emerald-700">
+                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                Confirmados por leitura determinística: {(report.deterministicFields ?? []).map((fieldId) => labels.get(fieldId) ?? fieldId).join(", ")}.
+              </div>
+            ) : null}
+            {(report.missingCriticalFields ?? []).length ? (
               <p className="mt-3 text-xs leading-5 text-amber-800">
-                Não extraídos após nova tentativa: {report.missingCriticalFields.map((fieldId) => labels.get(fieldId) ?? fieldId).join(", ")}.
+                Não extraídos após nova tentativa: {(report.missingCriticalFields ?? []).map((fieldId) => labels.get(fieldId) ?? fieldId).join(", ")}.
               </p>
-            ) : (
-              <p className="mt-3 text-xs leading-5 text-slate-500">Todos os campos críticos esperados foram extraídos.</p>
-            )}
+            ) : null}
+            {(report.lowConfidenceCriticalFields ?? []).length ? (
+              <p className="mt-3 text-xs leading-5 text-amber-800">
+                Extraídos com baixa confiança: {(report.lowConfidenceCriticalFields ?? []).map((fieldId) => labels.get(fieldId) ?? fieldId).join(", ")}.
+              </p>
+            ) : null}
+            {(report.ambiguousCriticalFields ?? []).length ? (
+              <p className="mt-3 text-xs leading-5 text-rose-700">
+                Com conflito interno na mesma fonte: {(report.ambiguousCriticalFields ?? []).map((fieldId) => labels.get(fieldId) ?? fieldId).join(", ")}.
+              </p>
+            ) : null}
+            {!(report.missingCriticalFields ?? []).length && !(report.lowConfidenceCriticalFields ?? []).length && !(report.ambiguousCriticalFields ?? []).length ? (
+              <p className="mt-3 text-xs leading-5 text-slate-500">Todos os campos críticos esperados foram extraídos com confiança suficiente.</p>
+            ) : null}
           </div>
         ))}
       </div>

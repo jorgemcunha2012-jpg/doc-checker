@@ -129,7 +129,10 @@ export type ExtractionQualityReport = {
   expectedCriticalFields: string[];
   extractedCriticalFields: string[];
   missingCriticalFields: string[];
+  lowConfidenceCriticalFields: string[];
+  ambiguousCriticalFields: string[];
   recoveredFields: string[];
+  deterministicFields: string[];
   coverage: number;
 };
 

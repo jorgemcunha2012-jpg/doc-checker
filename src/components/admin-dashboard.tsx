@@ -64,12 +64,13 @@ export function AdminDashboard({ isMasterAdmin, embedded = false }: { isMasterAd
   const documentsInProgress = inProgressProcesses.reduce((total, process) => total + process.process_documents.length, 0);
   const documentsAnalyzed = finishedProcesses.reduce((total, process) => total + process.process_documents.length, 0);
   const documentsTotal = processes.reduce((total, process) => total + process.process_documents.length, 0);
+  const qualityMetrics = extractionQualityMetrics(processes);
   async function createUser(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); const response = await fetch("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: form.get("name"), email: form.get("email") }) }); const payload = await response.json(); if (response.ok) { setTemporaryPassword(payload.temporaryPassword); event.currentTarget.reset(); await load(); } }
   async function userAction(id: string, action: string) { const response = await fetch(`/api/admin/users/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }); const payload = await response.json(); if (payload.temporaryPassword) setTemporaryPassword(payload.temporaryPassword); await load(); }
   return <main className={embedded ? "" : "min-h-screen bg-slate-50"}>
     {!embedded ? <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4"><div><div className="text-lg font-bold">ConferIA Admin</div><div className="text-xs text-slate-500">Gestão operacional</div></div><div className="flex items-center gap-4"><Link href={{ pathname: "/history" }} className="text-sm font-bold text-slate-600">Histórico</Link><Link href="/change-password" className="text-sm font-bold text-slate-600">Alterar minha senha</Link><Link href="/" className="text-sm font-bold text-blue-600">Nova conferência</Link></div></div></header> : null}
     <div className={`mx-auto max-w-7xl space-y-8 ${embedded ? "" : "px-5 py-8"}`}>
-      {isMasterAdmin ? <section><div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Visão geral</h1><p className="mt-1 text-sm text-slate-500">Atividades e resultados da equipe.</p></div><button title="Atualizar" onClick={load} className="rounded-md border border-slate-200 bg-white p-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button></div><div className="mt-5 grid gap-3 sm:grid-cols-5"><Metric label="Documentos analisados" value={documentsAnalyzed} /><Metric label="Documentos em análise" value={documentsInProgress} /><Metric label="Documentos cadastrados" value={documentsTotal} /><Metric label="Processos em andamento" value={inProgressProcesses.length} /><Metric label="Alertas operacionais" value={operationalAlerts.length} alert={operationalAlerts.length > 0} /></div><div className="mt-3 grid gap-3 sm:grid-cols-4"><Metric label="Com pendências" value={count("PENDING_REVIEW")} /><Metric label="Conferidos" value={count("FULLY_CHECKED")} /><Metric label="Falhas" value={count("FAILED")} /><Metric label="Usuários ativos" value={users.filter((user) => user.active).length} /></div></section> : <section><div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Gestão de usuários</h1><p className="mt-1 text-sm text-slate-500">Criação de acessos para novos analistas.</p></div><button title="Atualizar" onClick={load} className="rounded-md border border-slate-200 bg-white p-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button></div></section>}
+      {isMasterAdmin ? <section><div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Visão geral</h1><p className="mt-1 text-sm text-slate-500">Atividades e resultados da equipe.</p></div><button title="Atualizar" onClick={load} className="rounded-md border border-slate-200 bg-white p-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button></div><div className="mt-5 grid gap-3 sm:grid-cols-5"><Metric label="Documentos analisados" value={documentsAnalyzed} /><Metric label="Documentos em análise" value={documentsInProgress} /><Metric label="Documentos cadastrados" value={documentsTotal} /><Metric label="Processos em andamento" value={inProgressProcesses.length} /><Metric label="Alertas operacionais" value={operationalAlerts.length} alert={operationalAlerts.length > 0} /></div><div className="mt-3 grid gap-3 sm:grid-cols-4"><Metric label="Com pendências" value={count("PENDING_REVIEW")} /><Metric label="Conferidos" value={count("FULLY_CHECKED")} /><Metric label="Falhas" value={count("FAILED")} /><Metric label="Usuários ativos" value={users.filter((user) => user.active).length} /></div><div className="mt-3 grid gap-3 sm:grid-cols-4"><Metric label="Campos críticos ausentes" value={qualityMetrics.missingCritical} alert={qualityMetrics.missingCritical > 0} /><Metric label="Baixa confiança crítica" value={qualityMetrics.lowConfidence} alert={qualityMetrics.lowConfidence > 0} /><Metric label="Conflitos internos críticos" value={qualityMetrics.ambiguous} alert={qualityMetrics.ambiguous > 0} /><Metric label="Recuperados automaticamente" value={qualityMetrics.recovered + qualityMetrics.deterministic} /></div></section> : <section><div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Gestão de usuários</h1><p className="mt-1 text-sm text-slate-500">Criação de acessos para novos analistas.</p></div><button title="Atualizar" onClick={load} className="rounded-md border border-slate-200 bg-white p-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button></div></section>}
       {isMasterAdmin && operationalAlerts.length ? <section className="border border-amber-300 bg-amber-50">
         <div className="flex items-start gap-3 border-b border-amber-200 p-5">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
@@ -138,13 +139,32 @@ function processAnomaly(process: ManagedProcess) {
     .filter((report) => report?.status === "PARTIAL" || report?.status === "FAILED");
   if (incompleteSources.length) {
     const lowestCoverage = Math.min(...incompleteSources.map((report) => report?.coverage ?? 0));
+    const missing = incompleteSources.reduce((total, report) => total + (report?.missingCriticalFields?.length ?? 0), 0);
+    const lowConfidence = incompleteSources.reduce((total, report) => total + (report?.lowConfidenceCriticalFields?.length ?? 0), 0);
+    const ambiguous = incompleteSources.reduce((total, report) => total + (report?.ambiguousCriticalFields?.length ?? 0), 0);
     return {
-      label: `Extração incompleta em ${incompleteSources.length} fonte(s) · menor cobertura ${lowestCoverage}%`,
+      label: `Extração incompleta em ${incompleteSources.length} fonte(s) · cobertura ${lowestCoverage}% · ausentes ${missing} · baixa confiança ${lowConfidence} · conflitos ${ambiguous}`,
       severity: "warning" as const,
       durationMs,
     };
   }
   return null;
+}
+
+function extractionQualityMetrics(processes: ManagedProcess[]) {
+  return processes.reduce(
+    (metrics, process) => {
+      for (const report of Object.values(process.summary?.extractionQualityBySource ?? {})) {
+        metrics.missingCritical += report?.missingCriticalFields?.length ?? 0;
+        metrics.lowConfidence += report?.lowConfidenceCriticalFields?.length ?? 0;
+        metrics.ambiguous += report?.ambiguousCriticalFields?.length ?? 0;
+        metrics.recovered += report?.recoveredFields?.length ?? 0;
+        metrics.deterministic += report?.deterministicFields?.length ?? 0;
+      }
+      return metrics;
+    },
+    { missingCritical: 0, lowConfidence: 0, ambiguous: 0, recovered: 0, deterministic: 0 },
+  );
 }
 function processDurationMs(process: ManagedProcess) {
   const start = new Date(process.started_at).getTime();
@@ -165,5 +185,6 @@ function eventLabel(type: string) {
     PROCESS_FAILED: "Processo com falha",
     REVIEW_APPROVED: "Item validado",
     REVIEW_REVOKED: "Validação desfeita",
+    LEARNING_RULE_RECORDED: "Aprendizado supervisionado registrado",
   } as Record<string, string>)[type] ?? type;
 }

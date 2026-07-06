@@ -6,6 +6,8 @@ import type {
   ProviderExtractionOutput,
 } from "@/domain/validation";
 
+const LOW_CRITICAL_CONFIDENCE_THRESHOLD = 75;
+
 const criticalFieldsBySource: Partial<Record<DocumentSource, string[]>> = {
   MINUTA: [
     "buyer.name",
@@ -70,6 +72,8 @@ export function buildExtractionQuality(
   values: ExtractedFieldValue[],
   checklist: ChecklistField[],
   recoveredFields: string[],
+  deterministicFields: string[],
+  conflictedFields: string[],
   unreadable: boolean,
 ): ExtractionQualityReport {
   const expected = criticalChecklistFields(source, checklist).map((field) => field.id);
@@ -80,7 +84,10 @@ export function buildExtractionQuality(
       expectedCriticalFields: [],
       extractedCriticalFields: [],
       missingCriticalFields: [],
+      lowConfidenceCriticalFields: [],
+      ambiguousCriticalFields: [],
       recoveredFields: [],
+      deterministicFields: [],
       coverage: unreadable ? 0 : 100,
     };
   }
@@ -88,13 +95,27 @@ export function buildExtractionQuality(
     values.some((value) => value.fieldId === fieldId && hasValue(value.value)),
   );
   const missing = expected.filter((fieldId) => !extracted.includes(fieldId));
+  const lowConfidence = expected.filter((fieldId) =>
+    values.some(
+      (value) =>
+        value.fieldId === fieldId &&
+        hasValue(value.value) &&
+        value.confidence < LOW_CRITICAL_CONFIDENCE_THRESHOLD,
+    ),
+  );
+  const ambiguous = expected.filter((fieldId) =>
+    conflictedFields.some((conflict) => conflict === fieldId || conflict.startsWith(`${fieldId}::`)),
+  );
   return {
     source,
-    status: unreadable ? "FAILED" : missing.length ? "PARTIAL" : "COMPLETE",
+    status: unreadable ? "FAILED" : missing.length || lowConfidence.length || ambiguous.length ? "PARTIAL" : "COMPLETE",
     expectedCriticalFields: expected,
     extractedCriticalFields: extracted,
     missingCriticalFields: missing,
+    lowConfidenceCriticalFields: lowConfidence,
+    ambiguousCriticalFields: ambiguous,
     recoveredFields: [...new Set(recoveredFields.filter((fieldId) => expected.includes(fieldId)))],
+    deterministicFields: [...new Set(deterministicFields.filter((fieldId) => expected.includes(fieldId)))],
     coverage: Math.round((extracted.length / expected.length) * 100),
   };
 }

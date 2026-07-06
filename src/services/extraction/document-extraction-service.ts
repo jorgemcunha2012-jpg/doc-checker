@@ -9,6 +9,7 @@ import { extractDocxText } from "./word-text-service";
 import { convertTiffToPngPages } from "./tiff-image-service";
 import type { ExtractionRequest, ExtractionResult, ReconciliationExtractionResult, UploadedDocumentPayload } from "./types";
 import { buildExtractionQuality, missingCriticalFields } from "./extraction-quality-service";
+import { extractDeterministicFields } from "./deterministic-field-extractor";
 
 export class DocumentExtractionService {
   constructor(
@@ -161,6 +162,7 @@ export class DocumentExtractionService {
             return {
               output: extraction.output,
               recoveredFields: extraction.recoveredFields,
+              deterministicFields: extraction.deterministicFields,
               usedPdfVisionFallback: false,
             };
           }
@@ -175,7 +177,12 @@ export class DocumentExtractionService {
               extractedTextCharacters: text.length,
               requestedFields: sourceChecklist.length,
             });
-            return { output: extraction.output, recoveredFields: extraction.recoveredFields, usedPdfVisionFallback: false };
+            return {
+              output: extraction.output,
+              recoveredFields: extraction.recoveredFields,
+              deterministicFields: extraction.deterministicFields,
+              usedPdfVisionFallback: false,
+            };
           }
           if (document.mimeType.includes("image") || isTiff(document)) {
             const output = await this.extractVisualDocument(document, sourceChecklist);
@@ -188,10 +195,11 @@ export class DocumentExtractionService {
             return {
               output,
               recoveredFields: [],
+              deterministicFields: [],
               usedPdfVisionFallback: false,
             };
           }
-          return { output: null, recoveredFields: [], usedPdfVisionFallback: false, error: "Formato de arquivo não suportado." };
+          return { output: null, recoveredFields: [], deterministicFields: [], usedPdfVisionFallback: false, error: "Formato de arquivo não suportado." };
         } catch (error) {
           const errorMessage = sanitizeExtractionError(error);
           console.error("[ConferIA] Falha de extração por documento", {
@@ -199,13 +207,14 @@ export class DocumentExtractionService {
             documentName: document.name,
             error: errorMessage,
           });
-          return { output: null, recoveredFields: [], usedPdfVisionFallback: false, error: errorMessage };
+          return { output: null, recoveredFields: [], deterministicFields: [], usedPdfVisionFallback: false, error: errorMessage };
         }
       }),
     );
     const outputs = attempts.flatMap((attempt) => (attempt.output ? [attempt.output] : []));
     const consolidated = consolidateSourceOutputs(source, outputs, checklist);
     const recoveredFields = [...new Set(attempts.flatMap((attempt) => attempt.recoveredFields ?? []))];
+    const deterministicFields = [...new Set(attempts.flatMap((attempt) => attempt.deterministicFields ?? []))];
     const unreadable = outputs.length === 0;
 
     return {
@@ -215,7 +224,15 @@ export class DocumentExtractionService {
       unreadable,
       error: attempts.find((attempt) => attempt.error)?.error,
       usedPdfVisionFallback: attempts.some((attempt) => attempt.usedPdfVisionFallback),
-      quality: buildExtractionQuality(source, consolidated.values, checklist, recoveredFields, unreadable),
+      quality: buildExtractionQuality(
+        source,
+        consolidated.values,
+        checklist,
+        recoveredFields,
+        deterministicFields,
+        consolidated.conflictedFields,
+        unreadable,
+      ),
     };
   }
 
@@ -224,9 +241,13 @@ export class DocumentExtractionService {
     checklist: ExtractionRequest["checklist"],
     source: DocumentSource,
   ) {
-    const initial = await this.deepSeekProvider.structureText(text, checklist);
+    const deterministic = extractDeterministicFields(text, checklist, source);
+    const deterministicFields = deterministic.fields
+      .filter((field) => field.value != null && String(field.value).trim())
+      .map((field) => field.fieldId);
+    const initial = mergeRecoveryOutput(await this.deepSeekProvider.structureText(text, checklist), deterministic, checklist);
     const missing = missingCriticalFields(source, initial, checklist);
-    if (!missing.length) return { output: initial, recoveredFields: [] };
+    if (!missing.length) return { output: initial, recoveredFields: [], deterministicFields };
 
     try {
       const recovery = await this.deepSeekProvider.structureText(text, missing);
@@ -240,8 +261,9 @@ export class DocumentExtractionService {
         recoveredFields,
       });
       return {
-        output: mergeRecoveryOutput(initial, recovery, checklist),
+        output: mergeRecoveryOutput(mergeRecoveryOutput(initial, recovery, checklist), deterministic, checklist),
         recoveredFields,
+        deterministicFields,
       };
     } catch (error) {
       console.warn("[ConferIA] Recuperação direcionada indisponível; extração inicial preservada", {
@@ -249,7 +271,7 @@ export class DocumentExtractionService {
         requestedFields: missing.map((field) => field.id),
         error: sanitizeExtractionError(error),
       });
-      return { output: initial, recoveredFields: [] };
+      return { output: initial, recoveredFields: [], deterministicFields };
     }
   }
 
