@@ -10,6 +10,7 @@ import { audit, persistDocuments, persistOriginalDocuments, persistProcess, pers
 import { loadLearnedEquivalences } from "./learning-repository";
 
 export function createValidationProcess(validationType: ValidationType, documents: UploadedDocumentPayload[]) {
+  assertProcessHasDocuments(documents);
   const process = createBaseValidationProcess(validationType, documents);
 
   saveValidationProcess(process);
@@ -19,6 +20,7 @@ export function createValidationProcess(validationType: ValidationType, document
 }
 
 export async function createValidationProcessAndWait(validationType: ValidationType, documents: UploadedDocumentPayload[], user = defaultUser) {
+  assertProcessHasDocuments(documents);
   const process = createBaseValidationProcess(validationType, documents, user);
 
   saveValidationProcess(process);
@@ -41,6 +43,7 @@ export async function createValidationProcessAndStart(
   },
   referenceValues: ExtractedFieldValue[] = [],
 ) {
+  assertProcessHasDocuments(documents);
   const process = createBaseValidationProcess(validationType, documents, user);
 
   saveValidationProcess(process);
@@ -52,6 +55,12 @@ export async function createValidationProcessAndStart(
   schedule(() => processValidation(process.id, validationType, documents, referenceValues));
 
   return process;
+}
+
+function assertProcessHasDocuments(documents: UploadedDocumentPayload[]) {
+  if (!documents.length) {
+    throw new Error("Não é possível criar uma conferência sem documentos.");
+  }
 }
 
 function createBaseValidationProcess(validationType: ValidationType, documents: UploadedDocumentPayload[], user = defaultUser): ValidationProcess {

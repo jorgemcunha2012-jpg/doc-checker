@@ -122,6 +122,9 @@ function formatDuration(milliseconds: number) {
 function processAnomaly(process: ManagedProcess) {
   const durationMs = processDurationMs(process);
   if (!Number.isFinite(durationMs)) return null;
+  if (process.process_documents.length === 0) {
+    return { label: "Processo sem documentos registrados", severity: "critical" as const, durationMs };
+  }
   if (process.final_status === "FAILED") {
     return { label: process.error ? `Falha: ${process.error}` : "Processo finalizado com falha", severity: "critical" as const, durationMs };
   }

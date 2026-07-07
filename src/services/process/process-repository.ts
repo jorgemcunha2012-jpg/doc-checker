@@ -34,6 +34,9 @@ export async function persistProcess(process: ValidationProcess) {
 
 export async function persistDocuments(processId: string, documents: UploadedDocument[]) {
   if (!isSupabaseConfigured()) return;
+  if (!documents.length) {
+    throw new Error("Falha ao persistir documentos: nenhum documento informado.");
+  }
   const supabase = createSupabaseAdminClient();
   const { error } = await supabase.from("process_documents").upsert(
     documents.map((document) => ({
@@ -53,6 +56,9 @@ export async function persistDocuments(processId: string, documents: UploadedDoc
 
 export async function persistOriginalDocuments(processId: string, documents: UploadedDocumentPayload[]) {
   if (!isSupabaseConfigured()) return;
+  if (!documents.length) {
+    throw new Error("Não foi possível armazenar documentos: nenhum arquivo informado.");
+  }
   const supabase = createSupabaseAdminClient();
   const uploaded: Array<{ id: string; path: string }> = [];
   try {

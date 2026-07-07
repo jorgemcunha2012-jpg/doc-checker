@@ -19,6 +19,7 @@ export function IncompleteProcessDetail({
   backHref: string;
 }) {
   const duration = durationLabel(process.started_at, process.completed_at);
+  const orphanWithoutDocuments = process.process_documents.length === 0;
   const stalled = process.final_status === "IN_PROGRESS" && elapsedMs(process.started_at, process.completed_at) >= 30 * 60 * 1000;
 
   return (
@@ -36,15 +37,23 @@ export function IncompleteProcessDetail({
         </a>
       </div>
 
-      <section className={`border p-5 ${stalled || process.final_status === "FAILED" ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
+      <section className={`border p-5 ${orphanWithoutDocuments || stalled || process.final_status === "FAILED" ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
         <div className="flex items-start gap-3">
-          <AlertTriangle className={`mt-0.5 h-5 w-5 shrink-0 ${stalled || process.final_status === "FAILED" ? "text-amber-700" : "text-slate-500"}`} />
+          <AlertTriangle className={`mt-0.5 h-5 w-5 shrink-0 ${orphanWithoutDocuments || stalled || process.final_status === "FAILED" ? "text-amber-700" : "text-slate-500"}`} />
           <div>
             <h2 className="font-bold text-slate-950">
-              {stalled ? "Possível processo travado" : process.final_status === "FAILED" ? "Processo finalizado com falha" : "Processamento ainda não concluído"}
+              {orphanWithoutDocuments
+                ? "Processo sem documentos registrados"
+                : stalled
+                  ? "Possível processo travado"
+                  : process.final_status === "FAILED"
+                    ? "Processo finalizado com falha"
+                    : "Processamento ainda não concluído"}
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              {stalled
+              {orphanWithoutDocuments
+                ? "A conferência foi iniciada, mas nenhum arquivo ficou associado ao processo. Isso indica falha de criação ou upload, não processamento documental em andamento."
+                : stalled
                 ? "O processo permaneceu sem conclusão por mais de 30 minutos e não produziu um checklist."
                 : "Ainda não existe um resultado consolidado para este processo."}
             </p>
