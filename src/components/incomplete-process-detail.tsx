@@ -1,4 +1,5 @@
 import { AlertTriangle, ArrowLeft, Clock3, FileText } from "lucide-react";
+import { ProcessDocumentList } from "./process-document-list";
 
 type IncompleteProcess = {
   id: string;
@@ -73,22 +74,8 @@ export function IncompleteProcessDetail({
           <FileText className="h-5 w-5 text-slate-500" />
           <h2 className="font-bold text-slate-950">Documentos enviados</h2>
         </div>
-        <div className="mt-4 divide-y divide-slate-100">
-          {process.process_documents.length ? process.process_documents.map((document) => (
-            <div key={document.id} className="flex items-center justify-between gap-3 py-3 text-sm">
-              <span className="min-w-0 truncate text-slate-700">{document.name}</span>
-              {document.storage_path ? (
-                <a
-                  href={`/api/processes/${process.id}/documents/${document.id}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="shrink-0 font-bold text-[#0f8f88]"
-                >
-                  Visualizar
-                </a>
-              ) : <span className="shrink-0 text-xs text-slate-400">Original indisponível</span>}
-            </div>
-          )) : <p className="py-4 text-sm text-slate-500">Nenhum documento foi registrado.</p>}
+        <div className="mt-4">
+          <ProcessDocumentList processId={process.id} documents={process.process_documents} />
         </div>
       </section>
     </div>
