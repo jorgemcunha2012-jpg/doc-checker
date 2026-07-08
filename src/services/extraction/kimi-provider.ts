@@ -95,7 +95,7 @@ export class KimiProvider implements DocumentExtractionProvider {
           {
             type: "text",
             text:
-              `Esta é a página ${page}. Extraia o empreendimento e todas as regras explícitas e legíveis de torre, apartamento e área privativa nesta página. Responda no formato compacto {\"name\":string|null,\"city\":string|null,\"registration\":string|null,\"groups\":[{\"towers\":[string],\"units\":[string],\"privateArea\":string,\"typology\":string|null,\"registration\":string|null,\"confidence\":number}]}. Não expanda combinações. Ignore regras cortadas ou incompletas nas margens.`,
+              `Esta é a página ${page}. Extraia o empreendimento e todas as regras explícitas e legíveis de torre, apartamento, área privativa, área total e fração ideal nesta página. Responda no formato compacto {\"name\":string|null,\"city\":string|null,\"registration\":string|null,\"groups\":[{\"towers\":[string],\"units\":[string],\"privateArea\":string,\"totalArea\":string|null,\"idealFraction\":string|null,\"typology\":string|null,\"registration\":string|null,\"confidence\":number}]}. Não expanda combinações inventadas. Ignore regras cortadas ou incompletas nas margens.`,
           },
           { type: "image_url", image_url: { url: image } },
         ],
@@ -119,6 +119,8 @@ function coerceDevelopmentExtraction(value: unknown): DevelopmentExtraction {
       tower,
       unit,
       privateArea,
+      totalArea: clean(group.totalArea) || undefined,
+      idealFraction: clean(group.idealFraction) || undefined,
       typology: clean(group.typology) || undefined,
       registration: clean(group.registration) || undefined,
       confidence: Math.max(0, Math.min(100, Number(group.confidence) || 0)),

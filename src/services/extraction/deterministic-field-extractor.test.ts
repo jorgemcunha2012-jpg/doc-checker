@@ -46,6 +46,24 @@ test("extrai dados principais da tela de reserva", () => {
   assert.equal(value(output, "buyer.email"), "pessoalgabrielbarros@gmail.com");
 });
 
+test("extrai campos financeiros de print de pagamento incluindo opcionais", () => {
+  const output = extractDeterministicFields(
+    [
+      "Valor do contrato: R$ 237.000,00",
+      "Financiamento: R$ 114.616,91",
+      "FGTS: R$ 12.000,00",
+      "Subsídio: R$ 51.776,00",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "DADOS_RESERVA",
+  );
+
+  assert.equal(value(output, "financial.totalValue"), "R$ 237.000,00");
+  assert.equal(value(output, "financial.financing"), "R$ 114.616,91");
+  assert.equal(value(output, "financial.fgts"), "R$ 12.000,00");
+  assert.equal(value(output, "financial.subsidy"), "R$ 51.776,00");
+});
+
 function value(output: ReturnType<typeof extractDeterministicFields>, fieldId: string) {
   return output.fields.find((field) => field.fieldId === fieldId)?.value;
 }

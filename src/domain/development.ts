@@ -6,6 +6,8 @@ export type DevelopmentUnit = {
   tower: string;
   unit: string;
   privateArea: string;
+  totalArea?: string;
+  idealFraction?: string;
   typology?: string;
   registration?: string;
   confidence: number;
@@ -41,5 +43,7 @@ export function developmentUnitValues(
     { fieldId: "property.unit", source, value: unit.unit, confidence },
     { fieldId: "property.tower", source, value: unit.tower, confidence },
     { fieldId: "property.privateArea", source, value: unit.privateArea, confidence },
+    { fieldId: "property.totalArea", source, value: unit.totalArea ?? null, confidence },
+    { fieldId: "property.idealFraction", source, value: unit.idealFraction ?? null, confidence },
   ];
 }

@@ -333,7 +333,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
             <div className="flex flex-col gap-1">
               <div className="text-xs font-bold uppercase text-[#0f8f88]">Etapa 1</div>
               <h2 className="text-base font-bold text-slate-950">Base do empreendimento</h2>
-              <p className="text-sm text-slate-500">Selecione a unidade de referência. Torre, apartamento, área privativa, empreendimento e matrícula serão conferidos contra os documentos do comprador.</p>
+              <p className="text-sm text-slate-500">Selecione a unidade de referência. Torre, apartamento, áreas, fração ideal, empreendimento e matrícula serão conferidos contra os documentos do comprador.</p>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-bold text-slate-600">Empreendimento
@@ -345,7 +345,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
               <label className="text-xs font-bold text-slate-600">Torre e unidade
                 <select disabled={!selectedDevelopment} className="mt-1 block min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 disabled:bg-slate-100" value={developmentUnitId} onChange={(event) => setDevelopmentUnitId(event.target.value)}>
                   <option value="">Selecione a unidade</option>
-                  {selectedDevelopment?.units.map((unit) => <option key={unit.id} value={unit.id}>Torre {unit.tower} · Apto {unit.unit} · {unit.privateArea} m²</option>)}
+                  {selectedDevelopment?.units.map((unit) => <option key={unit.id} value={unit.id}>Torre {unit.tower} · Apto {unit.unit} · {unit.privateArea} priv. · {unit.totalArea || "-"} total · fração {unit.idealFraction || "-"}</option>)}
                 </select>
               </label>
             </div>

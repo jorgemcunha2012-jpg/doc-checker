@@ -73,6 +73,9 @@ export class ReconciliationEngine {
   }
 
   private hasEvidenceForField(field: ChecklistField, input: ReconciliationInput) {
+    if (isOptionalPaymentPrintResourceField(field, input)) {
+      return hasFilledValueFromSource(field, input.values, "DADOS_RESERVA");
+    }
     return input.participatingSources.some((source) => field.expectedSources?.includes(source)) ||
       input.values.some((value) => matchesFieldValue(value, field));
   }
@@ -203,6 +206,22 @@ export class ReconciliationEngine {
     addDiffTokens(comparisonParticipants, valuesBySource);
     return result(organizationId, field, valuesBySource, "DIVERGENCE", buildSourceDiagnostic(groups));
   }
+}
+
+function isOptionalPaymentPrintResourceField(field: ChecklistField, input: ReconciliationInput) {
+  const fieldId = field.baseFieldId ?? field.id;
+  return (fieldId === "financial.fgts" || fieldId === "financial.subsidy") &&
+    input.participatingSources.includes("DADOS_RESERVA");
+}
+
+function hasFilledValueFromSource(field: ChecklistField, values: ExtractedFieldValue[], source: DocumentSource) {
+  return values.some(
+    (value) =>
+      matchesFieldValue(value, field) &&
+      value.source === source &&
+      value.value != null &&
+      String(value.value).trim().length > 0,
+  );
 }
 
 function expandParticipantFields(checklist: ChecklistField[], values: ExtractedFieldValue[]) {

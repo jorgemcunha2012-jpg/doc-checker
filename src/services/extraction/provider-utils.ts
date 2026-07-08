@@ -11,6 +11,14 @@ export function checklistPrompt(checklist: ChecklistField[]) {
 
 export function fieldExtractionHint(fieldId: string) {
   return ({
+    "financial.totalValue":
+      "no print de pagamento é o Valor do contrato; na Minuta extraia somente da seção B.4 Valor de composição dos recursos, preferencialmente página 2",
+    "financial.financing":
+      "no print de pagamento é obrigatório; na Minuta extraia somente o item de financiamento dentro da seção B.4 Valor de composição dos recursos, preferencialmente página 2",
+    "financial.fgts":
+      "no print de pagamento é opcional; só preencha se houver FGTS explícito no print; na Minuta extraia somente o item FGTS dentro da seção B.4 Valor de composição dos recursos",
+    "financial.subsidy":
+      "no print de pagamento é opcional; só preencha se houver subsídio/desconto explícito no print; na Minuta extraia somente o item subsídio/desconto dentro da seção B.4 Valor de composição dos recursos",
     "buyer.address":
       "extrair somente o domicílio/endereço residencial do comprador, adquirente ou cliente na qualificação pessoal; nunca usar endereço do imóvel, empreendimento ou unidade",
     "seller.address":

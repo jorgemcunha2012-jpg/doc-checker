@@ -141,6 +141,61 @@ test("trata zero e vazio como equivalentes apenas em campos financeiros opcionai
   assert.match(field(result, "financial.fgts").observation, /campo opcional/);
 });
 
+test("compara print de pagamento obrigatório contra composição da minuta", () => {
+  const result = run(
+    [
+      value("financial.totalValue", "DADOS_RESERVA", "R$ 237.000,00"),
+      value("financial.financing", "DADOS_RESERVA", "R$ 114.616,91"),
+      value("financial.totalValue", "MINUTA", "R$ 237.000,00"),
+      value("financial.financing", "MINUTA", "R$ 114.616,91"),
+      value("financial.fgts", "MINUTA", "R$ 0,00"),
+      value("financial.subsidy", "MINUTA", "R$ 51.776,00"),
+    ],
+    ["DADOS_RESERVA", "MINUTA"],
+  );
+
+  assert.equal(field(result, "financial.totalValue").status, "MATCH");
+  assert.equal(field(result, "financial.financing").status, "MATCH");
+  assert.equal(result.results.some((item) => item.field.id === "financial.fgts"), false);
+  assert.equal(result.results.some((item) => item.field.id === "financial.subsidy"), false);
+});
+
+test("compara FGTS do print apenas quando presente", () => {
+  const result = run(
+    [
+      value("financial.totalValue", "DADOS_RESERVA", "R$ 237.000,00"),
+      value("financial.financing", "DADOS_RESERVA", "R$ 114.616,91"),
+      value("financial.fgts", "DADOS_RESERVA", "R$ 12.000,00"),
+      value("financial.totalValue", "MINUTA", "R$ 237.000,00"),
+      value("financial.financing", "MINUTA", "R$ 114.616,91"),
+      value("financial.fgts", "MINUTA", "R$ 12.000,00"),
+    ],
+    ["DADOS_RESERVA", "MINUTA"],
+  );
+
+  assert.equal(field(result, "financial.totalValue").status, "MATCH");
+  assert.equal(field(result, "financial.financing").status, "MATCH");
+  assert.equal(field(result, "financial.fgts").status, "MATCH");
+});
+
+test("compara subsídio do print apenas quando presente", () => {
+  const result = run(
+    [
+      value("financial.totalValue", "DADOS_RESERVA", "R$ 237.000,00"),
+      value("financial.financing", "DADOS_RESERVA", "R$ 114.616,91"),
+      value("financial.subsidy", "DADOS_RESERVA", "R$ 51.776,00"),
+      value("financial.totalValue", "MINUTA", "R$ 237.000,00"),
+      value("financial.financing", "MINUTA", "R$ 114.616,91"),
+      value("financial.subsidy", "MINUTA", "R$ 51.776,00"),
+    ],
+    ["DADOS_RESERVA", "MINUTA"],
+  );
+
+  assert.equal(field(result, "financial.totalValue").status, "MATCH");
+  assert.equal(field(result, "financial.financing").status, "MATCH");
+  assert.equal(field(result, "financial.subsidy").status, "MATCH");
+});
+
 test("separa e confere dois compradores pelo identificador de participante", () => {
   const maria = "cpf_11111111111";
   const joao = "cpf_22222222222";

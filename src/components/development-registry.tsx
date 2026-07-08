@@ -58,7 +58,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
     await loadDevelopments();
   }
 
-  function updateUnit(index: number, key: "tower" | "unit" | "privateArea" | "typology", value: string) {
+  function updateUnit(index: number, key: "tower" | "unit" | "privateArea" | "totalArea" | "idealFraction" | "typology", value: string) {
     if (!extraction) return;
     setExtraction({
       ...extraction,
@@ -84,7 +84,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
             className="ml-2 inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
             onClick={() => {
               setSourceDocumentName("Cadastro manual");
-              setExtraction({ name: "", units: [{ tower: "", unit: "", privateArea: "", confidence: 100 }] });
+              setExtraction({ name: "", units: [{ tower: "", unit: "", privateArea: "", totalArea: "", idealFraction: "", confidence: 100 }] });
             }}
           >
             <Plus className="h-4 w-4" /> Criar manualmente
@@ -107,12 +107,12 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
             <div className="mt-5 overflow-x-auto">
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead className="border-b border-slate-200 text-xs uppercase text-slate-500">
-                  <tr><th className="py-3">Torre</th><th>Unidade</th><th>Área privativa</th><th>Tipologia</th><th>Confiança</th><th /></tr>
+                  <tr><th className="py-3">Torre</th><th>Unidade</th><th>Área privativa</th><th>Área total</th><th>Fração ideal</th><th>Tipo</th><th>Confiança</th><th /></tr>
                 </thead>
                 <tbody>
                   {extraction.units.map((unit, index) => (
                     <tr key={`${unit.tower}-${unit.unit}-${index}`} className="border-b border-slate-100">
-                      {(["tower", "unit", "privateArea", "typology"] as const).map((key) => (
+                      {(["tower", "unit", "privateArea", "totalArea", "idealFraction", "typology"] as const).map((key) => (
                         <td key={key} className="py-2 pr-3">
                           <input className="w-full rounded border border-slate-300 px-2 py-1.5" value={unit[key] ?? ""} onChange={(event) => updateUnit(index, key, event.target.value)} />
                         </td>
@@ -124,7 +124,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
                 </tbody>
               </table>
             </div>
-            <button onClick={() => setExtraction({ ...extraction, units: [...extraction.units, { tower: "", unit: "", privateArea: "", confidence: 100 }] })} className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-blue-600">
+            <button onClick={() => setExtraction({ ...extraction, units: [...extraction.units, { tower: "", unit: "", privateArea: "", totalArea: "", idealFraction: "", confidence: 100 }] })} className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-blue-600">
               <Plus className="h-4 w-4" /> Adicionar unidade
             </button>
           </section>
@@ -135,7 +135,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
           <div className="mt-4 divide-y divide-slate-100">
             {developments.map((development) => (
               <div key={development.id} className="flex items-center justify-between gap-4 py-4">
-                <div><div className="font-bold text-slate-900">{development.name}</div><div className="text-sm text-slate-500">{development.city ?? "Cidade não informada"} · Matrícula {development.registration ?? "não informada"}</div></div>
+                <div><div className="font-bold text-slate-900">{development.name}</div><div className="text-sm text-slate-500">{development.city ?? "Cidade não informada"} · Matrícula {development.registration ?? "não informada"}</div><div className="mt-1 text-xs text-slate-500">{summarizeUnitTypes(development)}</div></div>
                 <div className="text-sm font-semibold text-slate-600">{development.units.length} unidades</div>
               </div>
             ))}
@@ -144,6 +144,13 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
         </section>
     </div>
   );
+}
+
+function summarizeUnitTypes(development: Development) {
+  const signatures = new Set(development.units.map((unit) =>
+    `${unit.privateArea || "-"} priv. · ${unit.totalArea || "-"} total · fração ${unit.idealFraction || "-"}`,
+  ));
+  return `${signatures.size} tipo(s) cadastrado(s)`;
 }
 
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {

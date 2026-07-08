@@ -35,6 +35,21 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     text("property.tower", "Dados da reserva", 94, [/\/\s*torre\s*([A-Z0-9-]{1,12})/i]),
     text("property.unit", "Dados da reserva", 94, [/\/\s*torre\s*[A-Z0-9-]{1,12}\s*\/\s*([A-Z0-9-]{1,12})/i]),
     text("property.registration", "Dados da reserva", 88, [/matr[ií]cula:\s*([A-Z0-9./-]+)/i]),
+    money("financial.totalValue", "Print de pagamento", 94, [
+      /valor\s+do\s+contrato[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+      /valor\s+total[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+    ]),
+    money("financial.financing", "Print de pagamento", 94, [
+      /financiamento[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+      /valor\s+financiado[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+    ]),
+    money("financial.fgts", "Print de pagamento", 92, [
+      /\bFGTS\b[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+    ]),
+    money("financial.subsidy", "Print de pagamento", 92, [
+      /subs[ií]dio[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+      /desconto[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+    ]),
   ],
   SIOPI: [
     text("buyer.cpf", "Espelho SIOPI", 94, [/\bCPF\b[^\d]*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i]),

@@ -11,7 +11,7 @@ export async function listDevelopments(organizationId: string): Promise<Developm
 
   const { data, error } = await createSupabaseAdminClient()
     .from("developments")
-    .select("id, organization_id, name, city, registration, source_document_name, created_at, development_units(id, tower, unit, private_area, typology, registration, confidence)")
+    .select("id, organization_id, name, city, registration, source_document_name, created_at, development_units(id, tower, unit, private_area, total_area, ideal_fraction, typology, registration, confidence)")
     .eq("organization_id", organizationId)
     .order("name");
   if (error) throw new Error(error.message);
@@ -30,6 +30,8 @@ export async function listDevelopments(organizationId: string): Promise<Developm
       tower: unit.tower,
       unit: unit.unit,
       privateArea: unit.private_area,
+      totalArea: unit.total_area ?? undefined,
+      idealFraction: unit.ideal_fraction ?? undefined,
       typology: unit.typology ?? undefined,
       registration: unit.registration ?? undefined,
       confidence: Number(unit.confidence),
@@ -90,6 +92,8 @@ export async function createDevelopment(
       tower: unit.tower,
       unit: unit.unit,
       private_area: unit.privateArea,
+      total_area: unit.totalArea ?? null,
+      ideal_fraction: unit.idealFraction ?? null,
       typology: unit.typology ?? null,
       registration: unit.registration ?? null,
       confidence: unit.confidence,
