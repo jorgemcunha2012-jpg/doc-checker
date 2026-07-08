@@ -26,7 +26,37 @@ export type OpenAICompatibleConfig = {
 export class OpenAICompatibleClient {
   constructor(private readonly config: OpenAICompatibleConfig) {}
 
+  async completeText(
+    messages: ChatMessage[],
+    options: { timeoutMs?: number; maxTokens?: number } = {},
+  ) {
+    const payload = await this.request(messages, {
+      timeoutMs: options.timeoutMs,
+      maxTokens: options.maxTokens,
+      responseFormat: false,
+    });
+    const content = payload.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error(`${this.config.providerName} não retornou texto.`);
+    }
+    return stripCodeFence(content);
+  }
+
   async completeJson(
+    messages: ChatMessage[],
+    options: { timeoutMs?: number; maxTokens?: number; responseFormat?: boolean } = {},
+  ) {
+    const payload = await this.request(messages, options);
+    const content = payload.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error(`${this.config.providerName} não retornou conteúdo estruturado.`);
+    }
+
+    return parseJsonResponse(content);
+  }
+
+  private async request(
     messages: ChatMessage[],
     options: { timeoutMs?: number; maxTokens?: number; responseFormat?: boolean } = {},
   ) {
@@ -57,26 +87,12 @@ export class OpenAICompatibleClient {
       throw new Error(`${providerName} retornou ${response.status}: ${body}`);
     }
 
-    const payload = (await response.json()) as ChatCompletionResponse;
-    const content = payload.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error(`${providerName} não retornou conteúdo estruturado.`);
-    }
-
-    return parseJsonResponse(content);
+    return (await response.json()) as ChatCompletionResponse;
   }
 }
 
 function parseJsonResponse(content: string): unknown {
-  let json = content.trim();
-
-  if (json.startsWith("```")) {
-    json = json
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```$/, "")
-      .trim();
-  }
+  const json = stripCodeFence(content);
 
   try {
     return JSON.parse(json) as unknown;
@@ -101,6 +117,17 @@ function parseJsonResponse(content: string): unknown {
 
     throw error;
   }
+}
+
+function stripCodeFence(content: string) {
+  let value = content.trim();
+  if (value.startsWith("```")) {
+    value = value
+      .replace(/^```(?:json|text|markdown)?\s*/i, "")
+      .replace(/\s*```$/, "")
+      .trim();
+  }
+  return value;
 }
 
 function parsePartialFields(content: string) {

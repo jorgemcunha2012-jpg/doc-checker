@@ -92,6 +92,29 @@ test("extrai dados do cliente da reserva quando o valor vem abaixo do rótulo", 
   assert.equal(value(output, "buyer.maritalStatus"), "Solteiro(a)");
 });
 
+test("monta endereço residencial do cliente a partir dos rótulos da reserva", () => {
+  const output = extractDeterministicFields(
+    [
+      "ENDEREÇO",
+      "Rua Otávio Alves",
+      "NÚMERO",
+      "102",
+      "COMPLEMENTO",
+      "-",
+      "BAIRRO",
+      "Pajuçara",
+      "CIDADE",
+      "Maracanaú",
+      "ESTADO",
+      "Ceará",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "DADOS_RESERVA",
+  );
+
+  assert.equal(value(output, "buyer.address"), "Rua Otávio Alves, 102, Pajuçara, Maracanaú, Ceará");
+});
+
 test("extrai financiamento e subsídio de tabela de condição de pagamento", () => {
   const output = extractDeterministicFields(
     [

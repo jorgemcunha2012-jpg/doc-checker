@@ -91,6 +91,20 @@ export function extractDeterministicFields(
   const fields = checklist.map((field): ExtractedField => {
     if (!allowed.has(field.id)) return empty(field.id);
     const definition = definitions.find((item) => item.fieldId === field.id);
+    if (source === "DADOS_RESERVA" && field.id === "buyer.address") {
+      const address = reservationAddress(text);
+      if (address) {
+        return {
+          fieldId: field.id,
+          value: address.value,
+          confidence: 88,
+          sourceLocation: {
+            section: "Dados da reserva",
+            rawText: address.rawText,
+          },
+        };
+      }
+    }
     const match = definition ? firstMatch(text, definition.patterns) : null;
     if (!definition || !match) return empty(field.id);
     return {
@@ -105,6 +119,63 @@ export function extractDeterministicFields(
   });
 
   return { fields };
+}
+
+function reservationAddress(text: string) {
+  const street = labelValue(text, ["ENDEREÇO", "ENDERECO"]);
+  const number = labelValue(text, ["NÚMERO", "NUMERO"]);
+  const complement = labelValue(text, ["COMPLEMENTO"]);
+  const district = labelValue(text, ["BAIRRO"]);
+  const city = labelValue(text, ["CIDADE"]);
+  const state = labelValue(text, ["ESTADO"]);
+  const parts = [
+    street,
+    number && number !== "-" ? number : "",
+    complement && complement !== "-" ? complement : "",
+    district && district !== "-" ? district : "",
+    city && city !== "-" ? city : "",
+    state && state !== "-" ? state : "",
+  ].filter(Boolean);
+  if (!street || parts.length < 2) return null;
+  return {
+    value: parts.join(", "),
+    rawText: [
+      `ENDEREÇO ${street}`,
+      number ? `NÚMERO ${number}` : "",
+      complement ? `COMPLEMENTO ${complement}` : "",
+      district ? `BAIRRO ${district}` : "",
+      city ? `CIDADE ${city}` : "",
+      state ? `ESTADO ${state}` : "",
+    ].filter(Boolean).join(" | ").slice(0, 500),
+  };
+}
+
+function labelValue(text: string, labels: string[]) {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  for (let index = 0; index < lines.length; index += 1) {
+    const normalized = normalizeLabel(lines[index]);
+    const label = labels.find((item) => normalized === normalizeLabel(item) || normalized.startsWith(`${normalizeLabel(item)} `));
+    if (!label) continue;
+    const sameLine = lines[index].replace(new RegExp(`^${escapeRegExp(label)}\\s*:?\\s*`, "i"), "").trim();
+    if (sameLine && normalizeLabel(sameLine) !== normalizeLabel(label)) return cleanValue(sameLine);
+    const next = lines[index + 1]?.trim();
+    if (next) return cleanValue(next);
+  }
+  return "";
+}
+
+function normalizeLabel(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9/ ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function firstMatch(text: string, patterns: RegExp[]) {

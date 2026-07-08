@@ -316,12 +316,45 @@ export class DocumentExtractionService {
   ) {
     if (source !== "DADOS_RESERVA") return this.kimiProvider.extractFromImage(document, checklist);
 
-    try {
-      const reservationOutput = await this.kimiProvider.extractReservationFromImage(document, checklist);
-      if (hasReservationCriticalValue(reservationOutput)) return reservationOutput;
+    const [focusedAttempt, ocrAttempt] = await Promise.allSettled([
+      this.kimiProvider.extractReservationFromImage(document, checklist),
+      this.kimiProvider.transcribeReservationImage(document).then((text) => ({
+        output: extractDeterministicFields(text, checklist, "DADOS_RESERVA"),
+        text,
+      })),
+    ]);
+    const focusedOutput = focusedAttempt.status === "fulfilled" ? focusedAttempt.value : null;
+    const ocrOutput = ocrAttempt.status === "fulfilled" ? ocrAttempt.value.output : null;
+    const firstPassOutputs = [focusedOutput, ocrOutput].filter((output): output is ProviderExtractionOutput => Boolean(output));
+    if (firstPassOutputs.length) {
+      const mergedFirstPass = mergeOutputs(firstPassOutputs, checklist);
+      if (hasReservationCriticalValue(mergedFirstPass)) {
+        if (ocrOutput) {
+          console.info("[ConferIA] Dados da Reserva extraídos com camada OCR determinística", {
+            documentName: document.name,
+            extractedTextCharacters: ocrAttempt.status === "fulfilled" ? ocrAttempt.value.text.length : 0,
+          });
+        }
+        return mergedFirstPass;
+      }
+    }
 
+    if (focusedAttempt.status === "rejected") {
+      console.warn("[ConferIA] Extração focada de Dados da Reserva falhou", {
+        documentName: document.name,
+        error: sanitizeExtractionError(focusedAttempt.reason),
+      });
+    }
+    if (ocrAttempt.status === "rejected") {
+      console.warn("[ConferIA] OCR textual de Dados da Reserva falhou", {
+        documentName: document.name,
+        error: sanitizeExtractionError(ocrAttempt.reason),
+      });
+    }
+
+    try {
       const genericOutput = await this.kimiProvider.extractFromImage(document, checklist);
-      const merged = mergeOutputs([reservationOutput, genericOutput], checklist);
+      const merged = mergeOutputs([...firstPassOutputs, genericOutput], checklist);
       if (hasReservationCriticalValue(merged)) {
         console.info("[ConferIA] Dados da Reserva recuperados com extração visual genérica", {
           documentName: document.name,
@@ -329,11 +362,11 @@ export class DocumentExtractionService {
       }
       return merged;
     } catch (error) {
-      console.warn("[ConferIA] Extração focada de Dados da Reserva indisponível; tentando fluxo visual genérico", {
+      console.warn("[ConferIA] Todas as camadas visuais de Dados da Reserva falharam", {
         documentName: document.name,
         error: sanitizeExtractionError(error),
       });
-      return this.kimiProvider.extractFromImage(document, checklist);
+      return firstPassOutputs.length ? mergeOutputs(firstPassOutputs, checklist) : emptyOutput(checklist);
     }
   }
 }

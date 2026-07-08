@@ -87,6 +87,29 @@ export class KimiProvider implements DocumentExtractionProvider {
     };
   }
 
+  async transcribeReservationImage(document: UploadedDocumentPayload): Promise<string> {
+    const dataUrl = `data:${document.mimeType};base64,${document.buffer.toString("base64")}`;
+    return this.client.completeText([
+      {
+        role: "system",
+        content:
+          "Você é um OCR de telas de reserva imobiliária. Transcreva fielmente todos os rótulos e valores visíveis. Preserve quebras de linha, valores monetários, CPF, telefone, e-mail, torre, unidade e matrícula. Não interprete, não compare e não resuma.",
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text:
+              "Transcreva a imagem em texto plano. Se for uma tabela, mantenha uma linha por item da tabela. " +
+              "Inclua especialmente: NOME DO CLIENTE, CPF/CNPJ, RG, CELULAR, TELEFONE, E-MAIL, ESTADO CIVIL, ENDEREÇO, NÚMERO, COMPLEMENTO, BAIRRO, CIDADE, ESTADO, Unidade, Matrícula, Valor do contrato, Sinal, Entrada, Financiamento, FGTS e Subsídio.",
+          },
+          { type: "image_url", image_url: { url: dataUrl } },
+        ],
+      },
+    ], { timeoutMs: 120_000, maxTokens: 4_000 });
+  }
+
   async extractFromPdfFallback(document: UploadedDocumentPayload, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
     const dataUrl = `data:${document.mimeType};base64,${document.buffer.toString("base64")}`;
     const result = await this.client.completeJson([
