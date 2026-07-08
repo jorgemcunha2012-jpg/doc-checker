@@ -1,5 +1,6 @@
 import { AlertTriangle, ArrowLeft, Clock3, FileText } from "lucide-react";
 import { ProcessDocumentList } from "./process-document-list";
+import { processCode } from "@/lib/process-code";
 
 type IncompleteProcess = {
   id: string;
@@ -29,7 +30,7 @@ export function IncompleteProcessDetail({
         <div>
           <h1 className="text-2xl font-bold text-slate-950">Diagnóstico do processo</h1>
           <p className="mt-1 text-sm text-slate-500">
-            {process.profiles?.name ?? "Usuário"} · iniciado em {new Date(process.started_at).toLocaleString("pt-BR")}
+            {processCode(process.id)} · {process.profiles?.name ?? "Usuário"} · iniciado em {new Date(process.started_at).toLocaleString("pt-BR")}
           </p>
         </div>
         <a href={backHref} className="inline-flex items-center gap-2 text-sm font-bold text-[#0f8f88]">

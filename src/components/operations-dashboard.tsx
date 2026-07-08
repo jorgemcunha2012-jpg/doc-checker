@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, Clock3, FileCheck2, Loader2, Plus, Timer } from "lucide-react";
 import Link from "next/link";
 import type { User } from "@/domain/validation";
+import { processCode } from "@/lib/process-code";
 
 type DashboardProcess = {
   id: string;
@@ -77,6 +78,7 @@ export function OperationsDashboard({ user }: { user: User }) {
                 {processes.slice(0, 6).map((process) => (
                   <div key={process.id} className="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_180px_130px] sm:items-center">
                     <div className="min-w-0">
+                      <div className="mb-1 text-xs font-bold text-[#0f8f88]">{processCode(process.id)}</div>
                       <div className="truncate text-sm font-bold text-slate-800">{process.process_documents.map((document) => document.name).join(", ") || "Sem documentos"}</div>
                       <div className="mt-1 text-xs text-slate-500">{user.role === "ADMIN" ? `${process.profiles?.name ?? "Analista"} · ` : ""}{new Date(process.started_at).toLocaleString("pt-BR")}</div>
                     </div>

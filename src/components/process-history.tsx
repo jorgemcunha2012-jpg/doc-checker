@@ -1,8 +1,9 @@
 "use client";
 
-import { Clock3, Eye, FileClock, Loader2 } from "lucide-react";
+import { Clock3, Copy, Eye, FileClock, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { processCode } from "@/lib/process-code";
 
 type HistoryProcess = {
   id: string;
@@ -38,6 +39,15 @@ export function ProcessHistory({ showAnalyst, status }: { showAnalyst: boolean; 
       {processes.map((process) => (
         <article key={process.id} className="grid gap-4 p-5 lg:grid-cols-[180px_1fr_180px_120px] lg:items-center">
           <div>
+            <button
+              type="button"
+              onClick={() => void navigator.clipboard.writeText(processCode(process.id))}
+              className="mb-2 inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+              title="Copiar ID da conferência"
+            >
+              {processCode(process.id)}
+              <Copy className="h-3 w-3" />
+            </button>
             <div className="text-sm font-bold text-slate-900">{new Date(process.started_at).toLocaleDateString("pt-BR")}</div>
             <div className="mt-1 text-xs text-slate-500">{new Date(process.started_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</div>
             {showAnalyst ? <div className="mt-2 text-xs font-semibold text-blue-700">{process.profiles?.name ?? "Analista"}</div> : null}
