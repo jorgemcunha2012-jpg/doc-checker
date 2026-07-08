@@ -64,6 +64,51 @@ test("extrai campos financeiros de print de pagamento incluindo opcionais", () =
   assert.equal(value(output, "financial.subsidy"), "R$ 51.776,00");
 });
 
+test("extrai dados do cliente da reserva quando o valor vem abaixo do rótulo", () => {
+  const output = extractDeterministicFields(
+    [
+      "NOME DO CLIENTE",
+      "NYASHI DE OLIVEIRA NUNES",
+      "CPF / CNPJ",
+      "078.223.613-84",
+      "RG",
+      "07165783729",
+      "CELULAR",
+      "+5585986923999",
+      "E-MAIL",
+      "nyashi.nunes18@gmail.com",
+      "ESTADO CIVIL",
+      "Solteiro(a)",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "DADOS_RESERVA",
+  );
+
+  assert.equal(value(output, "buyer.name"), "NYASHI DE OLIVEIRA NUNES");
+  assert.equal(value(output, "buyer.cpf"), "078.223.613-84");
+  assert.equal(value(output, "buyer.rg"), "07165783729");
+  assert.equal(value(output, "buyer.phone"), "+5585986923999");
+  assert.equal(value(output, "buyer.email"), "nyashi.nunes18@gmail.com");
+  assert.equal(value(output, "buyer.maritalStatus"), "Solteiro(a)");
+});
+
+test("extrai financiamento e subsídio de tabela de condição de pagamento", () => {
+  const output = extractDeterministicFields(
+    [
+      "Valor do contrato: R$ 216.000,00",
+      "Série Parcelas Valor Subtotal",
+      "Financiamento 1 R$ 172.800,00 R$ 172.800,00 R$ 0,00 R$ 172.800,00",
+      "Subsídio 1 R$ 4.183,00 R$ 4.183,00 R$ 0,00 R$ 4.183,00",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "DADOS_RESERVA",
+  );
+
+  assert.equal(value(output, "financial.totalValue"), "R$ 216.000,00");
+  assert.equal(value(output, "financial.financing"), "R$ 172.800,00");
+  assert.equal(value(output, "financial.subsidy"), "R$ 4.183,00");
+});
+
 function value(output: ReturnType<typeof extractDeterministicFields>, fieldId: string) {
   return output.fields.find((field) => field.fieldId === fieldId)?.value;
 }

@@ -28,7 +28,7 @@ export class OpenAICompatibleClient {
 
   async completeJson(
     messages: ChatMessage[],
-    options: { timeoutMs?: number; maxTokens?: number } = {},
+    options: { timeoutMs?: number; maxTokens?: number; responseFormat?: boolean } = {},
   ) {
     const { apiKey, baseUrl, model, providerName } = this.config;
 
@@ -48,7 +48,7 @@ export class OpenAICompatibleClient {
         messages,
         temperature: 1,
         ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
-        response_format: { type: "json_object" },
+        ...(options.responseFormat === false ? {} : { response_format: { type: "json_object" } }),
       }),
     });
 
@@ -94,8 +94,28 @@ function parseJsonResponse(content: string): unknown {
       }
     }
 
+    const partialFields = parsePartialFields(json);
+    if (partialFields.fields.length) {
+      return partialFields;
+    }
+
     throw error;
   }
+}
+
+function parsePartialFields(content: string) {
+  const fields: Array<Record<string, unknown>> = [];
+  const objectLikeFields = content.matchAll(/"fieldId"\s*:\s*"([^"]+)"[\s\S]*?"value"\s*:\s*(?:"([^"]*)"|null)[\s\S]*?"confidence"\s*:\s*([0-9.]+)/g);
+
+  for (const match of objectLikeFields) {
+    fields.push({
+      fieldId: match[1],
+      value: match[2] ?? null,
+      confidence: Number(match[3]),
+    });
+  }
+
+  return { fields };
 }
 
 function sliceCompleteJson(

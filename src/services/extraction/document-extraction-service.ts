@@ -185,7 +185,7 @@ export class DocumentExtractionService {
             };
           }
           if (document.mimeType.includes("image") || isTiff(document)) {
-            const output = await this.extractVisualDocument(document, sourceChecklist);
+            const output = await this.extractVisualDocument(document, sourceChecklist, source);
             console.info("[ConferIA] Extração concluída", {
               source,
               documentName: document.name,
@@ -278,12 +278,13 @@ export class DocumentExtractionService {
   private async extractVisualDocument(
     document: UploadedDocumentPayload,
     checklist: ExtractionRequest["checklist"],
+    source?: DocumentSource,
   ) {
-    if (!isTiff(document)) return this.kimiProvider.extractFromImage(document, checklist);
+    if (!isTiff(document)) return this.extractSingleVisualDocument(document, checklist, source);
     const pages = await convertTiffToPngPages(document.buffer);
     const outputs = await Promise.all(
       pages.map((buffer, index) =>
-        this.kimiProvider.extractFromImage(
+        this.extractSingleVisualDocument(
           {
             ...document,
             id: `${document.id}_page_${index + 1}`,
@@ -292,6 +293,7 @@ export class DocumentExtractionService {
             buffer,
           },
           checklist,
+          source,
         ).then((output) => ({
           fields: output.fields.map((field) => ({
             ...field,
@@ -306,6 +308,48 @@ export class DocumentExtractionService {
     );
     return mergeOutputs(outputs, checklist);
   }
+
+  private async extractSingleVisualDocument(
+    document: UploadedDocumentPayload,
+    checklist: ExtractionRequest["checklist"],
+    source?: DocumentSource,
+  ) {
+    if (source !== "DADOS_RESERVA") return this.kimiProvider.extractFromImage(document, checklist);
+
+    try {
+      const reservationOutput = await this.kimiProvider.extractReservationFromImage(document, checklist);
+      if (hasReservationCriticalValue(reservationOutput)) return reservationOutput;
+
+      const genericOutput = await this.kimiProvider.extractFromImage(document, checklist);
+      const merged = mergeOutputs([reservationOutput, genericOutput], checklist);
+      if (hasReservationCriticalValue(merged)) {
+        console.info("[ConferIA] Dados da Reserva recuperados com extração visual genérica", {
+          documentName: document.name,
+        });
+      }
+      return merged;
+    } catch (error) {
+      console.warn("[ConferIA] Extração focada de Dados da Reserva indisponível; tentando fluxo visual genérico", {
+        documentName: document.name,
+        error: sanitizeExtractionError(error),
+      });
+      return this.kimiProvider.extractFromImage(document, checklist);
+    }
+  }
+}
+
+function hasReservationCriticalValue(output: ProviderExtractionOutput) {
+  const critical = new Set([
+    "buyer.name",
+    "property.development",
+    "property.unit",
+    "property.tower",
+    "financial.financing",
+    "financial.totalValue",
+  ]);
+  return output.fields.some(
+    (field) => critical.has(field.fieldId) && field.value != null && String(field.value).trim().length > 0,
+  );
 }
 
 function pdfPageSelectionFor(source: DocumentSource) {

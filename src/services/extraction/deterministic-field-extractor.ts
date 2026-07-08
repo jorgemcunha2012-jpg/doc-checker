@@ -28,26 +28,36 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     ]),
   ],
   DADOS_RESERVA: [
-    text("buyer.name", "Dados da reserva", 92, [/cliente:\s*([^\n\r]+)/i]),
-    text("buyer.email", "Dados da reserva", 96, [/e-?mail:\s*([^\s\n\r]+@[^\s\n\r]+)/i]),
-    text("buyer.phone", "Dados da reserva", 94, [/telefone:\s*([+()\d\s.-]{8,24})/i]),
-    text("property.development", "Dados da reserva", 92, [/unidade:\s*([^/\n\r]+?)(?:\s*\/\s*torre|\s*\/\s*\d|\n|\r)/i]),
+    text("buyer.name", "Dados da reserva", 92, [
+      /(?:nome\s+do\s+cliente|cliente)\s*:?\s*([^\n\r]+)/i,
+    ]),
+    text("buyer.cpf", "Dados da reserva", 94, [
+      /(?:cpf\s*\/\s*cnpj|cpf)\s*:?\s*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i,
+    ]),
+    text("buyer.rg", "Dados da reserva", 90, [/\brg\s*:?\s*([A-Z0-9.-]{5,30})/i]),
+    text("buyer.maritalStatus", "Dados da reserva", 90, [/estado\s+civil\s*:?\s*([^\n\r]+)/i]),
+    text("buyer.email", "Dados da reserva", 96, [/e-?mail\s*:?\s*([^\s\n\r]+@[^\s\n\r]+)/i]),
+    text("buyer.phone", "Dados da reserva", 94, [/(?:telefone|celular)\s*:?\s*([+()\d\s.-]{8,24})/i]),
+    text("property.development", "Dados da reserva", 92, [/unidade\s*:?\s*([^/\n\r]+?)(?:\s*\/\s*torre|\s*\/\s*\d|\n|\r)/i]),
     text("property.tower", "Dados da reserva", 94, [/\/\s*torre\s*([A-Z0-9-]{1,12})/i]),
     text("property.unit", "Dados da reserva", 94, [/\/\s*torre\s*[A-Z0-9-]{1,12}\s*\/\s*([A-Z0-9-]{1,12})/i]),
-    text("property.registration", "Dados da reserva", 88, [/matr[ií]cula:\s*([A-Z0-9./-]+)/i]),
+    text("property.registration", "Dados da reserva", 88, [/matr[ií]cula\s*:?\s*([A-Z0-9./-]+)/i]),
     money("financial.totalValue", "Print de pagamento", 94, [
       /valor\s+do\s+contrato[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
       /valor\s+total[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
     ]),
     money("financial.financing", "Print de pagamento", 94, [
       /financiamento[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+      /financiamento\s+\d+\s+(R\$\s*\d[\d.,]*)/i,
       /valor\s+financiado[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
     ]),
     money("financial.fgts", "Print de pagamento", 92, [
       /\bFGTS\b[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+      /\bFGTS\b\s+\d+\s+(R\$\s*\d[\d.,]*)/i,
     ]),
     money("financial.subsidy", "Print de pagamento", 92, [
       /subs[ií]dio[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+      /subs[ií]dio\s+\d+\s+(R\$\s*\d[\d.,]*)/i,
       /desconto[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
     ]),
   ],
