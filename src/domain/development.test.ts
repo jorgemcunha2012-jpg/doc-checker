@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { developmentUnitValues } from "./development";
+import { developmentUnitValues, reviewDevelopmentExtraction } from "./development";
 
 test("injeta área total e fração ideal do cadastro mestre na conferência", () => {
   const values = developmentUnitValues(
@@ -20,4 +20,22 @@ test("injeta área total e fração ideal do cadastro mestre na conferência", (
   assert.equal(values.find((value) => value.fieldId === "property.privateArea")?.value, "45,62 m²");
   assert.equal(values.find((value) => value.fieldId === "property.totalArea")?.value, "58,10 m²");
   assert.equal(values.find((value) => value.fieldId === "property.idealFraction")?.value, "0,001234");
+});
+
+test("resume e bloqueia cadastro extraído quando há unidade incompleta", () => {
+  const review = reviewDevelopmentExtraction({
+    name: "Vitória Maracanaú",
+    units: [
+      { tower: "1", unit: "101", privateArea: "45,00", totalArea: "58,00", idealFraction: "0,10", confidence: 95 },
+      { tower: "1", unit: "", privateArea: "45,00", totalArea: "58,00", idealFraction: "0,10", confidence: 65 },
+      { tower: "2", unit: "201", privateArea: "55,00", totalArea: "70,00", idealFraction: "0,12", confidence: 90 },
+    ],
+  });
+
+  assert.equal(review.towerCount, 2);
+  assert.equal(review.unitCount, 3);
+  assert.equal(review.typeCount, 2);
+  assert.equal(review.incompleteUnits, 1);
+  assert.equal(review.lowConfidenceUnits, 1);
+  assert.equal(review.canSave, false);
 });

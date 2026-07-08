@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, FileUp, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { AlertTriangle, Building2, CheckCircle2, FileUp, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import type { Development, DevelopmentExtraction } from "@/domain/development";
+import { reviewDevelopmentExtraction, unitTypeSignature } from "@/domain/development";
 
 export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
   const [developments, setDevelopments] = useState<Development[]>([]);
@@ -10,6 +11,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
   const [sourceDocumentName, setSourceDocumentName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const review = extraction ? reviewDevelopmentExtraction(extraction) : null;
 
   useEffect(() => {
     void loadDevelopments();
@@ -40,6 +42,11 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
 
   async function save() {
     if (!extraction) return;
+    const reviewResult = reviewDevelopmentExtraction(extraction);
+    if (!reviewResult.canSave) {
+      setError("Revise o nome do empreendimento e preencha torre, unidade e área privativa antes de salvar.");
+      return;
+    }
     setBusy(true);
     setError("");
     const response = await fetch("/api/developments", {
@@ -74,7 +81,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
       </div>
         {canManage ? <section className="border border-slate-200 bg-white p-6">
           <h2 className="text-lg font-bold text-slate-950">Novo empreendimento</h2>
-          <p className="mt-1 text-sm text-slate-500">Envie a matrícula mestre. A IA lista torre, apartamento e área; revise antes de salvar.</p>
+          <p className="mt-1 text-sm text-slate-500">Envie a matrícula mestre. A IA lista torre, apartamento, áreas e fração ideal; revise antes de salvar.</p>
           <label className="mt-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
             Extrair matrícula
@@ -94,13 +101,43 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
 
         {canManage && extraction ? (
           <section className="border border-slate-200 bg-white p-6">
+            <div className="mb-5 flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-xs font-bold uppercase text-[#0f8f88]">Revisão obrigatória</div>
+                <h2 className="mt-1 text-lg font-bold text-slate-950">Revisar cadastro extraído</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Confira os tipos, torres, apartamentos, áreas e fração ideal antes de transformar a extração em base mestre.</p>
+              </div>
+              {review?.canSave ? (
+                <div className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800">
+                  <CheckCircle2 className="h-4 w-4" /> Pronto para salvar
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800">
+                  <AlertTriangle className="h-4 w-4" /> Revisão pendente
+                </div>
+              )}
+            </div>
+            {review ? (
+              <div className="mb-5 grid gap-3 sm:grid-cols-5">
+                <ReviewMetric label="Torres" value={review.towerCount} />
+                <ReviewMetric label="Unidades" value={review.unitCount} />
+                <ReviewMetric label="Tipos" value={review.typeCount} />
+                <ReviewMetric label="Incompletas" value={review.incompleteUnits} alert={review.incompleteUnits > 0} />
+                <ReviewMetric label="Baixa confiança" value={review.lowConfidenceUnits} alert={review.lowConfidenceUnits > 0} />
+              </div>
+            ) : null}
+            {review && (!review.canSave || review.lowConfidenceUnits > 0) ? (
+              <div className="mb-5 border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                Preencha os campos obrigatórios destacados. Área total e fração ideal podem ficar vazias se não constarem na matrícula, mas serão melhores para conferência quando informadas.
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div className="grid flex-1 gap-3 sm:grid-cols-3">
-                <Field label="Empreendimento" value={extraction.name} onChange={(value) => setExtraction({ ...extraction, name: value })} />
+                <Field label="Empreendimento" value={extraction.name} required invalid={!extraction.name.trim()} onChange={(value) => setExtraction({ ...extraction, name: value })} />
                 <Field label="Cidade" value={extraction.city ?? ""} onChange={(value) => setExtraction({ ...extraction, city: value })} />
                 <Field label="Matrícula" value={extraction.registration ?? ""} onChange={(value) => setExtraction({ ...extraction, registration: value })} />
               </div>
-              <button onClick={() => void save()} disabled={busy} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-bold text-white disabled:opacity-50">
+              <button onClick={() => void save()} disabled={busy || !review?.canSave} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
                 <Save className="h-4 w-4" /> Salvar cadastro
               </button>
             </div>
@@ -114,15 +151,26 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
                     <tr key={`${unit.tower}-${unit.unit}-${index}`} className="border-b border-slate-100">
                       {(["tower", "unit", "privateArea", "totalArea", "idealFraction", "typology"] as const).map((key) => (
                         <td key={key} className="py-2 pr-3">
-                          <input className="w-full rounded border border-slate-300 px-2 py-1.5" value={unit[key] ?? ""} onChange={(event) => updateUnit(index, key, event.target.value)} />
+                          <input
+                            className={`w-full rounded border px-2 py-1.5 ${isRequiredUnitField(key) && !String(unit[key] ?? "").trim() ? "border-amber-400 bg-amber-50" : unit.confidence < 80 ? "border-amber-200 bg-amber-50/50" : "border-slate-300"}`}
+                            value={unit[key] ?? ""}
+                            onChange={(event) => updateUnit(index, key, event.target.value)}
+                          />
                         </td>
                       ))}
-                      <td>{unit.confidence}%</td>
+                      <td className={unit.confidence < 80 ? "font-bold text-amber-700" : "text-slate-700"}>{unit.confidence}%</td>
                       <td><button title="Remover unidade" onClick={() => setExtraction({ ...extraction, units: extraction.units.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 className="h-4 w-4 text-slate-400" /></button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[...new Set(extraction.units.map(unitTypeSignature))].map((signature, index) => (
+                <span key={signature} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600">
+                  Tipo {index + 1}: {signature.split("::").slice(1).join(" · ")}
+                </span>
+              ))}
             </div>
             <button onClick={() => setExtraction({ ...extraction, units: [...extraction.units, { tower: "", unit: "", privateArea: "", totalArea: "", idealFraction: "", confidence: 100 }] })} className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-blue-600">
               <Plus className="h-4 w-4" /> Adicionar unidade
@@ -153,6 +201,14 @@ function summarizeUnitTypes(development: Development) {
   return `${signatures.size} tipo(s) cadastrado(s)`;
 }
 
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="text-xs font-bold text-slate-600">{label}<input className="mt-1 block min-h-10 w-full rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-900" value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+function ReviewMetric({ label, value, alert = false }: { label: string; value: number; alert?: boolean }) {
+  return <div className={`border p-3 ${alert ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50"}`}><div className={`text-xl font-bold ${alert ? "text-amber-800" : "text-slate-950"}`}>{value}</div><div className={`text-xs font-semibold ${alert ? "text-amber-800" : "text-slate-500"}`}>{label}</div></div>;
+}
+
+function Field({ label, value, onChange, required = false, invalid = false }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; invalid?: boolean }) {
+  return <label className="text-xs font-bold text-slate-600">{label}{required ? <span className="ml-1 text-amber-600">*</span> : null}<input className={`mt-1 block min-h-10 w-full rounded-md border px-3 text-sm font-medium text-slate-900 ${invalid ? "border-amber-400 bg-amber-50" : "border-slate-300"}`} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+}
+
+function isRequiredUnitField(key: string) {
+  return key === "tower" || key === "unit" || key === "privateArea";
 }
