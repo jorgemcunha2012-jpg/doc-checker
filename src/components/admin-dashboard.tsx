@@ -4,6 +4,7 @@ import { AlertTriangle, Copy, KeyRound, Loader2, Plus, Power, RefreshCw, Users }
 import Link from "next/link";
 import type { DocumentSource, ExtractionQualityReport } from "@/domain/validation";
 import { processCode } from "@/lib/process-code";
+import { extractionAlert } from "@/lib/extraction-alerts";
 
 type ManagedUser = { id: string; name: string; email: string; role: string; active: boolean; must_change_password: boolean };
 type ManagedProcess = {
@@ -131,6 +132,14 @@ function processAnomaly(process: ManagedProcess) {
   }
   if (process.final_status === "IN_PROGRESS" && durationMs >= 30 * 60 * 1000) {
     return { label: "Possível processo travado", severity: "critical" as const, durationMs };
+  }
+  const alert = extractionAlert(process);
+  if (alert) {
+    return {
+      label: `${alert.label} · ${alert.detail}`,
+      severity: alert.severity,
+      durationMs,
+    };
   }
   if (durationMs >= 10 * 60 * 1000) {
     return {
