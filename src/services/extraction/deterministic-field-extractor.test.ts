@@ -132,6 +132,39 @@ test("extrai financiamento e subsídio de tabela de condição de pagamento", ()
   assert.equal(value(output, "financial.subsidy"), "R$ 4.183,00");
 });
 
+test("extrai campos de ITBI preenchível a partir dos campos de formulário do PDF", () => {
+  const output = extractDeterministicFields(
+    [
+      "[CAMPOS DE FORMULARIO]",
+      "Texto1: FRANCISCO JOSE MARQUES DOS SANTOS28780619851",
+      "Endereço: R CORONEL CHICO ALVES, 21 APT 407 T 01 - PASSARE CEP 60744050 FORTALEZA/CE",
+      "Email_4: MARQUESFRANCISCOJOSE79@GMAIL.COM",
+      "Texto2: VICTA 07 EMPREENDIMENTOS IMOBILIARIOS SPE S.A.",
+      "Texto3: 44.537.507/0001-54",
+      "Texto6: 1017539-3",
+      "Endereço_2: R BENVINDA",
+      "Complemento: APT 1205 TORRE 02",
+      "Área privativa m²: 48,95m²",
+      "Área comum m²: 37,338423m²",
+      "Área total m²: 86,288423m²",
+      "Fração ideal: 0,003699811434",
+      "Valor financiado SFH: 271.704,42",
+      "Valor não financiado: 78.295,58",
+      "VALOR TOTAL DECLARADO: 350.000,00",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "ITBI",
+  );
+
+  assert.equal(value(output, "buyer.name"), "FRANCISCO JOSE MARQUES DOS SANTOS");
+  assert.equal(value(output, "buyer.cpf"), "28780619851");
+  assert.equal(value(output, "seller.cnpj"), "44.537.507/0001-54");
+  assert.equal(value(output, "property.unit"), "1205");
+  assert.equal(value(output, "property.tower"), "02");
+  assert.equal(value(output, "financial.financing"), "271.704,42");
+  assert.equal(value(output, "financial.totalValue"), "350.000,00");
+});
+
 function value(output: ReturnType<typeof extractDeterministicFields>, fieldId: string) {
   return output.fields.find((field) => field.fieldId === fieldId)?.value;
 }

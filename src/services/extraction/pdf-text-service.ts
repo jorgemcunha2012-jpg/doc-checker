@@ -35,14 +35,38 @@ export async function extractPdfText(
       .map((item) => ("str" in item ? item.str : ""))
       .filter(Boolean)
       .join(" ");
+    const formText = await extractPageFormText(page);
 
-    pages.push(`[PÁGINA ${pageNumber}]\n${pageText}`);
+    pages.push(`[PÁGINA ${pageNumber}]\n${[pageText, formText].filter(Boolean).join("\n\n")}`);
     page.cleanup();
   }
 
   await loadingTask.destroy();
 
   return pages.join("\n\n").trim();
+}
+
+export async function extractPageFormText(page: {
+  getAnnotations: (options: { intent: "display" }) => Promise<unknown[]>;
+}) {
+  const annotations = await page.getAnnotations({ intent: "display" }).catch(() => []);
+  const fields = annotations.flatMap((annotation) => {
+    if (!annotation || typeof annotation !== "object") return [];
+    const item = annotation as Record<string, unknown>;
+    if (item.subtype !== "Widget") return [];
+    const name = cleanFormText(item.fieldName);
+    const value = cleanFormText(item.fieldValue);
+    if (!name || !value || value === "Off") return [];
+    return `${name}: ${value}`;
+  });
+
+  return fields.length ? `[CAMPOS DE FORMULARIO]\n${fields.join("\n")}` : "";
+}
+
+function cleanFormText(value: unknown) {
+  return typeof value === "string" || typeof value === "number"
+    ? String(value).replace(/\s+/g, " ").trim()
+    : "";
 }
 
 export function hasEnoughPdfText(text: string) {
