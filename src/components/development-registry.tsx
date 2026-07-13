@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, Building2, CheckCircle2, FileUp, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import type { Development, DevelopmentExtraction } from "@/domain/development";
 import { reviewDevelopmentExtraction, unitTypeSignature } from "@/domain/development";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-const DIRECT_UPLOAD_LIMIT_BYTES = 4 * 1024 * 1024;
+const MAX_RENDERED_PAGES = 12;
 
 export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
   const [developments, setDevelopments] = useState<Development[]>([]);
@@ -33,14 +32,16 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
     setBusy(true);
     setError("");
     try {
-      const response = file.size > DIRECT_UPLOAD_LIMIT_BYTES
-        ? await extractLargeFile(file, controller.signal)
-        : await extractDirectFile(file, controller.signal);
+      const images = await renderPdfInBrowser(file, MAX_RENDERED_PAGES);
+      const response = await fetch("/api/developments/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceDocumentName: file.name, images }),
+        signal: controller.signal,
+      });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(response.status === 413
-          ? "O PDF ultrapassou o limite de envio direto da Vercel. Tente novamente: a ferramenta usará upload seguro pelo Storage."
-          : payload.error ?? "Não foi possível extrair a matrícula.");
+        setError(payload.error ?? "Não foi possível extrair a matrícula.");
         return;
       }
       setExtraction(payload.extraction);
@@ -211,54 +212,30 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
   );
 }
 
-async function extractDirectFile(file: File, signal: AbortSignal) {
-  const form = new FormData();
-  form.set("document", file);
-  return fetch("/api/developments/extract", {
-    method: "POST",
-    body: form,
-    signal,
-  });
-}
+async function renderPdfInBrowser(file: File, maxPages: number) {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.mjs";
+  const document = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const images: string[] = [];
 
-async function extractLargeFile(file: File, signal: AbortSignal) {
-  const uploadResponse = await fetch("/api/developments/extract/upload-url", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fileName: file.name, fileSize: file.size, mimeType: file.type || "application/pdf" }),
-    signal,
-  });
-  const uploadPayload = await uploadResponse.json().catch(() => ({}));
-  if (!uploadResponse.ok) {
-    return new Response(JSON.stringify(uploadPayload), {
-      status: uploadResponse.status,
-      headers: { "Content-Type": "application/json" },
-    });
+  try {
+    for (let pageNumber = 1; pageNumber <= Math.min(document.numPages, maxPages); pageNumber += 1) {
+      const page = await document.getPage(pageNumber);
+      const viewport = page.getViewport({ scale: 1.8 });
+      const canvas = window.document.createElement("canvas");
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Não foi possível preparar a renderização do PDF no navegador.");
+      await page.render({ canvasContext: context, viewport }).promise;
+      images.push(canvas.toDataURL("image/jpeg", 0.78));
+      page.cleanup();
+    }
+  } finally {
+    await document.destroy();
   }
 
-  const supabase = createSupabaseBrowserClient();
-  if (!supabase) {
-    return new Response(JSON.stringify({ error: "Supabase não configurado para upload de arquivos grandes." }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-  const { error } = await supabase.storage
-    .from("process-documents")
-    .uploadToSignedUrl(uploadPayload.storagePath, uploadPayload.token, file);
-  if (error) {
-    return new Response(JSON.stringify({ error: `Não foi possível enviar a matrícula ao Storage: ${error.message}` }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  return fetch("/api/developments/extract", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ storagePath: uploadPayload.storagePath, sourceDocumentName: file.name }),
-    signal,
-  });
+  return images;
 }
 
 function summarizeUnitTypes(development: Development) {
