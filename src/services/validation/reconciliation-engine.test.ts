@@ -85,11 +85,14 @@ test("não oculta campos esperados quando estão ausentes em todas as fontes", (
 });
 
 test("marca fonte ilegível mesmo quando nenhum campo foi extraído dela", () => {
-  const result = run([], ["MINUTA"], {}, ["MINUTA"]);
+  const result = run([], ["MINUTA"], {}, ["MINUTA"], {
+    MINUTA: "PDF escaneado/imagem sem texto legível suficiente após OCR.",
+  });
   const cpf = field(result, "buyer.cpf");
 
   assert.equal(cpf.status, "SOURCE_UNREADABLE");
   assert.match(cpf.observation, /não foi interpretada/);
+  assert.match(cpf.observation, /PDF escaneado/);
 });
 
 test("compara ITBI com qualquer documento complementar que contenha o mesmo campo", () => {
@@ -224,13 +227,14 @@ function run(
   participatingSources: DocumentSource[] = ["SIOPI", "MINUTA", "ITBI"],
   conflictedFieldsBySource: ReconciliationInput["conflictedFieldsBySource"] = {},
   unreadableSources: DocumentSource[] = [],
+  sourceErrors: ReconciliationInput["sourceErrors"] = {},
 ) {
   return engine.run("org_test", {
     values,
     participatingSources,
     conflictedFieldsBySource,
     unreadableSources,
-    sourceErrors: {},
+    sourceErrors,
     usedPdfVisionFallback: false,
   });
 }

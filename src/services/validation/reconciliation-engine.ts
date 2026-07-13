@@ -129,7 +129,7 @@ export class ReconciliationEngine {
         field,
         valuesBySource,
         "SOURCE_UNREADABLE",
-        `Campo não pôde ser conferido completamente porque a fonte ${joinSources(unreadableExpectedSources)} não foi interpretada.`,
+        `Campo não pôde ser conferido completamente porque a fonte ${joinSources(unreadableExpectedSources)} não foi interpretada.${sourceErrorDetails(unreadableExpectedSources, input)}`,
       );
     }
 
@@ -352,4 +352,12 @@ function joinSources(sources: DocumentSource[]) {
   return new Intl.ListFormat("pt-BR", { style: "long", type: "conjunction" }).format(
     sources.map((source) => documentSourceLabels[source]),
   );
+}
+
+function sourceErrorDetails(sources: DocumentSource[], input: ReconciliationInput) {
+  const messages = sources.flatMap((source) => {
+    const error = input.sourceErrors[source] ?? input.qualityBySource?.[source]?.error;
+    return error ? [` ${documentSourceLabels[source]}: ${error}`] : [];
+  });
+  return messages.length ? ` Motivo:${messages.join("")}` : "";
 }

@@ -75,12 +75,15 @@ export function buildExtractionQuality(
   deterministicFields: string[],
   conflictedFields: string[],
   unreadable: boolean,
+  details: Pick<ExtractionQualityReport, "error" | "extractionMethod"> = {},
 ): ExtractionQualityReport {
   const expected = criticalChecklistFields(source, checklist).map((field) => field.id);
   if (!expected.length) {
     return {
       source,
       status: unreadable ? "FAILED" : "NOT_ASSESSED",
+      error: details.error,
+      extractionMethod: details.extractionMethod,
       expectedCriticalFields: [],
       extractedCriticalFields: [],
       missingCriticalFields: [],
@@ -109,6 +112,8 @@ export function buildExtractionQuality(
   return {
     source,
     status: unreadable ? "FAILED" : missing.length || lowConfidence.length || ambiguous.length ? "PARTIAL" : "COMPLETE",
+    error: details.error,
+    extractionMethod: details.extractionMethod,
     expectedCriticalFields: expected,
     extractedCriticalFields: extracted,
     missingCriticalFields: missing,

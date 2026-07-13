@@ -5,6 +5,7 @@ import { normalizeValue } from "@/services/normalization/normalization-service";
 import { DeepSeekProvider } from "./deepseek-provider";
 import { KimiProvider } from "./kimi-provider";
 import { extractPdfText, hasEnoughPdfText } from "./pdf-text-service";
+import { extractPdfOcrText } from "./pdf-ocr-service";
 import { extractDocxText } from "./word-text-service";
 import { convertTiffToPngPages } from "./tiff-image-service";
 import type { ExtractionRequest, ExtractionResult, ReconciliationExtractionResult, UploadedDocumentPayload } from "./types";
@@ -144,10 +145,38 @@ export class DocumentExtractionService {
               pageSelection,
             );
             if (!hasEnoughPdfText(text)) {
+              console.info("[ConferIA] PDF sem texto extraível suficiente; iniciando OCR", {
+                source,
+                documentName: document.name,
+                extractedTextCharacters: text.length,
+                pageSelection,
+              });
+              const ocrText = await extractPdfOcrText(document.buffer, { maxPages: pdfOcrPageLimitFor(source) });
+              if (!hasEnoughPdfText(ocrText)) {
+                return {
+                  output: null,
+                  recoveredFields: [],
+                  deterministicFields: [],
+                  usedPdfVisionFallback: true,
+                  extractionMethod: "OCR" as const,
+                  error: "PDF escaneado/imagem sem texto legível suficiente após OCR. Possíveis causas: baixa resolução, imagem torta, borrada, texto muito pequeno ou páginas sem os dados esperados.",
+                };
+              }
+              const extraction = await this.extractTextWithRecovery(ocrText, sourceChecklist, source);
+              console.info("[ConferIA] Extração OCR concluída", {
+                source,
+                documentName: document.name,
+                durationMs: Date.now() - startedAt,
+                extractedTextCharacters: ocrText.length,
+                requestedFields: sourceChecklist.length,
+                pageSelection,
+              });
               return {
-                output: null,
+                output: extraction.output,
+                recoveredFields: extraction.recoveredFields,
+                deterministicFields: extraction.deterministicFields,
                 usedPdfVisionFallback: true,
-                error: "O PDF não possui texto extraível suficiente e o OCR visual ainda não está disponível neste fluxo.",
+                extractionMethod: "OCR" as const,
               };
             }
             const extraction = await this.extractTextWithRecovery(text, sourceChecklist, source);
@@ -164,6 +193,7 @@ export class DocumentExtractionService {
               recoveredFields: extraction.recoveredFields,
               deterministicFields: extraction.deterministicFields,
               usedPdfVisionFallback: false,
+              extractionMethod: "TEXT" as const,
             };
           }
           if (isDocx(document)) {
@@ -182,6 +212,7 @@ export class DocumentExtractionService {
               recoveredFields: extraction.recoveredFields,
               deterministicFields: extraction.deterministicFields,
               usedPdfVisionFallback: false,
+              extractionMethod: "TEXT" as const,
             };
           }
           if (document.mimeType.includes("image") || isTiff(document)) {
@@ -197,9 +228,10 @@ export class DocumentExtractionService {
               recoveredFields: [],
               deterministicFields: [],
               usedPdfVisionFallback: false,
+              extractionMethod: "VISION" as const,
             };
           }
-          return { output: null, recoveredFields: [], deterministicFields: [], usedPdfVisionFallback: false, error: "Formato de arquivo não suportado." };
+          return { output: null, recoveredFields: [], deterministicFields: [], usedPdfVisionFallback: false, extractionMethod: "UNSUPPORTED" as const, error: `Formato de arquivo não suportado: ${document.mimeType || document.name}.` };
         } catch (error) {
           const errorMessage = sanitizeExtractionError(error);
           console.error("[ConferIA] Falha de extração por documento", {
@@ -207,7 +239,7 @@ export class DocumentExtractionService {
             documentName: document.name,
             error: errorMessage,
           });
-          return { output: null, recoveredFields: [], deterministicFields: [], usedPdfVisionFallback: false, error: errorMessage };
+          return { output: null, recoveredFields: [], deterministicFields: [], usedPdfVisionFallback: false, error: explainExtractionError(errorMessage, document) };
         }
       }),
     );
@@ -216,13 +248,15 @@ export class DocumentExtractionService {
     const recoveredFields = [...new Set(attempts.flatMap((attempt) => attempt.recoveredFields ?? []))];
     const deterministicFields = [...new Set(attempts.flatMap((attempt) => attempt.deterministicFields ?? []))];
     const unreadable = outputs.length === 0;
+    const error = attempts.find((attempt) => attempt.error)?.error;
+    const extractionMethods = [...new Set(attempts.map((attempt) => attempt.extractionMethod).filter(Boolean))];
 
     return {
       source,
       values: consolidated.values,
       conflictedFields: consolidated.conflictedFields,
       unreadable,
-      error: attempts.find((attempt) => attempt.error)?.error,
+      error,
       usedPdfVisionFallback: attempts.some((attempt) => attempt.usedPdfVisionFallback),
       quality: buildExtractionQuality(
         source,
@@ -232,6 +266,10 @@ export class DocumentExtractionService {
         deterministicFields,
         consolidated.conflictedFields,
         unreadable,
+        {
+          error,
+          extractionMethod: extractionMethods.length > 1 ? "MIXED" : extractionMethods[0],
+        },
       ),
     };
   }
@@ -392,6 +430,13 @@ function pdfPageSelectionFor(source: DocumentSource) {
   return { headPages: 8, tailPages: 2 };
 }
 
+function pdfOcrPageLimitFor(source: DocumentSource) {
+  if (source === "MINUTA") return 8;
+  if (source === "SIOPI") return 12;
+  if (source === "ITBI") return 8;
+  return 10;
+}
+
 async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,
@@ -423,6 +468,23 @@ function sanitizeExtractionError(error: unknown) {
     .replace(/Bearer\s+\S+/gi, "Bearer [oculto]")
     .replace(/sk-[A-Za-z0-9_-]+/g, "[chave oculta]")
     .slice(0, 500);
+}
+
+function explainExtractionError(message: string, document: UploadedDocumentPayload) {
+  const lower = message.toLowerCase();
+  if (lower.includes("password") || lower.includes("encrypted") || lower.includes("senha")) {
+    return `PDF protegido por senha ou criptografia: ${document.name}. Remova a proteção ou envie uma versão desbloqueada.`;
+  }
+  if (lower.includes("timeout") || lower.includes("aborted")) {
+    return `Tempo excedido ao extrair ${document.name}. O arquivo pode ser muito pesado, escaneado em alta resolução ou o provedor de IA/OCR demorou demais.`;
+  }
+  if (lower.includes("invalid pdf") || lower.includes("corrupt") || lower.includes("bad xref")) {
+    return `PDF corrompido ou malformado: ${document.name}. Gere uma nova cópia do documento e tente novamente.`;
+  }
+  if (lower.includes("não configurado") || lower.includes("api key")) {
+    return `Provider de extração não configurado corretamente para ${document.name}. Verifique as variáveis de ambiente da IA/OCR.`;
+  }
+  return message;
 }
 
 function isDocx(document: UploadedDocumentPayload) {

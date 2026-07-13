@@ -126,6 +126,8 @@ export type ExtractionQualityStatus = "COMPLETE" | "PARTIAL" | "FAILED" | "NOT_A
 export type ExtractionQualityReport = {
   source: DocumentSource;
   status: ExtractionQualityStatus;
+  error?: string;
+  extractionMethod?: "TEXT" | "FORM" | "OCR" | "VISION" | "MIXED" | "UNSUPPORTED";
   expectedCriticalFields: string[];
   extractedCriticalFields: string[];
   missingCriticalFields: string[];

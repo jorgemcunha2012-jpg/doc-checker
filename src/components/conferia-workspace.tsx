@@ -377,13 +377,11 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                   <div>
                     <div className="text-sm font-bold">
-                      {run.validationType === "RECONCILIATION" ? "Fonte sem texto extraível" : "Fallback de visão utilizado"}
+                      {run.validationType === "RECONCILIATION" ? "OCR aplicado em PDF escaneado" : "Fallback de visão utilizado"}
                     </div>
-                    <div className="mt-1 text-sm">
-                      {run.validationType === "RECONCILIATION"
-                        ? "Um PDF exigia OCR visual e foi sinalizado como fonte ilegível para não comprometer as demais fontes."
-                        : "O PDF tinha pouco ou nenhum texto extraível e exigiu análise visual."}
-                    </div>
+                    {run.validationType === "RECONCILIATION" ? <ExtractionMethodNotice run={run} /> : (
+                      <div className="mt-1 text-sm">O PDF tinha pouco ou nenhum texto extraível e exigiu análise visual.</div>
+                    )}
                   </div>
                 </div>
               ) : null}
@@ -639,6 +637,34 @@ function ProcessError({ message }: { message?: string }) {
       </div>
     </div>
   );
+}
+
+function ExtractionMethodNotice({ run }: { run: Extract<ValidationRun, { validationType: "RECONCILIATION" }> }) {
+  const reports = Object.values(run.extractionQualityBySource ?? {}).filter(Boolean);
+  const ocrReports = reports.filter((report) => report.extractionMethod === "OCR" || report.extractionMethod === "MIXED");
+  const failedReports = reports.filter((report) => report.status === "FAILED" && report.error);
+
+  if (failedReports.length) {
+    return (
+      <div className="mt-1 space-y-1 text-sm">
+        {failedReports.map((report) => (
+          <div key={report.source}>
+            {documentSourceLabels[report.source]}: {report.error}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (ocrReports.length) {
+    return (
+      <div className="mt-1 text-sm">
+        {ocrReports.map((report) => documentSourceLabels[report.source]).join(", ")} exigiu OCR porque o PDF tinha pouco ou nenhum texto selecionável.
+      </div>
+    );
+  }
+
+  return <div className="mt-1 text-sm">Um PDF tinha pouco ou nenhum texto extraível e exigiu análise visual.</div>;
 }
 
 function formatElapsed(seconds: number) {
