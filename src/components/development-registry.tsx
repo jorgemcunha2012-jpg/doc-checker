@@ -25,19 +25,34 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
 
   async function handleFile(file?: File) {
     if (!file) return;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 165_000);
     setBusy(true);
     setError("");
-    const form = new FormData();
-    form.set("document", file);
-    const response = await fetch("/api/developments/extract", { method: "POST", body: form });
-    const payload = await response.json();
-    setBusy(false);
-    if (!response.ok) {
-      setError(payload.error ?? "Não foi possível extrair a matrícula.");
-      return;
+    try {
+      const form = new FormData();
+      form.set("document", file);
+      const response = await fetch("/api/developments/extract", {
+        method: "POST",
+        body: form,
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(payload.error ?? "Não foi possível extrair a matrícula.");
+        return;
+      }
+      setExtraction(payload.extraction);
+      setSourceDocumentName(payload.sourceDocumentName);
+    } catch (reason) {
+      const aborted = reason instanceof DOMException && reason.name === "AbortError";
+      setError(aborted
+        ? "A extração demorou demais. Cadastre manualmente ou envie uma versão menor com as páginas de tipos, áreas e frações."
+        : "Não foi possível comunicar com o extrator. Tente novamente ou use o cadastro manual.");
+    } finally {
+      window.clearTimeout(timeout);
+      setBusy(false);
     }
-    setExtraction(payload.extraction);
-    setSourceDocumentName(payload.sourceDocumentName);
   }
 
   async function save() {
@@ -81,10 +96,10 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
       </div>
         {canManage ? <section className="border border-slate-200 bg-white p-6">
           <h2 className="text-lg font-bold text-slate-950">Novo empreendimento</h2>
-          <p className="mt-1 text-sm text-slate-500">Envie a matrícula mestre. A IA lista torre, apartamento, áreas e fração ideal; revise antes de salvar.</p>
+          <p className="mt-1 text-sm text-slate-500">Envie a matrícula mestre. A IA lista torre, apartamento, áreas e fração ideal; revise antes de salvar. PDFs escaneados ou muito longos podem levar mais tempo.</p>
           <label className="mt-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-            Extrair matrícula
+            {busy ? "Extraindo matrícula..." : "Extrair matrícula"}
             <input className="sr-only" type="file" accept=".pdf,application/pdf" disabled={busy} onChange={(event) => void handleFile(event.target.files?.[0])} />
           </label>
           <button
@@ -96,6 +111,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
           >
             <Plus className="h-4 w-4" /> Criar manualmente
           </button>
+          {busy ? <p className="mt-3 text-sm font-semibold text-slate-500">Analisando a matrícula com imagens otimizadas. Se passar de 2 a 3 minutos, a tela encerrará a tentativa automaticamente.</p> : null}
           {error ? <p className="mt-3 text-sm font-semibold text-red-600">{error}</p> : null}
         </section> : null}
 

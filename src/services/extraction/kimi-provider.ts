@@ -134,7 +134,7 @@ export class KimiProvider implements DocumentExtractionProvider {
   }
 
   async extractDevelopment(images: string[]): Promise<DevelopmentExtraction> {
-    const attempts = await Promise.allSettled(images.map((image, index) => this.extractDevelopmentPage(image, index + 1)));
+    const attempts = await mapWithConcurrencySettled(images, 3, (image, index) => this.extractDevelopmentPage(image, index + 1));
     const pages = attempts.flatMap((attempt) => attempt.status === "fulfilled" ? [attempt.value] : []);
     if (!pages.length) {
       const failure = attempts.find((attempt) => attempt.status === "rejected");
@@ -173,9 +173,41 @@ export class KimiProvider implements DocumentExtractionProvider {
           { type: "image_url", image_url: { url: image } },
         ],
       },
-    ], { timeoutMs: 240_000, maxTokens: 3_000 });
+    ], { timeoutMs: 90_000, maxTokens: 2_500 });
     return coerceDevelopmentExtraction(result);
   }
+}
+
+async function mapWithConcurrencySettled<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  const results = new Array<PromiseSettledResult<R>>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      try {
+        results[currentIndex] = {
+          status: "fulfilled",
+          value: await mapper(items[currentIndex], currentIndex),
+        };
+      } catch (reason) {
+        results[currentIndex] = { status: "rejected", reason };
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(concurrency, items.length) },
+      () => worker(),
+    ),
+  );
+  return results;
 }
 
 const reservationFieldIds = new Set([
