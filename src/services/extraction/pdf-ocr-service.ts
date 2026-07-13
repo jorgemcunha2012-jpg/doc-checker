@@ -1,3 +1,4 @@
+import path from "node:path";
 import { createWorker } from "tesseract.js";
 import { renderPdfToJpegDataUrls } from "./pdf-image-service";
 
@@ -6,7 +7,10 @@ export async function extractPdfOcrText(buffer: Buffer, options: { maxPages?: nu
     quality: 88,
     scale: 2.2,
   });
-  const worker = await createWorker("por", 1, { cachePath: "/tmp" });
+  const worker = await createWorker("por", 1, {
+    cachePath: "/tmp",
+    workerPath: path.join(process.cwd(), "node_modules/tesseract.js/src/worker-script/node/index.js"),
+  });
   const pages: string[] = [];
 
   try {

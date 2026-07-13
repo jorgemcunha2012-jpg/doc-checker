@@ -1,3 +1,4 @@
+import path from "node:path";
 import { createWorker } from "tesseract.js";
 import type { DevelopmentExtraction } from "@/domain/development";
 import { extractDevelopmentFromOcrText } from "./development-ocr-parser";
@@ -6,7 +7,10 @@ export async function extractDevelopmentFromImagesWithOcr(
   images: string[],
 ): Promise<DevelopmentExtraction> {
   const pages: string[] = [];
-  const worker = await createWorker("por", 1, { cachePath: "/tmp" });
+  const worker = await createWorker("por", 1, {
+    cachePath: "/tmp",
+    workerPath: path.join(process.cwd(), "node_modules/tesseract.js/src/worker-script/node/index.js"),
+  });
 
   try {
     for (const image of images) {
