@@ -28,7 +28,7 @@ export async function renderPdfToJpegDataUrls(
       const viewport = page.getViewport({ scale });
       const canvas = canvasModule.createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
       const context = canvas.getContext("2d");
-      await page.render({ canvasContext: context as never, viewport, canvas: canvas as never }).promise;
+      await page.render({ canvasContext: context as never, viewport }).promise;
       images.push(`data:image/jpeg;base64,${canvas.toBuffer("image/jpeg", quality).toString("base64")}`);
       page.cleanup();
     }
