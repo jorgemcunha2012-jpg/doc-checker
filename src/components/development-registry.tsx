@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, Building2, CheckCircle2, FileUp, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import type { Development, DevelopmentExtraction } from "@/domain/development";
 import { reviewDevelopmentExtraction, unitTypeSignature } from "@/domain/development";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+
+const DIRECT_UPLOAD_LIMIT_BYTES = 4 * 1024 * 1024;
 
 export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
   const [developments, setDevelopments] = useState<Development[]>([]);
@@ -30,16 +33,14 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
     setBusy(true);
     setError("");
     try {
-      const form = new FormData();
-      form.set("document", file);
-      const response = await fetch("/api/developments/extract", {
-        method: "POST",
-        body: form,
-        signal: controller.signal,
-      });
+      const response = file.size > DIRECT_UPLOAD_LIMIT_BYTES
+        ? await extractLargeFile(file, controller.signal)
+        : await extractDirectFile(file, controller.signal);
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(payload.error ?? "Não foi possível extrair a matrícula.");
+        setError(response.status === 413
+          ? "O PDF ultrapassou o limite de envio direto da Vercel. Tente novamente: a ferramenta usará upload seguro pelo Storage."
+          : payload.error ?? "Não foi possível extrair a matrícula.");
         return;
       }
       setExtraction(payload.extraction);
@@ -208,6 +209,56 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
         </section>
     </div>
   );
+}
+
+async function extractDirectFile(file: File, signal: AbortSignal) {
+  const form = new FormData();
+  form.set("document", file);
+  return fetch("/api/developments/extract", {
+    method: "POST",
+    body: form,
+    signal,
+  });
+}
+
+async function extractLargeFile(file: File, signal: AbortSignal) {
+  const uploadResponse = await fetch("/api/developments/extract/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fileName: file.name, fileSize: file.size, mimeType: file.type || "application/pdf" }),
+    signal,
+  });
+  const uploadPayload = await uploadResponse.json().catch(() => ({}));
+  if (!uploadResponse.ok) {
+    return new Response(JSON.stringify(uploadPayload), {
+      status: uploadResponse.status,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const supabase = createSupabaseBrowserClient();
+  if (!supabase) {
+    return new Response(JSON.stringify({ error: "Supabase não configurado para upload de arquivos grandes." }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const { error } = await supabase.storage
+    .from("process-documents")
+    .uploadToSignedUrl(uploadPayload.storagePath, uploadPayload.token, file);
+  if (error) {
+    return new Response(JSON.stringify({ error: `Não foi possível enviar a matrícula ao Storage: ${error.message}` }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  return fetch("/api/developments/extract", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ storagePath: uploadPayload.storagePath, sourceDocumentName: file.name }),
+    signal,
+  });
 }
 
 function summarizeUnitTypes(development: Development) {
