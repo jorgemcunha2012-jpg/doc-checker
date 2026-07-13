@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AuthError, requireAdmin } from "@/lib/auth";
+import { extractDevelopmentWithOcr } from "@/services/development/development-ocr-service";
 import { KimiProvider } from "@/services/extraction/kimi-provider";
 import { renderPdfToJpegDataUrls } from "@/services/extraction/pdf-image-service";
 
@@ -16,7 +17,20 @@ export async function POST(request: Request) {
     if (!(file instanceof File) || !file.name.toLowerCase().endsWith(".pdf") || file.size > MAX_SIZE) {
       return NextResponse.json({ error: "Envie uma matrícula em PDF de até 20 MB." }, { status: 400 });
     }
-    const images = await renderPdfToJpegDataUrls(Buffer.from(await file.arrayBuffer()), MAX_PAGES, {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const ocrExtraction = await withTimeout(
+      extractDevelopmentWithOcr(buffer, MAX_PAGES),
+      EXTRACTION_TIMEOUT_MS,
+      "O OCR da matrícula demorou demais.",
+    ).catch((error) => {
+      console.warn("[ConferIA] OCR da matrícula falhou", error);
+      return null;
+    });
+    if (ocrExtraction?.units.length) {
+      return NextResponse.json({ extraction: ocrExtraction, sourceDocumentName: file.name });
+    }
+
+    const images = await renderPdfToJpegDataUrls(buffer, MAX_PAGES, {
       quality: 72,
       scale: 1.15,
     });
