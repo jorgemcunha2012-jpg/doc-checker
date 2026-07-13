@@ -13,11 +13,16 @@ export async function POST(request: Request) {
     const fileSize = Number(body.fileSize ?? 0);
     const mimeType = body.mimeType || "application/pdf";
 
-    if (!fileName?.toLowerCase().endsWith(".pdf") || mimeType !== "application/pdf" || fileSize <= 0 || fileSize > MAX_SIZE) {
-      return NextResponse.json({ error: "Envie uma matrícula em PDF de até 20 MB." }, { status: 400 });
+    if (mimeType === "application/pdf") {
+      return NextResponse.json({
+        error: "Atualize a página e envie a matrícula novamente. A versão atual renderiza o PDF no navegador antes da extração.",
+      }, { status: 410 });
+    }
+    if (!fileName || mimeType !== "image/jpeg" || fileSize <= 0 || fileSize > MAX_SIZE) {
+      return NextResponse.json({ error: "Não foi possível preparar a página renderizada da matrícula." }, { status: 400 });
     }
 
-    const storagePath = `${user.organizationId}/development-extractions/${randomUUID()}-${safeFileName(fileName)}`;
+    const storagePath = `${user.organizationId}/development-extractions/rendered-pages/${randomUUID()}-${safeFileName(fileName)}`;
     const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase.storage
       .from("process-documents")

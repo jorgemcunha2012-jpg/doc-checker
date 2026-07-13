@@ -52,7 +52,7 @@ export async function POST(request: Request) {
 async function readPdfPayload(request: Request, organizationId: string) {
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
-    const body = await request.json() as { storagePath?: string; sourceDocumentName?: string; images?: string[] };
+    const body = await request.json() as { storagePath?: string; sourceDocumentName?: string; images?: string[]; imagePaths?: string[] };
     if (Array.isArray(body.images)) {
       const images = body.images.filter((image) => typeof image === "string" && image.startsWith("data:image/")).slice(0, MAX_IMAGES);
       if (!body.sourceDocumentName || !images.length) return null;
@@ -60,6 +60,24 @@ async function readPdfPayload(request: Request, organizationId: string) {
         images,
         sourceDocumentName: body.sourceDocumentName,
         size: images.reduce((total, image) => total + image.length, 0),
+      };
+    }
+    if (Array.isArray(body.imagePaths)) {
+      const paths = body.imagePaths
+        .filter((path) => typeof path === "string" && path.startsWith(`${organizationId}/development-extractions/rendered-pages/`))
+        .slice(0, MAX_IMAGES);
+      if (!body.sourceDocumentName || !paths.length) return null;
+      const supabase = createSupabaseAdminClient();
+      const downloads = await Promise.all(paths.map(async (path) => {
+        const { data, error } = await supabase.storage.from("process-documents").download(path);
+        if (error || !data) throw new Error(`Não foi possível baixar página renderizada: ${error?.message ?? path}`);
+        const buffer = Buffer.from(await data.arrayBuffer());
+        return `data:${data.type || "image/jpeg"};base64,${buffer.toString("base64")}`;
+      }));
+      return {
+        images: downloads,
+        sourceDocumentName: body.sourceDocumentName,
+        size: downloads.reduce((total, image) => total + image.length, 0),
       };
     }
     if (!body.storagePath || !body.sourceDocumentName || !body.storagePath.startsWith(`${organizationId}/development-extractions/`)) {

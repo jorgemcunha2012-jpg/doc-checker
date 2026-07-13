@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, Building2, CheckCircle2, FileUp, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import type { Development, DevelopmentExtraction } from "@/domain/development";
 import { reviewDevelopmentExtraction, unitTypeSignature } from "@/domain/development";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const MAX_RENDERED_PAGES = 12;
 
@@ -32,11 +33,12 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
     setBusy(true);
     setError("");
     try {
-      const images = await renderPdfInBrowser(file, MAX_RENDERED_PAGES);
+      const pages = await renderPdfInBrowser(file, MAX_RENDERED_PAGES);
+      const imagePaths = await uploadRenderedPages(file.name, pages, controller.signal);
       const response = await fetch("/api/developments/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceDocumentName: file.name, images }),
+        body: JSON.stringify({ sourceDocumentName: file.name, imagePaths }),
         signal: controller.signal,
       });
       const payload = await response.json().catch(() => ({}));
@@ -50,7 +52,9 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
       const aborted = reason instanceof DOMException && reason.name === "AbortError";
       setError(aborted
         ? "A extração demorou demais. Cadastre manualmente ou envie uma versão menor com as páginas de tipos, áreas e frações."
-        : "Não foi possível comunicar com o extrator. Tente novamente ou use o cadastro manual.");
+        : reason instanceof Error
+          ? reason.message
+          : "Não foi possível comunicar com o extrator. Tente novamente ou use o cadastro manual.");
     } finally {
       window.clearTimeout(timeout);
       setBusy(false);
@@ -216,7 +220,7 @@ async function renderPdfInBrowser(file: File, maxPages: number) {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.mjs";
   const document = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
-  const images: string[] = [];
+  const images: Blob[] = [];
 
   try {
     for (let pageNumber = 1; pageNumber <= Math.min(document.numPages, maxPages); pageNumber += 1) {
@@ -228,7 +232,7 @@ async function renderPdfInBrowser(file: File, maxPages: number) {
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Não foi possível preparar a renderização do PDF no navegador.");
       await page.render({ canvasContext: context, viewport }).promise;
-      images.push(canvas.toDataURL("image/jpeg", 0.78));
+      images.push(await canvasToJpegBlob(canvas));
       page.cleanup();
     }
   } finally {
@@ -236,6 +240,44 @@ async function renderPdfInBrowser(file: File, maxPages: number) {
   }
 
   return images;
+}
+
+async function uploadRenderedPages(fileName: string, pages: Blob[], signal: AbortSignal) {
+  const supabase = createSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase não configurado para upload das páginas renderizadas.");
+  const paths: string[] = [];
+
+  for (let index = 0; index < pages.length; index += 1) {
+    const page = pages[index];
+    const uploadResponse = await fetch("/api/developments/extract/upload-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: `${fileName.replace(/\.pdf$/i, "")}-pagina-${index + 1}.jpg`,
+        fileSize: page.size,
+        mimeType: "image/jpeg",
+      }),
+      signal,
+    });
+    const uploadPayload = await uploadResponse.json().catch(() => ({}));
+    if (!uploadResponse.ok) throw new Error(uploadPayload.error ?? "Não foi possível preparar upload da página renderizada.");
+    const { error } = await supabase.storage
+      .from("process-documents")
+      .uploadToSignedUrl(uploadPayload.storagePath, uploadPayload.token, page);
+    if (error) throw new Error(`Não foi possível enviar página renderizada: ${error.message}`);
+    paths.push(uploadPayload.storagePath);
+  }
+
+  return paths;
+}
+
+function canvasToJpegBlob(canvas: HTMLCanvasElement) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("Não foi possível converter a página renderizada em imagem."));
+    }, "image/jpeg", 0.78);
+  });
 }
 
 function summarizeUnitTypes(development: Development) {
