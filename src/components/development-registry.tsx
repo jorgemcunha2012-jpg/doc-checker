@@ -29,7 +29,9 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
   async function handleFile(file?: File) {
     if (!file) return;
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 165_000);
+    // Keep the browser request aligned with the serverless OCR ceiling. The
+    // full matrícula is rendered and read; pages are not silently discarded.
+    const timeout = window.setTimeout(() => controller.abort(), 295_000);
     setBusy(true);
     setError("");
     try {
@@ -51,7 +53,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
     } catch (reason) {
       const aborted = reason instanceof DOMException && reason.name === "AbortError";
       setError(aborted
-        ? "A extração demorou demais. Cadastre manualmente ou envie uma versão menor com as páginas de tipos, áreas e frações."
+          ? "A extração ultrapassou o limite de 5 minutos. O PDF pode ser escaneado ou ter muitas páginas; tente novamente ou cadastre manualmente."
         : reason instanceof Error
           ? reason.message
           : "Não foi possível comunicar com o extrator. Tente novamente ou use o cadastro manual.");
@@ -117,7 +119,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
           >
             <Plus className="h-4 w-4" /> Criar manualmente
           </button>
-          {busy ? <p className="mt-3 text-sm font-semibold text-slate-500">Analisando a matrícula com imagens otimizadas. Se passar de 2 a 3 minutos, a tela encerrará a tentativa automaticamente.</p> : null}
+          {busy ? <p className="mt-3 text-sm font-semibold text-slate-500">Analisando todas as páginas da matrícula. PDFs escaneados podem levar alguns minutos porque cada página passa por OCR.</p> : null}
           {error ? <p className="mt-3 text-sm font-semibold text-red-600">{error}</p> : null}
         </section> : null}
 
