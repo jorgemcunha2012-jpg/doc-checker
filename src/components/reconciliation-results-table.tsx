@@ -47,6 +47,18 @@ export function ReconciliationResultsTable({
       }),
     [filter, query, results, sources],
   );
+  const participantGroups = useMemo(() => {
+    const groups = new Map<string, { label: string; results: FieldComparisonResult[] }>();
+    for (const result of filteredResults) {
+      if (!result.field.participantId) continue;
+      const key = result.field.participantId;
+      const group = groups.get(key) ?? { label: result.field.participantLabel ?? "Comprador", results: [] };
+      group.results.push(result);
+      groups.set(key, group);
+    }
+    return [...groups.entries()].map(([participantId, group]) => ({ participantId, ...group }));
+  }, [filteredResults]);
+  const sharedResults = useMemo(() => filteredResults.filter((result) => !result.field.participantId), [filteredResults]);
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -75,81 +87,28 @@ export function ReconciliationResultsTable({
         </label>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-900 text-xs uppercase text-slate-200">
-              <th className="px-4 py-3 font-semibold">Campo</th>
-              {sources.map((source) => (
-                <th key={source} className="px-4 py-3 font-semibold">{documentSourceLabels[source]}</th>
-              ))}
-              <th className="px-4 py-3 font-semibold">Status</th>
-              <th className="px-4 py-3 font-semibold">Diagnóstico e revisão</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredResults.map((result) => (
-              <tr key={result.field.id} className="border-b border-slate-100 align-top hover:bg-slate-50">
-                <td className="px-4 py-4">
-                  <div className="font-semibold text-slate-950">{result.field.label}</div>
-                  <div className="mt-1 text-xs text-slate-500">{result.field.category}</div>
-                </td>
-                {sources.map((source) => (
-                  <td key={source} className="max-w-64 px-4 py-4 text-slate-700">
-                    <SourceValueCell source={source} result={result} />
-                  </td>
-                ))}
-                <td className="px-4 py-4">
-                  {result.humanReview?.status === "APPROVED" ? (
-                    <div>
-                      <span className="inline-flex min-w-32 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
-                        Verificado
-                      </span>
-                      <div className="mt-1 text-[11px] text-slate-400">Automático: {statusCopy[result.status]}</div>
-                    </div>
-                  ) : (
-                    <StatusBadge status={result.status} />
-                  )}
-                </td>
-                <td className="max-w-80 px-4 py-4">
-                  <div className={`text-xs leading-5 ${result.status === "DIVERGENCE" ? "font-semibold text-rose-700" : "text-slate-600"}`}>
-                    {result.observation}
-                  </div>
-                  {result.humanReview ? (
-                    <div className="mt-3 border-l-2 border-emerald-500 pl-3">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        {result.status === "DIVERGENCE" ? "Divergência ignorada" : "Validado manualmente"}
-                      </div>
-                      {result.humanReview.justification ? (
-                        <p className="mt-1 text-xs leading-5 text-slate-600">{result.humanReview.justification}</p>
-                      ) : null}
-                      <div className="mt-1 text-[11px] text-slate-400">
-                        {result.humanReview.reviewerName} · {formatReviewDate(result.humanReview.reviewedAt)}
-                      </div>
-                      <button
-                        className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900"
-                        onClick={() => onReview(result.field.id)}
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                        Desfazer
-                      </button>
-                    </div>
-                  ) : result.status !== "MATCH" ? (
-                    <button
-                      className="mt-3 inline-flex min-h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700"
-                      onClick={() => setReviewingResult(result)}
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {result.status === "DIVERGENCE" ? "Ignorar divergência" : "Marcar como verificado"}
-                    </button>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {participantGroups.map((group) => (
+        <ResultGroup
+          key={group.participantId}
+          title={group.label}
+          subtitle="Dados conferidos exclusivamente para este comprador"
+          results={group.results}
+          sources={sources}
+          onReview={onReview}
+          onOpenReview={setReviewingResult}
+        />
+      ))}
+      {sharedResults.length ? (
+        <ResultGroup
+          title="Dados comuns da operação"
+          subtitle="Imóvel, contrato e valores compartilhados entre os compradores"
+          results={sharedResults}
+          sources={sources}
+          onReview={onReview}
+          onOpenReview={setReviewingResult}
+        />
+      ) : null}
+      {!participantGroups.length && !sharedResults.length ? <div className="p-8 text-center text-sm text-slate-500">Nenhum campo encontrado para este filtro.</div> : null}
       {reviewingResult ? (
         <ReviewDialog
           result={reviewingResult}
@@ -162,6 +121,99 @@ export function ReconciliationResultsTable({
         />
       ) : null}
     </section>
+  );
+}
+
+function ResultGroup({
+  title,
+  subtitle,
+  results,
+  sources,
+  onReview,
+  onOpenReview,
+}: {
+  title: string;
+  subtitle: string;
+  results: FieldComparisonResult[];
+  sources: DocumentSource[];
+  onReview: (fieldId: string, review?: HumanReview) => void;
+  onOpenReview: (result: FieldComparisonResult) => void;
+}) {
+  const pending = results.filter((result) => result.status !== "MATCH" && result.humanReview?.status !== "APPROVED").length;
+  return (
+    <div className="border-b border-slate-200 last:border-b-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 px-4 py-3">
+        <div>
+          <h3 className="text-sm font-bold text-slate-950">{title}</h3>
+          <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>
+        </div>
+        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${pending ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+          {pending ? `${pending} pendência${pending === 1 ? "" : "s"}` : "Tudo conferido"}
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-900 text-xs uppercase text-slate-200">
+              <th className="px-4 py-3 font-semibold">Campo</th>
+              {sources.map((source) => <th key={source} className="px-4 py-3 font-semibold">{documentSourceLabels[source]}</th>)}
+              <th className="px-4 py-3 font-semibold">Status</th>
+              <th className="px-4 py-3 font-semibold">Diagnóstico e revisão</th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.map((result) => (
+              <ResultRow key={result.field.id} result={result} sources={sources} onReview={onReview} onOpenReview={onOpenReview} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ResultRow({
+  result,
+  sources,
+  onReview,
+  onOpenReview,
+}: {
+  result: FieldComparisonResult;
+  sources: DocumentSource[];
+  onReview: (fieldId: string, review?: HumanReview) => void;
+  onOpenReview: (result: FieldComparisonResult) => void;
+}) {
+  return (
+    <tr className="border-b border-slate-100 align-top hover:bg-slate-50">
+      <td className="px-4 py-4">
+        <div className="font-semibold text-slate-950">{result.field.baseFieldId ? result.field.label.slice(0, result.field.label.lastIndexOf(" · ")) : result.field.label}</div>
+        <div className="mt-1 text-xs text-slate-500">{result.field.category}</div>
+      </td>
+      {sources.map((source) => <td key={source} className="max-w-64 px-4 py-4 text-slate-700"><SourceValueCell source={source} result={result} /></td>)}
+      <td className="px-4 py-4">
+        {result.humanReview?.status === "APPROVED" ? (
+          <div>
+            <span className="inline-flex min-w-32 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">Verificado</span>
+            <div className="mt-1 text-[11px] text-slate-400">Automático: {statusCopy[result.status]}</div>
+          </div>
+        ) : <StatusBadge status={result.status} />}
+      </td>
+      <td className="max-w-80 px-4 py-4">
+        <div className={`text-xs leading-5 ${result.status === "DIVERGENCE" ? "font-semibold text-rose-700" : "text-slate-600"}`}>{result.observation}</div>
+        {result.humanReview ? (
+          <div className="mt-3 border-l-2 border-emerald-500 pl-3">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700"><ShieldCheck className="h-3.5 w-3.5" />{result.status === "DIVERGENCE" ? "Divergência ignorada" : "Validado manualmente"}</div>
+            {result.humanReview.justification ? <p className="mt-1 text-xs leading-5 text-slate-600">{result.humanReview.justification}</p> : null}
+            <div className="mt-1 text-[11px] text-slate-400">{result.humanReview.reviewerName} · {formatReviewDate(result.humanReview.reviewedAt)}</div>
+            <button className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900" onClick={() => onReview(result.field.id)}><RotateCcw className="h-3.5 w-3.5" />Desfazer</button>
+          </div>
+        ) : result.status !== "MATCH" ? (
+          <button className="mt-3 inline-flex min-h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700" onClick={() => onOpenReview(result)}>
+            <CheckCircle2 className="h-3.5 w-3.5" />{result.status === "DIVERGENCE" ? "Ignorar divergência" : "Marcar como verificado"}
+          </button>
+        ) : null}
+      </td>
+    </tr>
   );
 }
 

@@ -236,6 +236,24 @@ test("separa e confere dois compradores pelo identificador de participante", () 
   assert.match(field(result, `buyer.name::${joao}`).field.label, /João Souza/);
 });
 
+test("mantém pendente o segundo comprador quando ele não aparece em uma fonte", () => {
+  const maria = "cpf_11111111111";
+  const joao = "cpf_22222222222";
+  const result = run([
+    value("buyer.name", "SIOPI", "Maria Silva", 95, maria),
+    value("buyer.cpf", "SIOPI", "11111111111", 95, maria),
+    value("buyer.name", "MINUTA", "Maria Silva", 95, maria),
+    value("buyer.cpf", "MINUTA", "11111111111", 95, maria),
+    value("buyer.name", "SIOPI", "João Souza", 95, joao),
+    value("buyer.cpf", "SIOPI", "22222222222", 95, joao),
+  ], ["SIOPI", "MINUTA"]);
+
+  const joaoCpf = field(result, `buyer.cpf::${joao}`);
+  assert.equal(joaoCpf.status, "REVIEW_REQUIRED");
+  assert.match(joaoCpf.observation, /João Souza/);
+  assert.match(joaoCpf.observation, /Minuta/);
+});
+
 function run(
   values: ExtractedFieldValue[],
   participatingSources: DocumentSource[] = ["SIOPI", "MINUTA", "ITBI"],

@@ -118,7 +118,7 @@ export class ReconciliationEngine {
         field,
         valuesBySource,
         "REVIEW_REQUIRED",
-        `Foram encontrados valores conflitantes entre arquivos da fonte ${joinSources(conflicts)}.`,
+        `Foram encontrados valores conflitantes para ${participantContext(field)} entre arquivos da fonte ${joinSources(conflicts)}.`,
       );
     }
 
@@ -131,7 +131,7 @@ export class ReconciliationEngine {
         field,
         valuesBySource,
         "REVIEW_REQUIRED",
-        `Evidência insuficiente ou incompatível para o campo na fonte ${joinSources(evidenceIssues)}.`,
+        `Evidência insuficiente ou incompatível para ${participantContext(field)} na fonte ${joinSources(evidenceIssues)}.`,
       );
     }
 
@@ -142,7 +142,7 @@ export class ReconciliationEngine {
         field,
         valuesBySource,
         "SOURCE_UNREADABLE",
-        `Campo não pôde ser conferido completamente porque a fonte ${joinSources(unreadableExpectedSources)} não foi interpretada.${sourceErrorDetails(unreadableExpectedSources, input)}`,
+        `Campo de ${participantContext(field)} não pôde ser conferido completamente porque a fonte ${joinSources(unreadableExpectedSources)} não foi interpretada.${sourceErrorDetails(unreadableExpectedSources, input)}`,
       );
     }
 
@@ -172,8 +172,8 @@ export class ReconciliationEngine {
         valuesBySource,
         "REVIEW_REQUIRED",
         comparisonParticipants.length
-          ? `Campo encontrado apenas na fonte ${joinSources(comparisonParticipants)}. É necessário outro arquivo com o mesmo dado para confirmar.${missingMessage}`
-          : `Campo não encontrado nas fontes esperadas para conferência.${missingMessage}`,
+          ? `Campo de ${participantContext(field)} encontrado apenas na fonte ${joinSources(comparisonParticipants)}. É necessário outro arquivo com o mesmo dado para confirmar.${missingMessage}`
+          : `Campo de ${participantContext(field)} não encontrado nas fontes esperadas para conferência.${missingMessage}`,
       );
     }
 
@@ -184,7 +184,7 @@ export class ReconciliationEngine {
         field,
         valuesBySource,
         "REVIEW_REQUIRED",
-        `Extração abaixo de ${LOW_CONFIDENCE_THRESHOLD}% na fonte ${joinSources(lowConfidence)}.`,
+        `Extração abaixo de ${LOW_CONFIDENCE_THRESHOLD}% para ${participantContext(field)} na fonte ${joinSources(lowConfidence)}.`,
       );
     }
 
@@ -238,7 +238,12 @@ function hasFilledValueFromSource(field: ChecklistField, values: ExtractedFieldV
 }
 
 function expandParticipantFields(checklist: ChecklistField[], values: ExtractedFieldValue[]) {
-  const participantIds = [...new Set(values.map((value) => value.participantId).filter((value): value is string => Boolean(value)))];
+  const identityParticipantIds = values
+    .filter((value) => (value.fieldId === "buyer.name" || value.fieldId === "buyer.cpf") && value.participantId)
+    .map((value) => value.participantId as string);
+  const participantIds = [...new Set(identityParticipantIds.length
+    ? identityParticipantIds
+    : values.map((value) => value.participantId).filter((value): value is string => Boolean(value)))];
   if (!participantIds.length) return checklist;
 
   const participantNames = new Map(
@@ -365,6 +370,10 @@ function joinSources(sources: DocumentSource[]) {
   return new Intl.ListFormat("pt-BR", { style: "long", type: "conjunction" }).format(
     sources.map((source) => documentSourceLabels[source]),
   );
+}
+
+function participantContext(field: ChecklistField) {
+  return field.participantLabel ? `o comprador ${field.participantLabel}` : "o campo";
 }
 
 function sourceErrorDetails(sources: DocumentSource[], input: ReconciliationInput) {
