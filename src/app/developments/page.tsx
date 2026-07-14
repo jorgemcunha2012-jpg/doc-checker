@@ -7,5 +7,5 @@ export default async function DevelopmentsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.mustChangePassword) redirect("/change-password");
-  return <AppShell user={user}><DevelopmentRegistry canManage={user.role === "ADMIN"} /></AppShell>;
+  return <AppShell user={user}><DevelopmentRegistry canManage /></AppShell>;
 }

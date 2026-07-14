@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { AuthError, requireAdmin } from "@/lib/auth";
+import { AuthError, requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
 const MAX_SIZE = 20 * 1024 * 1024;
 
 export async function POST(request: Request) {
   try {
-    const user = await requireAdmin();
+    const user = await requireUser();
     const body = await request.json() as { fileName?: string; fileSize?: number; mimeType?: string };
     const fileName = body.fileName?.trim();
     const fileSize = Number(body.fileSize ?? 0);

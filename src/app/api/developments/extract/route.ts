@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AuthError, requireAdmin } from "@/lib/auth";
+import { AuthError, requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { extractDevelopmentFromImagesWithOcr } from "@/services/development/development-ocr-service";
 import { KimiProvider } from "@/services/extraction/kimi-provider";
@@ -11,7 +11,7 @@ export const maxDuration = 300;
 
 export async function POST(request: Request) {
   try {
-    const user = await requireAdmin();
+    const user = await requireUser();
     const payload = await readPdfPayload(request, user.organizationId);
     if (!payload || !payload.sourceDocumentName.toLowerCase().endsWith(".pdf") || payload.size > MAX_SIZE) {
       return NextResponse.json({ error: "Envie uma matrícula em PDF de até 20 MB." }, { status: 400 });

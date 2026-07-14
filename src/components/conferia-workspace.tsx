@@ -293,7 +293,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
             <span className="text-slate-300">|</span>
             {currentUser.name}
             <Link href="/change-password" className="text-blue-600">Alterar senha</Link>
-            {currentUser.role === "ADMIN" ? <a href="/developments" className="text-blue-600">Empreendimentos</a> : null}
+            <a href="/developments" className="text-blue-600">Empreendimentos</a>
             <LogoutButton />
           </div> : null}
         </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { DevelopmentExtraction } from "@/domain/development";
-import { AuthError, requireAdmin, requireUser } from "@/lib/auth";
+import { AuthError, requireUser } from "@/lib/auth";
 import { audit } from "@/services/process/process-repository";
 import { createDevelopment, listDevelopments } from "@/services/development/development-repository";
 
@@ -15,7 +15,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireAdmin();
+    const user = await requireUser();
     const body = await request.json() as { sourceDocumentName?: string; extraction?: DevelopmentExtraction };
     if (!body.sourceDocumentName || !body.extraction?.name || !body.extraction.units?.length) {
       return NextResponse.json({ error: "Revise o nome e inclua ao menos uma unidade." }, { status: 400 });
