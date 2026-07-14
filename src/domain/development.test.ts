@@ -26,13 +26,13 @@ test("resume e bloqueia cadastro extraído quando há unidade incompleta", () =>
   const review = reviewDevelopmentExtraction({
     name: "Vitória Maracanaú",
     units: [
-      { tower: "1", unit: "101", privateArea: "45,00", totalArea: "58,00", idealFraction: "0,10", confidence: 95 },
-      { tower: "1", unit: "", privateArea: "45,00", totalArea: "58,00", idealFraction: "0,10", confidence: 65 },
-      { tower: "2", unit: "201", privateArea: "55,00", totalArea: "70,00", idealFraction: "0,12", confidence: 90 },
+      { tower: "", unit: "", typology: "Tipo A", privateArea: "45,00", totalArea: "58,00", idealFraction: "0,10", confidence: 95 },
+      { tower: "", unit: "", typology: "", privateArea: "45,00", totalArea: "58,00", idealFraction: "0,10", confidence: 65 },
+      { tower: "", unit: "", typology: "Tipo B", privateArea: "55,00", totalArea: "70,00", idealFraction: "0,12", confidence: 90 },
     ],
   });
 
-  assert.equal(review.towerCount, 2);
+  assert.equal(review.towerCount, 0);
   assert.equal(review.unitCount, 3);
   assert.equal(review.typeCount, 2);
   assert.equal(review.incompleteUnits, 1);

@@ -30,28 +30,20 @@ function extractUnits(text: string): DevelopmentExtraction["units"] {
     const totalArea = normalizeDecimal(after.match(/(?:area\s+total\s+real|area\s+real\s+total)\s+de\s+([0-9]{1,3}[,.][0-9]{3,6})\s*m?/)?.[1]);
     const idealFraction = normalizeDecimal(after.match(/fracao ideal de\s+([0-9][,.][0-9]{6,12})/)?.[1]);
     const typology = extractTypology(context);
-    const pairs = extractTowerUnitPairs(context);
-
-    for (const pair of pairs) {
-      for (const tower of pair.towers) {
-        for (const unit of pair.units) {
-          const key = `${tower}::${unit}`;
-          units.set(key, {
-            tower,
-            unit,
-            privateArea,
-            totalArea,
-            idealFraction,
-            typology,
-            confidence: idealFraction ? 88 : 82,
-            evidence: {
-              pages: extractPages(context),
-              rawText: compactEvidence(`${context.slice(-220)} ${after.slice(0, 180)}`),
-            },
-          });
-        }
-      }
-    }
+    const key = `${typology ?? "tipo"}::${privateArea}::${totalArea ?? ""}::${idealFraction ?? ""}`;
+    units.set(key, {
+      tower: "",
+      unit: "",
+      privateArea,
+      totalArea,
+      idealFraction,
+      typology,
+      confidence: idealFraction ? 88 : 82,
+      evidence: {
+        pages: extractPages(context),
+        rawText: compactEvidence(`${context.slice(-220)} ${after.slice(0, 180)}`),
+      },
+    });
     previousEnd = match.index + match[0].length;
   }
 
@@ -85,45 +77,6 @@ function extractPages(value: string) {
 
 function compactEvidence(value: string) {
   return value.replace(/\[PAGINA\s+\d+\]/g, "").replace(/\s+/g, " ").trim().slice(0, 500);
-}
-
-function extractTowerUnitPairs(context: string) {
-  const pairs: Array<{ towers: string[]; units: string[] }> = [];
-  const pattern = /torres?\s+(.{1,180}?)(?:\s*-\s*|\s*,\s*|\s+)apartamentos?\s+(?:(?:de\s+)?(?:n(?:r|rs|re|res)|n[ºo]s?)[.\s]*)?(.{1,180}?)(?=,?\s*com(?:\s+uma)?(?:\s+area)?\s*$|;|$)/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(context)) !== null) {
-    const towers = parseNumberList(match[1], 2);
-    const units = parseNumberList(match[2], 3);
-    if (towers.length && units.length) pairs.push({ towers, units });
-  }
-
-  return pairs;
-}
-
-function parseNumberList(value: string, width: number) {
-  const cleaned = value
-    .replace(/\b[oO](?=\d)/g, "0")
-    .replace(/[º°]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const numbers = new Set<string>();
-  const rangePattern = /(\d{1,3})\s*(?:a|à|-)\s*(\d{1,3})/g;
-  let range: RegExpExecArray | null;
-
-  while ((range = rangePattern.exec(cleaned)) !== null) {
-    const start = Number(range[1]);
-    const end = Number(range[2]);
-    if (Number.isInteger(start) && Number.isInteger(end) && end >= start && end - start <= 60) {
-      for (let item = start; item <= end; item += 1) numbers.add(pad(item, width));
-    }
-  }
-
-  for (const item of cleaned.match(/\b\d{1,3}\b/g) ?? []) {
-    numbers.add(pad(Number(item), width));
-  }
-
-  return [...numbers].sort((left, right) => Number(left) - Number(right));
 }
 
 function extractName(text: string) {
@@ -164,10 +117,6 @@ function parseDecimal(value?: string) {
   if (!value) return null;
   const parsed = Number(value.replace(/\./g, "").replace(",", "."));
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function pad(value: number, width: number) {
-  return String(value).padStart(width, "0");
 }
 
 function toDisplayName(value: string) {

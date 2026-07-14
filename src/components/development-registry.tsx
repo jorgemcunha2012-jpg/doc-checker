@@ -231,12 +231,12 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
             <div className="mt-5 overflow-x-auto">
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead className="border-b border-slate-200 text-xs uppercase text-slate-500">
-                  <tr><th className="py-3">Torre</th><th>Unidade</th><th>Área privativa</th><th>Área total</th><th>Fração ideal</th><th>Tipo</th><th>Confiança</th><th /></tr>
+                  <tr><th className="py-3">Tipo</th><th>Torre</th><th>Unidade</th><th>Área privativa</th><th>Área total</th><th>Fração ideal</th><th>Confiança</th><th /></tr>
                 </thead>
                 <tbody>
                   {extraction.units.map((unit, index) => (
                     <tr key={`${unit.tower}-${unit.unit}-${index}`} className="border-b border-slate-100">
-                      {(["tower", "unit", "privateArea", "totalArea", "idealFraction", "typology"] as const).map((key) => (
+                      {(["typology", "tower", "unit", "privateArea", "totalArea", "idealFraction"] as const).map((key) => (
                         <td key={key} className="py-2 pr-3">
                           <input
                             className={`w-full rounded border px-2 py-1.5 ${isRequiredUnitField(key) && !String(unit[key] ?? "").trim() ? "border-amber-400 bg-amber-50" : unit.confidence < 80 ? "border-amber-200 bg-amber-50/50" : "border-slate-300"}`}
@@ -392,5 +392,5 @@ function Field({ label, value, onChange, required = false, invalid = false }: { 
 }
 
 function isRequiredUnitField(key: string) {
-  return key === "tower" || key === "unit" || key === "privateArea";
+  return key === "typology" || key === "privateArea";
 }

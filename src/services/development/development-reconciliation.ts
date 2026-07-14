@@ -73,6 +73,10 @@ function addQuality(extraction: DevelopmentExtraction, reviewRequired: string[],
 }
 
 function unitKey(unit: { tower: string; unit: string }) {
+  const candidate = unit as typeof unit & { typology?: string; privateArea?: string; totalArea?: string; idealFraction?: string };
+  // A type is the identity of a registry record. Areas are compared as data,
+  // so an area mismatch must be reported as a divergence, not as two missing types.
+  if (candidate.typology?.trim()) return normalize(candidate.typology);
   return `${normalize(unit.tower)}::${normalize(unit.unit)}`;
 }
 
@@ -84,8 +88,8 @@ function sameUnitData(left: unitForType, right: unitForType) {
 
 type unitForType = { tower: string; unit: string; privateArea: string; totalArea?: string; idealFraction?: string; typology?: string; confidence: number };
 
-function unitLabel(unit: { tower: string; unit: string; typology?: string }) {
-  return `${unit.typology ?? "Unidade"} · torre ${unit.tower} · apartamento ${unit.unit}`;
+function unitLabel(unit: { tower: string; unit: string; typology?: string; privateArea?: string }) {
+  return unit.typology?.trim() ? `${unit.typology} · área ${unit.privateArea ?? "não informada"}` : `Torre ${unit.tower} · apartamento ${unit.unit}`;
 }
 
 function sameText(left: string, right: string) {

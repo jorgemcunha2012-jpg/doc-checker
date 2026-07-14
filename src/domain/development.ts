@@ -57,22 +57,23 @@ export function developmentUnitValues(
 ): ExtractedFieldValue[] {
   const source = "CADASTRO_EMPREENDIMENTO" as const;
   const confidence = unit.confidence;
-  return [
+  const values: ExtractedFieldValue[] = [
     { fieldId: "property.development", source, value: development.name, confidence },
     { fieldId: "property.registration", source, value: unit.registration ?? development.registration ?? null, confidence },
-    { fieldId: "property.unit", source, value: unit.unit, confidence },
-    { fieldId: "property.tower", source, value: unit.tower, confidence },
     { fieldId: "property.privateArea", source, value: unit.privateArea, confidence },
     { fieldId: "property.totalArea", source, value: unit.totalArea ?? null, confidence },
     { fieldId: "property.idealFraction", source, value: unit.idealFraction ?? null, confidence },
   ];
+  if (unit.unit.trim()) values.splice(2, 0, { fieldId: "property.unit", source, value: unit.unit, confidence });
+  if (unit.tower.trim()) values.splice(unit.unit.trim() ? 3 : 2, 0, { fieldId: "property.tower", source, value: unit.tower, confidence });
+  return values;
 }
 
 export function reviewDevelopmentExtraction(extraction: DevelopmentExtraction): DevelopmentExtractionReview {
   const towers = new Set(extraction.units.map((unit) => unit.tower.trim()).filter(Boolean));
-  const types = new Set(extraction.units.map(unitTypeSignature));
+  const types = new Set(extraction.units.map(unitTypeSignature).filter((signature) => !signature.startsWith("Tipo não informado::")));
   const incompleteUnits = extraction.units.filter((unit) =>
-    !unit.tower.trim() || !unit.unit.trim() || !unit.privateArea.trim(),
+    !unit.privateArea.trim() || !unit.typology?.trim(),
   ).length;
   const lowConfidenceUnits = extraction.units.filter((unit) => unit.confidence < 80).length;
 

@@ -19,21 +19,21 @@ test("extrai tipos de unidade de matrícula OCR com torres, apartamentos e fraç
   assert.equal(result.name, "Condominio Vitoria Maracanau");
   assert.equal(result.city, "Maracanau");
   assert.equal(result.registration, "6426");
-  assert.equal(result.units.length, 14);
-  const typeAUnit = result.units.find((unit) => unit.tower === "02" && unit.unit === "204");
+  assert.equal(result.units.length, 2);
+  const typeAUnit = result.units.find((unit) => unit.typology === "Tipo A");
   assert.deepEqual(stripEvidence(typeAUnit), {
-    tower: "02",
-    unit: "204",
+    tower: "",
+    unit: "",
     privateArea: "38,08",
     totalArea: "72,656616",
     idealFraction: "0,0022143433",
     typology: "Tipo A",
     confidence: 88,
   });
-  const typeBUnit = result.units.find((unit) => unit.tower === "11" && unit.unit === "104");
+  const typeBUnit = result.units.find((unit) => unit.typology === "Tipo B");
   assert.deepEqual(stripEvidence(typeBUnit), {
-    tower: "11",
-    unit: "104",
+    tower: "",
+    unit: "",
     privateArea: "50,43",
     totalArea: "86,127996",
     idealFraction: "0,0022861583",
@@ -62,7 +62,6 @@ test("extrai matrícula escaneada com área privativa coberta e apartamentos nrs
 
   assert.equal(result.name, "Vitoria Acacia");
   assert.equal(result.registration, "91849");
-  assert.ok(result.units.some((unit) => unit.tower === "01" && unit.unit === "201" && unit.privateArea === "38,08"));
-  assert.ok(result.units.some((unit) => unit.tower === "14" && unit.unit === "204" && unit.idealFraction === "0,003540265"));
-  assert.ok(result.units.some((unit) => unit.tower === "05" && unit.unit === "101" && unit.privateArea === "39,08"));
+  assert.ok(result.units.some((unit) => unit.typology === "Tipo A" && unit.privateArea === "38,08"));
+  assert.ok(result.units.some((unit) => unit.typology === "Tipo B" && unit.idealFraction === "0,003660292"));
 });

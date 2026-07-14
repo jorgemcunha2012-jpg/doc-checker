@@ -143,9 +143,9 @@ export class KimiProvider implements DocumentExtractionProvider {
     const firstNamed = pages.find((page) => page.name !== "Empreendimento sem nome");
     const units = new Map<string, DevelopmentExtraction["units"][number]>();
     pages.flatMap((page) => page.units).forEach((unit) => {
-      const key = `${unit.tower.toUpperCase()}::${unit.unit.toUpperCase()}`;
+      const key = `${unit.typology?.toUpperCase() ?? "TIPO"}::${unit.privateArea}::${unit.totalArea ?? ""}::${unit.idealFraction ?? ""}`;
       const current = units.get(key);
-      if (!current || unit.confidence > current.confidence) units.set(key, unit);
+      if (!current || unit.confidence > current.confidence) units.set(key, { ...unit, tower: "", unit: "" });
     });
     return {
       name: firstNamed?.name ?? "Empreendimento sem nome",
