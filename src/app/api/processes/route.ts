@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const supabase = createSupabaseAdminClient();
     let query = supabase
       .from("validation_processes")
-      .select("id, user_id, processing_status, final_status, summary, error, started_at, completed_at, profiles!validation_processes_user_id_fkey(name), process_documents(id, name, source, storage_path)")
+      .select("id, user_id, processing_status, final_status, result, summary, error, started_at, completed_at, profiles!validation_processes_user_id_fkey(name), process_documents(id, name, source, storage_path)")
       .eq("organization_id", user.organizationId)
       .order("started_at", { ascending: false })
       .limit(100);

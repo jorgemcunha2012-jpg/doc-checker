@@ -9,6 +9,11 @@ type MatchDefinition = {
 
 const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
   MINUTA: [
+    text("contract.number", "Ressalvas / identificação do processo", 94, [
+      /(?:n[úu]mero\s+do\s+(?:contrato|processo)|n[ºo.]?\s*do\s+(?:contrato|processo))\s*[:#-]?\s*([A-Z0-9./-]{3,40})/i,
+      /\bprocesso\s*(?:n[úu]mero|n[ºo.]?)?\s*[:#-]\s*([A-Z0-9./-]{3,40})/i,
+      /\bcontrato\s*(?:n[úu]mero|n[ºo.]?)?\s*[:#-]\s*([A-Z0-9./-]{3,40})/i,
+    ]),
     text("contract.agencyCode", "Identificação do contrato", 90, [/(?:ag[eê]ncia|c[oó]digo\s+da\s+ag[eê]ncia)[^:\n\r]*:\s*([A-Z0-9./-]+)/i]),
     text("contract.financingModality", "Identificação do contrato", 90, [/modalidade\s+de\s+financiamento[^:\n\r]*:\s*([^\n\r]+)/i]),
     text("contract.housingProgram", "Identificação do contrato", 90, [/programa\s+habitacional[^:\n\r]*:\s*([^\n\r]+)/i]),

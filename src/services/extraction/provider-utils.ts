@@ -33,6 +33,8 @@ export function fieldExtractionHint(fieldId: string) {
       "extrair somente o telefone da empresa transmitente/proprietária; nunca usar o telefone do comprador ou corretor",
     "property.registryOffice":
       "extrair o cartório/ofício de registro de imóveis responsável pela matrícula",
+    "contract.number":
+      "extrair o identificador do contrato; na Minuta, procurar também por número do processo, processo nº ou contrato nº, inclusive dentro da seção Ressalvas",
   } as Record<string, string>)[fieldId] ?? "";
 }
 

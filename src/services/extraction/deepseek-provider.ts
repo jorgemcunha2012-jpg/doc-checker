@@ -212,7 +212,7 @@ function fieldKeywords(field: ChecklistField) {
     seller: ["vendedor", "transmitente", "cnpj", "razão social"],
     property: ["imóvel", "matrícula", "unidade", "torre", "empreendimento", "área", "fração ideal", "iptu"],
     financial: ["valor", "entrada", "financiamento", "fgts", "subsídio", "recurso", "declaração"],
-    contract: ["contrato", "instrumento", "data"],
+    contract: ["contrato", "instrumento", "processo", "ressalvas", "data"],
     signature: ["assinatura", "cidade", "local"],
   };
   const semantic = Object.entries(domainKeywords)

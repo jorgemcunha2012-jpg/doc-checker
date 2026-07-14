@@ -17,6 +17,12 @@ type HistoryProcess = {
   } | null;
   started_at: string;
   completed_at: string | null;
+  result?: {
+    results?: Array<{
+      field?: { id?: string };
+      valuesBySource?: Record<string, { value?: string | null } | undefined>;
+    }>;
+  } | null;
   profiles: { name: string } | null;
   process_documents: Array<{ id: string; name: string; source?: string; available: boolean }>;
 };
@@ -25,6 +31,7 @@ export function ProcessHistory({ showAnalyst, status }: { showAnalyst: boolean; 
   const [processes, setProcesses] = useState<HistoryProcess[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -41,9 +48,24 @@ export function ProcessHistory({ showAnalyst, status }: { showAnalyst: boolean; 
 
   if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>;
   if (error) return <div className="border border-rose-200 bg-rose-50 p-5 text-sm font-semibold text-rose-700">{error}</div>;
+  const normalizedQuery = normalizeSearch(query);
+  const visibleProcesses = normalizedQuery
+    ? processes.filter((process) => processSearchText(process).includes(normalizedQuery))
+    : processes;
+
   return (
     <div className="divide-y divide-slate-100 border border-slate-200 bg-white">
-      {processes.map((process) => {
+      <div className="border-b border-slate-200 bg-slate-50 p-4">
+        <label className="block text-xs font-bold uppercase tracking-wide text-slate-500" htmlFor="history-search">Pesquisar conferência</label>
+        <input
+          id="history-search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="ID, nome, documento, contrato ou processo"
+          className="mt-2 min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none focus:border-[#0faaa2] focus:ring-2 focus:ring-[#0faaa2]/20"
+        />
+      </div>
+      {visibleProcesses.map((process) => {
         const alert = showAnalyst ? extractionAlert(process) : null;
         return (
           <article key={process.id} className={`grid gap-4 p-5 lg:grid-cols-[180px_1fr_220px_120px] lg:items-center ${alert?.severity === "critical" ? "bg-rose-50/50" : alert ? "bg-amber-50/50" : ""}`}>
@@ -87,9 +109,25 @@ export function ProcessHistory({ showAnalyst, status }: { showAnalyst: boolean; 
           </article>
         );
       })}
-      {!processes.length ? <div className="py-16 text-center"><FileClock className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm text-slate-500">Nenhuma conferência encontrada.</p></div> : null}
+      {!visibleProcesses.length ? <div className="py-16 text-center"><FileClock className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm text-slate-500">Nenhuma conferência encontrada.</p></div> : null}
     </div>
   );
+}
+
+function processSearchText(process: HistoryProcess) {
+  const extractedValues = (process.result?.results ?? []).flatMap((result) =>
+    Object.values(result.valuesBySource ?? {}).map((sourceValue) => sourceValue?.value ?? ""),
+  );
+  return normalizeSearch([
+    processCode(process.id),
+    process.profiles?.name ?? "",
+    ...process.process_documents.map((document) => document.name),
+    ...extractedValues,
+  ].join(" "));
+}
+
+function normalizeSearch(value: string) {
+  return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 function statusLabel(status: string) {
