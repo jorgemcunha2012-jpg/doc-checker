@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
       "./node_modules/tesseract.js/src/worker/node/**/*",
       "./node_modules/tesseract.js/src/**/*",
       "./node_modules/tesseract.js-core/**/*",
+      "./node_modules/regenerator-runtime/**/*",
+      "./node_modules/is-url/**/*",
     ],
     "/api/validation-processes": [
       "./node_modules/tesseract.js/src/worker-script/node/**/*",
@@ -16,6 +18,8 @@ const nextConfig: NextConfig = {
       "./node_modules/tesseract.js/src/worker/node/**/*",
       "./node_modules/tesseract.js/src/**/*",
       "./node_modules/tesseract.js-core/**/*",
+      "./node_modules/regenerator-runtime/**/*",
+      "./node_modules/is-url/**/*",
     ],
   },
   typedRoutes: true,
