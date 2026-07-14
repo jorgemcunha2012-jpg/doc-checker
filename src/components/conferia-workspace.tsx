@@ -342,7 +342,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
                   {developments.map((development) => <option key={development.id} value={development.id}>{development.name}</option>)}
                 </select>
               </label>
-              <label className="text-xs font-bold text-slate-600">Torre e unidade
+              <label className="text-xs font-bold text-slate-600">Tipo de unidade
                 <select disabled={!selectedDevelopment} className="mt-1 block min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 disabled:bg-slate-100" value={developmentUnitId} onChange={(event) => setDevelopmentUnitId(event.target.value)}>
                   <option value="">Selecione a unidade</option>
                   {selectedDevelopment?.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.typology || `Torre ${unit.tower} · Apto ${unit.unit}`} · {unit.privateArea} priv. · {unit.totalArea || "-"} total · fração {unit.idealFraction || "-"}</option>)}
