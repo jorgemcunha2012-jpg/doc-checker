@@ -11,6 +11,10 @@ export type DevelopmentUnit = {
   typology?: string;
   registration?: string;
   confidence: number;
+  evidence?: {
+    pages?: number[];
+    rawText?: string;
+  };
 };
 
 export type Development = {
@@ -29,6 +33,13 @@ export type DevelopmentExtraction = {
   city?: string;
   registration?: string;
   units: Array<Omit<DevelopmentUnit, "id" | "developmentId">>;
+  quality?: DevelopmentExtractionQuality;
+};
+
+export type DevelopmentExtractionQuality = {
+  reviewRequired: string[];
+  warnings: string[];
+  sourcesCompared?: string[];
 };
 
 export type DevelopmentExtractionReview = {
@@ -71,6 +82,8 @@ export function reviewDevelopmentExtraction(extraction: DevelopmentExtraction): 
     typeCount: types.size,
     incompleteUnits,
     lowConfidenceUnits,
+    // Saving the reviewed screen is the explicit human confirmation. Quality
+    // findings remain visible and auditable, but should not trap the reviewer.
     canSave: Boolean(extraction.name.trim()) && extraction.units.length > 0 && incompleteUnits === 0,
   };
 }

@@ -5,6 +5,7 @@ import { extractDevelopmentFromOcrText } from "./development-ocr-parser";
 
 export async function extractDevelopmentFromImagesWithOcr(
   images: string[],
+  pageNumbers = images.map((_, index) => index + 1),
 ): Promise<DevelopmentExtraction> {
   const pages: string[] = [];
   const worker = await createWorker("por", 1, {
@@ -16,7 +17,7 @@ export async function extractDevelopmentFromImagesWithOcr(
     for (const image of images) {
       const imageBuffer = Buffer.from(image.split(",")[1] ?? "", "base64");
       const result = await worker.recognize(imageBuffer);
-      pages.push(result.data.text);
+      pages.push(`[PAGINA ${pageNumbers[pages.length] ?? pages.length + 1}]\n${result.data.text}`);
     }
   } finally {
     await worker.terminate();

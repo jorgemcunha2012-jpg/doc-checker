@@ -20,7 +20,8 @@ test("extrai tipos de unidade de matrícula OCR com torres, apartamentos e fraç
   assert.equal(result.city, "Maracanau");
   assert.equal(result.registration, "6426");
   assert.equal(result.units.length, 14);
-  assert.deepEqual(result.units.find((unit) => unit.tower === "02" && unit.unit === "204"), {
+  const typeAUnit = result.units.find((unit) => unit.tower === "02" && unit.unit === "204");
+  assert.deepEqual(stripEvidence(typeAUnit), {
     tower: "02",
     unit: "204",
     privateArea: "38,08",
@@ -29,7 +30,8 @@ test("extrai tipos de unidade de matrícula OCR com torres, apartamentos e fraç
     typology: "Tipo A",
     confidence: 88,
   });
-  assert.deepEqual(result.units.find((unit) => unit.tower === "11" && unit.unit === "104"), {
+  const typeBUnit = result.units.find((unit) => unit.tower === "11" && unit.unit === "104");
+  assert.deepEqual(stripEvidence(typeBUnit), {
     tower: "11",
     unit: "104",
     privateArea: "50,43",
@@ -39,6 +41,13 @@ test("extrai tipos de unidade de matrícula OCR com torres, apartamentos e fraç
     confidence: 88,
   });
 });
+
+function stripEvidence<T extends { evidence?: unknown }>(unit: T | undefined) {
+  if (!unit) return unit;
+  const copy = { ...unit };
+  delete copy.evidence;
+  return copy;
+}
 
 test("extrai matrícula escaneada com área privativa coberta e apartamentos nrs", () => {
   const result = extractDevelopmentFromOcrText(`

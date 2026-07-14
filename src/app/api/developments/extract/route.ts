@@ -3,6 +3,7 @@ import { AuthError, requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { extractDevelopmentFromImagesWithOcr } from "@/services/development/development-ocr-service";
 import { KimiProvider } from "@/services/extraction/kimi-provider";
+import { reconcileDevelopmentExtractions } from "@/services/development/development-reconciliation";
 
 const MAX_SIZE = 20 * 1024 * 1024;
 const MAX_IMAGES = 40;
@@ -21,24 +22,33 @@ export async function POST(request: Request) {
         error: "Renderize a matrícula pelo navegador antes de extrair. Atualize a página e tente novamente.",
       }, { status: 422 });
     }
-    const ocrExtraction = await withTimeout(
-      extractDevelopmentFromImagesWithOcr(payload.images),
-      EXTRACTION_TIMEOUT_MS,
-      "O OCR da matrícula demorou demais.",
-    ).catch((error) => {
-      console.warn("[ConferIA] OCR da matrícula falhou", error);
-      return null;
+    const startedAt = Date.now();
+    const [ocrExtraction, visionExtraction] = await Promise.all([
+      withTimeout(
+        extractDevelopmentFromImagesWithOcr(payload.images, payload.pageNumbers),
+        EXTRACTION_TIMEOUT_MS,
+        "O OCR da matrícula demorou demais.",
+      ).catch((error) => {
+        console.warn("[ConferIA] OCR da matrícula falhou", error);
+        return null;
+      }),
+      withTimeout(
+        new KimiProvider().extractDevelopment(payload.images, payload.pageNumbers),
+        EXTRACTION_TIMEOUT_MS,
+        "A visão da IA demorou demais.",
+      ).catch((error) => {
+        console.warn("[ConferIA] Visão da IA da matrícula falhou", error);
+        return null;
+      }),
+    ]);
+    const extraction = reconcileDevelopmentExtractions(ocrExtraction?.units.length ? ocrExtraction : null, visionExtraction?.units.length ? visionExtraction : null);
+    console.info("[ConferIA] Leituras independentes da matrícula concluídas", {
+      durationMs: Date.now() - startedAt,
+      ocrUnits: ocrExtraction?.units.length ?? 0,
+      visionUnits: visionExtraction?.units.length ?? 0,
+      reviewRequired: extraction?.quality?.reviewRequired.length ?? 0,
     });
-    if (ocrExtraction?.units.length) {
-      return NextResponse.json({ extraction: ocrExtraction, sourceDocumentName: payload.sourceDocumentName });
-    }
-
-    const extraction = await withTimeout(
-      new KimiProvider().extractDevelopment(payload.images, payload.pageNumbers),
-      EXTRACTION_TIMEOUT_MS,
-      "A extração demorou demais. Tente uma matrícula menor ou cadastre manualmente os tipos encontrados.",
-    );
-    if (!extraction.units.length) {
+    if (!extraction?.units.length) {
       return NextResponse.json({ error: "A IA não encontrou combinações de torre, unidade e área privativa." }, { status: 422 });
     }
     return NextResponse.json({ extraction, sourceDocumentName: payload.sourceDocumentName });

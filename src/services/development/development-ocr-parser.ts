@@ -6,12 +6,14 @@ export function extractDevelopmentFromOcrText(text: string): DevelopmentExtracti
   const city = extractCity(normalized);
   const registration = normalized.match(/mat(?:ricula|\.)?\s*[:.]?\s*([0-9][0-9. -]{2,})/)?.[1]?.replace(/\D/g, "") || undefined;
   const units = extractUnits(normalized);
+  const quality = validateUnits(units);
 
   return {
     name: name || "Empreendimento sem nome",
     city,
     registration,
     units,
+    quality,
   };
 }
 
@@ -42,6 +44,10 @@ function extractUnits(text: string): DevelopmentExtraction["units"] {
             idealFraction,
             typology,
             confidence: idealFraction ? 88 : 82,
+            evidence: {
+              pages: extractPages(context),
+              rawText: compactEvidence(`${context.slice(-220)} ${after.slice(0, 180)}`),
+            },
           });
         }
       }
@@ -53,6 +59,32 @@ function extractUnits(text: string): DevelopmentExtraction["units"] {
     left.tower.localeCompare(right.tower, "pt-BR", { numeric: true }) ||
     left.unit.localeCompare(right.unit, "pt-BR", { numeric: true }),
   );
+}
+
+function validateUnits(units: DevelopmentExtraction["units"]): NonNullable<DevelopmentExtraction["quality"]> {
+  const reviewRequired = new Set<string>();
+  const warnings = new Set<string>();
+  for (const unit of units) {
+    const privateArea = parseDecimal(unit.privateArea);
+    const totalArea = parseDecimal(unit.totalArea);
+    const fraction = parseDecimal(unit.idealFraction);
+    const label = `${unit.typology ?? "Unidade"} · torre ${unit.tower} · apartamento ${unit.unit}`;
+    if (!unit.evidence?.rawText) reviewRequired.add(`${label} não possui trecho de evidência.`);
+    if (privateArea === null || privateArea <= 0) reviewRequired.add(`${label} possui área privativa inválida.`);
+    if (totalArea !== null && privateArea !== null && totalArea < privateArea) reviewRequired.add(`${label} possui área total menor que a área privativa.`);
+    if (fraction !== null && (fraction <= 0 || fraction >= 1)) reviewRequired.add(`${label} possui fração ideal fora do intervalo esperado.`);
+    if (!unit.totalArea || !unit.idealFraction) warnings.add(`${label} não possui todas as áreas/fração ideal legíveis.`);
+  }
+  if (!units.length) reviewRequired.add("Nenhuma unidade foi identificada com evidência suficiente.");
+  return { reviewRequired: [...reviewRequired], warnings: [...warnings] };
+}
+
+function extractPages(value: string) {
+  return [...value.matchAll(/\[PAGINA\s+(\d+)\]/g)].map((match) => Number(match[1])).filter((page) => page > 0);
+}
+
+function compactEvidence(value: string) {
+  return value.replace(/\[PAGINA\s+\d+\]/g, "").replace(/\s+/g, " ").trim().slice(0, 500);
 }
 
 function extractTowerUnitPairs(context: string) {
@@ -126,6 +158,12 @@ function normalizeOcrText(text: string) {
 
 function normalizeDecimal(value?: string) {
   return value?.replace(".", ",").trim();
+}
+
+function parseDecimal(value?: string) {
+  if (!value) return null;
+  const parsed = Number(value.replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function pad(value: number, width: number) {

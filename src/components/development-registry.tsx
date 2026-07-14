@@ -203,6 +203,21 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
                 Preencha os campos obrigatórios destacados. Área total e fração ideal podem ficar vazias se não constarem na matrícula, mas serão melhores para conferência quando informadas.
               </div>
             ) : null}
+            {extraction.quality?.reviewRequired.length ? (
+              <div className="mb-5 border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900">
+                <div className="font-bold">Revisão direcionada necessária</div>
+                <p className="mt-1">A extração não será aceita automaticamente enquanto houver ambiguidade entre as leituras.</p>
+                <ul className="mt-2 list-disc pl-5">
+                  {extraction.quality.reviewRequired.slice(0, 12).map((item) => <li key={item}>{item}</li>)}
+                </ul>
+                {extraction.quality.reviewRequired.length > 12 ? <p className="mt-2 text-xs font-semibold">+ {extraction.quality.reviewRequired.length - 12} apontamentos adicionais.</p> : null}
+              </div>
+            ) : null}
+            {extraction.quality?.warnings.length ? (
+              <div className="mb-5 border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                {extraction.quality.warnings.join(" ")}
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div className="grid flex-1 gap-3 sm:grid-cols-3">
                 <Field label="Empreendimento" value={extraction.name} required invalid={!extraction.name.trim()} onChange={(value) => setExtraction({ ...extraction, name: value })} />
