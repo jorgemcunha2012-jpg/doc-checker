@@ -15,7 +15,7 @@ const fieldLabels: Record<string, string> = {
   "seller.address": "Endereço do transmitente",
   "property.development": "Empreendimento",
   "property.registration": "Matrícula",
-  "property.iptu": "IPTU",
+  "property.iptu": "Inscrição imobiliária/IPTU",
   "property.address": "Endereço do imóvel",
   "property.unit": "Unidade/apartamento",
   "property.tower": "Torre",
@@ -47,4 +47,3 @@ export function humanFieldLabel(fieldId: string, checklist?: ChecklistField[]) {
   const baseFieldId = fieldId.split("::", 1)[0];
   return fieldLabels[baseFieldId] ?? fieldId;
 }
-

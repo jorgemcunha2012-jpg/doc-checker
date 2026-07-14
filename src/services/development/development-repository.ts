@@ -20,6 +20,7 @@ type DevelopmentRow = {
     private_area: string;
     total_area: string | null;
     ideal_fraction: string | null;
+    iptu_registration?: string | null;
     typology: string | null;
     registration: string | null;
     confidence: number;
@@ -36,10 +37,10 @@ export async function listDevelopments(organizationId: string): Promise<Developm
   let error: { message: string } | null;
   ({ data, error } = await supabase
     .from("developments")
-    .select("id, organization_id, name, city, registration, seller_legal_name, seller_cnpj, source_document_name, created_at, development_units(id, tower, unit, private_area, total_area, ideal_fraction, typology, registration, confidence)")
+    .select("id, organization_id, name, city, registration, seller_legal_name, seller_cnpj, source_document_name, created_at, development_units(id, tower, unit, private_area, total_area, ideal_fraction, iptu_registration, typology, registration, confidence)")
     .eq("organization_id", organizationId)
     .order("name"));
-  if (error?.message.includes("seller_legal_name") || error?.message.includes("seller_cnpj")) {
+  if (error?.message.includes("seller_legal_name") || error?.message.includes("seller_cnpj") || error?.message.includes("iptu_registration")) {
     ({ data, error } = await supabase
       .from("developments")
       .select("id, organization_id, name, city, registration, source_document_name, created_at, development_units(id, tower, unit, private_area, total_area, ideal_fraction, typology, registration, confidence)")
@@ -66,6 +67,7 @@ export async function listDevelopments(organizationId: string): Promise<Developm
       privateArea: unit.private_area,
       totalArea: unit.total_area ?? undefined,
       idealFraction: unit.ideal_fraction ?? undefined,
+      iptuRegistration: unit.iptu_registration ?? undefined,
       typology: unit.typology ?? undefined,
       registration: unit.registration ?? undefined,
       confidence: Number(unit.confidence),
@@ -122,12 +124,12 @@ export async function createDevelopment(
     source_document_name: sourceDocumentName,
   };
   let { error } = await supabase.from("developments").insert(developmentPayload);
-  if (error?.message.includes("seller_legal_name") || error?.message.includes("seller_cnpj")) {
+  if (error?.message.includes("seller_legal_name") || error?.message.includes("seller_cnpj") || error?.message.includes("iptu_registration")) {
     const legacyPayload = Object.fromEntries(Object.entries(developmentPayload).filter(([key]) => key !== "seller_legal_name" && key !== "seller_cnpj"));
     ({ error } = await supabase.from("developments").insert(legacyPayload));
   }
   if (error) throw new Error(error.message);
-  const { error: unitsError } = await supabase.from("development_units").insert(
+  let { error: unitsError } = await supabase.from("development_units").insert(
     development.units.map((unit) => ({
       id: unit.id,
       development_id: development.id,
@@ -137,11 +139,29 @@ export async function createDevelopment(
       private_area: unit.privateArea,
       total_area: unit.totalArea ?? null,
       ideal_fraction: unit.idealFraction ?? null,
+      iptu_registration: unit.iptuRegistration ?? null,
       typology: unit.typology ?? null,
       registration: unit.registration ?? null,
       confidence: unit.confidence,
     })),
   );
+  if (unitsError?.message.includes("iptu_registration")) {
+    ({ error: unitsError } = await supabase.from("development_units").insert(
+      development.units.map((unit) => ({
+        id: unit.id,
+        development_id: development.id,
+        organization_id: organizationId,
+        tower: unit.tower || "TIPO",
+        unit: unit.unit || unit.typology || "TIPO",
+        private_area: unit.privateArea,
+        total_area: unit.totalArea ?? null,
+        ideal_fraction: unit.idealFraction ?? null,
+        typology: unit.typology ?? null,
+        registration: unit.registration ?? null,
+        confidence: unit.confidence,
+      })),
+    ));
+  }
   if (unitsError) {
     await supabase.from("developments").delete().eq("id", development.id);
     throw new Error(unitsError.message);

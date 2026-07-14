@@ -7,6 +7,8 @@ export type DocumentSource =
   | "DADOS_RESERVA"
   | "CADASTRO_EMPREENDIMENTO"
   | "MATRICULA"
+  | "FRACOES"
+  | "IPTU"
   | "CERTIDAO"
   | "DOCUMENTO_COMPLEMENTAR";
 
@@ -17,6 +19,8 @@ export const activeDocumentSources: DocumentSource[] = [
   "DADOS_RESERVA",
   "CADASTRO_EMPREENDIMENTO",
   "MATRICULA",
+  "FRACOES",
+  "IPTU",
   "CERTIDAO",
   "DOCUMENTO_COMPLEMENTAR",
 ];
@@ -32,6 +36,8 @@ export const documentSourceLabels: Record<DocumentSource, string> = {
   DADOS_RESERVA: "Dados da Reserva",
   CADASTRO_EMPREENDIMENTO: "Cadastro do Empreendimento",
   MATRICULA: "Matrícula",
+  FRACOES: "Frações do empreendimento",
+  IPTU: "Documento IPTU",
   CERTIDAO: "Certidão",
   DOCUMENTO_COMPLEMENTAR: "Documento complementar",
 };

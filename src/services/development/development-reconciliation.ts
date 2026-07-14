@@ -89,12 +89,12 @@ function unitKey(unit: { tower: string; unit: string }) {
 }
 
 function sameUnitData(left: unitForType, right: unitForType) {
-  return [left.privateArea, left.totalArea, left.idealFraction, left.typology].every((value, index) =>
-    sameText(String(value ?? ""), String([right.privateArea, right.totalArea, right.idealFraction, right.typology][index] ?? "")),
+  return [left.privateArea, left.totalArea, left.idealFraction, left.iptuRegistration, left.typology].every((value, index) =>
+    sameText(String(value ?? ""), String([right.privateArea, right.totalArea, right.idealFraction, right.iptuRegistration, right.typology][index] ?? "")),
   );
 }
 
-type unitForType = { tower: string; unit: string; privateArea: string; totalArea?: string; idealFraction?: string; typology?: string; confidence: number };
+type unitForType = { tower: string; unit: string; privateArea: string; totalArea?: string; idealFraction?: string; iptuRegistration?: string; typology?: string; confidence: number };
 
 function unitLabel(unit: { tower: string; unit: string; typology?: string; privateArea?: string }) {
   return unit.typology?.trim() ? `${unit.typology} · área ${unit.privateArea ?? "não informada"}` : `Torre ${unit.tower} · apartamento ${unit.unit}`;

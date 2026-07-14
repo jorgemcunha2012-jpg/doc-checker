@@ -123,6 +123,20 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     text("property.totalArea", "Matrícula", 88, [/área total[^\d]*(\d+[\d.,]*\s*m[²2]?)/i]),
     text("property.idealFraction", "Matrícula", 88, [/fração ideal[^\d]*(\d+[\d.,]*)/i]),
   ],
+  FRACOES: [
+    text("property.iptu", "Frações do empreendimento", 92, [
+      /(?:inscri[cç][aã]o\s+(?:imobili[aá]ria|municipal)|IPTU)[^:\n\r]*:?\s*([A-Z0-9./-]{3,30})/i,
+    ]),
+    text("property.privateArea", "Frações do empreendimento", 90, [/área privativa[^\d]*(\d+[\d.,]*\s*m[²2]?)/i]),
+    text("property.totalArea", "Frações do empreendimento", 88, [/área total[^\d]*(\d+[\d.,]*\s*m[²2]?)/i]),
+    text("property.idealFraction", "Frações do empreendimento", 88, [/fração ideal[^\d]*(\d+[\d.,]*)/i]),
+  ],
+  IPTU: [
+    text("property.iptu", "Documento IPTU", 96, [
+      /(?:inscri[cç][aã]o\s+(?:imobili[aá]ria|municipal)|inscri[cç][aã]o\s+do\s+im[oó]vel|IPTU)[^:\n\r]*:?\s*([A-Z0-9./-]{3,30})/i,
+    ]),
+    text("property.address", "Documento IPTU", 88, [/endere[cç]o[^:\n\r]*:?\s*([^\n\r]+)/i]),
+  ],
 };
 
 export function extractDeterministicFields(

@@ -170,7 +170,7 @@ export class KimiProvider implements DocumentExtractionProvider {
           {
             type: "text",
             text:
-              `Esta é a página ${page}. Extraia o empreendimento, razão social e CNPJ da proprietária ou incorporadora quando aparecerem, além de todas as regras explícitas e legíveis de tipo de unidade, área privativa, área total e fração ideal. Torre e apartamento são opcionais e não devem impedir o registro do tipo. Responda no formato compacto {\"name\":string|null,\"city\":string|null,\"registration\":string|null,\"sellerLegalName\":string|null,\"sellerCnpj\":string|null,\"groups\":[{\"towers\":[string],\"units\":[string],\"privateArea\":string,\"totalArea\":string|null,\"idealFraction\":string|null,\"typology\":string|null,\"registration\":string|null,\"confidence\":number}]}. Não invente dados nem expanda combinações. Ignore regras cortadas ou incompletas nas margens.`,
+              `Esta é a página ${page}. Extraia o empreendimento, razão social e CNPJ da proprietária ou incorporadora quando aparecerem, além de todas as regras explícitas e legíveis de tipo de unidade, área privativa, área total, fração ideal e inscrição imobiliária/IPTU associada. Torre e apartamento são opcionais e não devem impedir o registro do tipo. Responda no formato compacto {\"name\":string|null,\"city\":string|null,\"registration\":string|null,\"sellerLegalName\":string|null,\"sellerCnpj\":string|null,\"groups\":[{\"towers\":[string],\"units\":[string],\"privateArea\":string,\"totalArea\":string|null,\"idealFraction\":string|null,\"iptuRegistration\":string|null,\"typology\":string|null,\"registration\":string|null,\"confidence\":number}]}. Não invente dados nem expanda combinações. Ignore regras cortadas ou incompletas nas margens.`,
           },
           { type: "image_url", image_url: { url: image } },
         ],
@@ -250,6 +250,7 @@ function coerceDevelopmentExtraction(value: unknown): DevelopmentExtraction {
       privateArea,
       totalArea: clean(group.totalArea) || undefined,
       idealFraction: clean(group.idealFraction) || undefined,
+      iptuRegistration: clean(group.iptuRegistration) || undefined,
       typology: clean(group.typology) || undefined,
       registration: clean(group.registration) || undefined,
       confidence: Math.max(0, Math.min(100, Number(group.confidence) || 0)),

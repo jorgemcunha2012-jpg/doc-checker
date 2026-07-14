@@ -189,6 +189,8 @@ function resolveDocumentType(file: File, validationType: ValidationType): Upload
 
 function inferDocumentSource(file: File): DocumentSource {
   if (/itbi|dti|guia/i.test(file.name)) return "ITBI";
+  if (/iptu|inscri[cç][aã]o\s*(imobili[aá]ria|municipal)/i.test(file.name)) return "IPTU";
+  if (/fra[cç][oõ]es?|fracoes?/i.test(file.name)) return "FRACOES";
   if (/minuta|contrato|instrumento/i.test(file.name)) return "MINUTA";
   if (/siopi|espelho.*proposta|concess[aã]o/i.test(file.name)) return "SIOPI";
   if (/matr[ií]cula|registro.*im[oó]vel/i.test(file.name)) return "MATRICULA";

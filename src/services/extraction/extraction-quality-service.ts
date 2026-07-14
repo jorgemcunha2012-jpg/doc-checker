@@ -51,6 +51,8 @@ const criticalFieldsBySource: Partial<Record<DocumentSource, string[]>> = {
     "property.tower",
     "property.privateArea",
   ],
+  FRACOES: ["property.iptu", "property.privateArea"],
+  IPTU: ["property.iptu"],
 };
 
 export function criticalChecklistFields(source: DocumentSource, checklist: ChecklistField[]) {

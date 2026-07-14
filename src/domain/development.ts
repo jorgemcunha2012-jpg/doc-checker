@@ -8,6 +8,7 @@ export type DevelopmentUnit = {
   privateArea: string;
   totalArea?: string;
   idealFraction?: string;
+  iptuRegistration?: string;
   typology?: string;
   registration?: string;
   confidence: number;
@@ -67,6 +68,7 @@ export function developmentUnitValues(
     { fieldId: "property.privateArea", source, value: unit.privateArea, confidence },
     { fieldId: "property.totalArea", source, value: unit.totalArea ?? null, confidence },
     { fieldId: "property.idealFraction", source, value: unit.idealFraction ?? null, confidence },
+    { fieldId: "property.iptu", source, value: unit.iptuRegistration ?? null, confidence },
   ];
   if (development.sellerLegalName?.trim()) values.splice(2, 0, { fieldId: "seller.legalName", source, value: development.sellerLegalName, confidence });
   if (development.sellerCnpj?.trim()) values.splice(3, 0, { fieldId: "seller.cnpj", source, value: development.sellerCnpj, confidence });
