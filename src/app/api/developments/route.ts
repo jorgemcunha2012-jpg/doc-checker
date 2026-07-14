@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import type { DevelopmentExtraction } from "@/domain/development";
-import { AuthError, requireUser } from "@/lib/auth";
+import { AuthError, requireAdmin, requireUser } from "@/lib/auth";
 import { audit } from "@/services/process/process-repository";
-import { createDevelopment, listDevelopments } from "@/services/development/development-repository";
+import { createDevelopment, deleteDevelopment, listDevelopments } from "@/services/development/development-repository";
 
 export async function GET() {
   try {
@@ -27,6 +27,20 @@ export async function POST(request: Request) {
       sourceDocumentName: development.sourceDocumentName,
     });
     return NextResponse.json({ development }, { status: 201 });
+  } catch (error) {
+    return handleError(error);
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await requireAdmin();
+    const body = await request.json() as { id?: string };
+    if (!body.id) return NextResponse.json({ error: "Empreendimento não informado." }, { status: 400 });
+    const deleted = await deleteDevelopment(user.organizationId, body.id);
+    if (!deleted) return NextResponse.json({ error: "Empreendimento não encontrado." }, { status: 404 });
+    await audit(user, "DEVELOPMENT_DELETED", "development", body.id, {});
+    return NextResponse.json({ ok: true });
   } catch (error) {
     return handleError(error);
   }

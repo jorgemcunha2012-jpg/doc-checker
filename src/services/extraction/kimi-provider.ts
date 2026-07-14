@@ -151,6 +151,8 @@ export class KimiProvider implements DocumentExtractionProvider {
       name: firstNamed?.name ?? "Empreendimento sem nome",
       city: pages.find((page) => page.city)?.city,
       registration: pages.find((page) => page.registration)?.registration,
+      sellerLegalName: pages.find((page) => page.sellerLegalName)?.sellerLegalName,
+      sellerCnpj: pages.find((page) => page.sellerCnpj)?.sellerCnpj,
       units: [...units.values()],
     };
   }
@@ -168,7 +170,7 @@ export class KimiProvider implements DocumentExtractionProvider {
           {
             type: "text",
             text:
-              `Esta é a página ${page}. Extraia o empreendimento e todas as regras explícitas e legíveis de torre, apartamento, área privativa, área total e fração ideal nesta página. Responda no formato compacto {\"name\":string|null,\"city\":string|null,\"registration\":string|null,\"groups\":[{\"towers\":[string],\"units\":[string],\"privateArea\":string,\"totalArea\":string|null,\"idealFraction\":string|null,\"typology\":string|null,\"registration\":string|null,\"confidence\":number}]}. Não expanda combinações inventadas. Ignore regras cortadas ou incompletas nas margens.`,
+              `Esta é a página ${page}. Extraia o empreendimento, razão social e CNPJ da proprietária ou incorporadora quando aparecerem, além de todas as regras explícitas e legíveis de tipo de unidade, área privativa, área total e fração ideal. Torre e apartamento são opcionais e não devem impedir o registro do tipo. Responda no formato compacto {\"name\":string|null,\"city\":string|null,\"registration\":string|null,\"sellerLegalName\":string|null,\"sellerCnpj\":string|null,\"groups\":[{\"towers\":[string],\"units\":[string],\"privateArea\":string,\"totalArea\":string|null,\"idealFraction\":string|null,\"typology\":string|null,\"registration\":string|null,\"confidence\":number}]}. Não invente dados nem expanda combinações. Ignore regras cortadas ou incompletas nas margens.`,
           },
           { type: "image_url", image_url: { url: image } },
         ],
@@ -238,8 +240,11 @@ function coerceDevelopmentExtraction(value: unknown): DevelopmentExtraction {
     const towers = stringArray(group.towers);
     const apartments = stringArray(group.units);
     const privateArea = clean(group.privateArea);
-    if (!towers.length || !apartments.length || !privateArea) return [];
-    return towers.flatMap((tower) => apartments.map((unit) => ({
+    if (!privateArea) return [];
+    const combinations = towers.length && apartments.length
+      ? towers.flatMap((tower) => apartments.map((unit) => ({ tower, unit })))
+      : [{ tower: "", unit: "" }];
+    return combinations.map(({ tower, unit }) => ({
       tower,
       unit,
       privateArea,
@@ -248,13 +253,15 @@ function coerceDevelopmentExtraction(value: unknown): DevelopmentExtraction {
       typology: clean(group.typology) || undefined,
       registration: clean(group.registration) || undefined,
       confidence: Math.max(0, Math.min(100, Number(group.confidence) || 0)),
-    })));
+    }));
   });
 
   return {
     name: clean(data.name) || "Empreendimento sem nome",
     city: clean(data.city) || undefined,
     registration: clean(data.registration) || undefined,
+    sellerLegalName: clean(data.sellerLegalName) || undefined,
+    sellerCnpj: clean(data.sellerCnpj) || undefined,
     units,
   };
 }

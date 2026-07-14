@@ -23,6 +23,8 @@ export type Development = {
   name: string;
   city?: string;
   registration?: string;
+  sellerLegalName?: string;
+  sellerCnpj?: string;
   sourceDocumentName: string;
   units: DevelopmentUnit[];
   createdAt: string;
@@ -32,6 +34,8 @@ export type DevelopmentExtraction = {
   name: string;
   city?: string;
   registration?: string;
+  sellerLegalName?: string;
+  sellerCnpj?: string;
   units: Array<Omit<DevelopmentUnit, "id" | "developmentId">>;
   quality?: DevelopmentExtractionQuality;
 };
@@ -52,7 +56,7 @@ export type DevelopmentExtractionReview = {
 };
 
 export function developmentUnitValues(
-  development: Pick<Development, "name" | "registration">,
+  development: Pick<Development, "name" | "registration" | "sellerLegalName" | "sellerCnpj">,
   unit: DevelopmentUnit,
 ): ExtractedFieldValue[] {
   const source = "CADASTRO_EMPREENDIMENTO" as const;
@@ -64,6 +68,8 @@ export function developmentUnitValues(
     { fieldId: "property.totalArea", source, value: unit.totalArea ?? null, confidence },
     { fieldId: "property.idealFraction", source, value: unit.idealFraction ?? null, confidence },
   ];
+  if (development.sellerLegalName?.trim()) values.splice(2, 0, { fieldId: "seller.legalName", source, value: development.sellerLegalName, confidence });
+  if (development.sellerCnpj?.trim()) values.splice(3, 0, { fieldId: "seller.cnpj", source, value: development.sellerCnpj, confidence });
   if (unit.unit.trim()) values.splice(2, 0, { fieldId: "property.unit", source, value: unit.unit, confidence });
   if (unit.tower.trim()) values.splice(unit.unit.trim() ? 3 : 2, 0, { fieldId: "property.tower", source, value: unit.tower, confidence });
   return values;

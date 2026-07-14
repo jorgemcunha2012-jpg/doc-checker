@@ -111,6 +111,13 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     ]),
   ],
   MATRICULA: [
+    text("seller.cnpj", "Matrícula", 94, [
+      /\bCNPJ\b[^\d]*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i,
+    ]),
+    text("seller.legalName", "Matrícula", 88, [
+      /(?:propriet[aá]ri[ao]|incorporadora|construtora|transmitente)[^:\n\r]{0,50}:\s*([^\n\r]+)/i,
+      /(?:raz[aã]o\s+social|denomina[cç][aã]o)[^:\n\r:]*:\s*([^\n\r]+)/i,
+    ]),
     text("property.registration", "Matrícula", 94, [/\bmatr[ií]cula\s*(?:n[ºo.]*)?\s*([A-Z0-9./-]{2,30})\b/i]),
     text("property.privateArea", "Matrícula", 90, [/área privativa[^\d]*(\d+[\d.,]*\s*m[²2]?)/i]),
     text("property.totalArea", "Matrícula", 88, [/área total[^\d]*(\d+[\d.,]*\s*m[²2]?)/i]),

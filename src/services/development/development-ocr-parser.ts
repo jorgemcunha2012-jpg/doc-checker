@@ -5,6 +5,8 @@ export function extractDevelopmentFromOcrText(text: string): DevelopmentExtracti
   const name = extractName(normalized);
   const city = extractCity(normalized);
   const registration = normalized.match(/mat(?:ricula|\.)?\s*[:.]?\s*([0-9][0-9. -]{2,})/)?.[1]?.replace(/\D/g, "") || undefined;
+  const sellerCnpj = normalized.match(/\bcnpj\b[^\d]*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i)?.[1];
+  const sellerLegalName = extractSellerLegalName(normalized);
   const units = extractUnits(normalized);
   const quality = validateUnits(units);
 
@@ -12,6 +14,8 @@ export function extractDevelopmentFromOcrText(text: string): DevelopmentExtracti
     name: name || "Empreendimento sem nome",
     city,
     registration,
+    sellerLegalName,
+    sellerCnpj,
     units,
     quality,
   };
@@ -84,6 +88,11 @@ function extractName(text: string) {
   if (named) return toDisplayName(named[1]);
   const empreendimento = text.match(/empreendimento\s+([a-z0-9]+(?:\s+[a-z0-9]+){0,4})(?=,?\s+(?:que\s+sera|a\s+ser\s+construido|objeto|residencial)|[,\.])/);
   return empreendimento ? toDisplayName(empreendimento[1]) : undefined;
+}
+
+function extractSellerLegalName(text: string) {
+  const labeled = text.match(/(?:proprietario|proprietaria|incorporadora|construtora|transmitente|razao social|denominacao)[^:\n\r]{0,50}:\s*([^\n\r]+)/i);
+  return labeled?.[1]?.replace(/\s+/g, " ").trim() || undefined;
 }
 
 function extractCity(text: string) {

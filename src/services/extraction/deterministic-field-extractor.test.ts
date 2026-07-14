@@ -165,6 +165,21 @@ test("extrai campos de ITBI preenchível a partir dos campos de formulário do P
   assert.equal(value(output, "financial.totalValue"), "350.000,00");
 });
 
+test("extrai razão social e CNPJ da matrícula para confronto com a minuta", () => {
+  const output = extractDeterministicFields(
+    [
+      "Proprietária: VICTA 07 EMPREENDIMENTOS IMOBILIARIOS SPE S.A.",
+      "CNPJ: 44.537.507/0001-54",
+      "Matrícula 91849",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "MATRICULA",
+  );
+
+  assert.equal(value(output, "seller.legalName"), "VICTA 07 EMPREENDIMENTOS IMOBILIARIOS SPE S.A");
+  assert.equal(value(output, "seller.cnpj"), "44.537.507/0001-54");
+});
+
 function value(output: ReturnType<typeof extractDeterministicFields>, fieldId: string) {
   return output.fields.find((field) => field.fieldId === fieldId)?.value;
 }

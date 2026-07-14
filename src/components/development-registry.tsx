@@ -8,7 +8,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const MAX_SELECTED_PAGES = 40;
 
-export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
+export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boolean; canDelete: boolean }) {
   const [developments, setDevelopments] = useState<Development[]>([]);
   const [extraction, setExtraction] = useState<DevelopmentExtraction | null>(null);
   const [sourceDocumentName, setSourceDocumentName] = useState("");
@@ -92,7 +92,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
     if (!extraction) return;
     const reviewResult = reviewDevelopmentExtraction(extraction);
     if (!reviewResult.canSave) {
-      setError("Revise o nome do empreendimento e preencha torre, unidade e área privativa antes de salvar.");
+      setError("Revise o nome do empreendimento e preencha o tipo e a área privativa antes de salvar.");
       return;
     }
     setBusy(true);
@@ -113,6 +113,27 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
     await loadDevelopments();
   }
 
+  async function removeDevelopment(development: Development) {
+    if (!window.confirm(`Excluir o empreendimento “${development.name}” e seus tipos cadastrados? Essa ação não pode ser desfeita.`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/developments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: development.id }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(payload.error ?? "Não foi possível excluir o empreendimento.");
+        return;
+      }
+      setDevelopments((current) => current.filter((item) => item.id !== development.id));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function updateUnit(index: number, key: "tower" | "unit" | "privateArea" | "totalArea" | "idealFraction" | "typology", value: string) {
     if (!extraction) return;
     setExtraction({
@@ -129,7 +150,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
       </div>
         {canManage ? <section className="border border-slate-200 bg-white p-6">
           <h2 className="text-lg font-bold text-slate-950">Novo empreendimento</h2>
-          <p className="mt-1 text-sm text-slate-500">Envie a matrícula mestre. A IA lista torre, apartamento, áreas e fração ideal; revise antes de salvar. Você pode escolher apenas as páginas relevantes.</p>
+          <p className="mt-1 text-sm text-slate-500">Envie a matrícula mestre. A IA identifica razão social, CNPJ, tipos e áreas; revise antes de salvar. Você pode escolher apenas as páginas relevantes.</p>
           <label className="mt-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
             {busy ? "Preparando..." : "Selecionar matrícula"}
@@ -162,7 +183,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
             className="ml-2 inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
             onClick={() => {
               setSourceDocumentName("Cadastro manual");
-              setExtraction({ name: "", units: [{ tower: "", unit: "", privateArea: "", totalArea: "", idealFraction: "", confidence: 100 }] });
+              setExtraction({ name: "", sellerLegalName: "", sellerCnpj: "", units: [{ tower: "", unit: "", privateArea: "", totalArea: "", idealFraction: "", confidence: 100 }] });
             }}
           >
             <Plus className="h-4 w-4" /> Criar manualmente
@@ -177,7 +198,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
               <div>
                 <div className="text-xs font-bold uppercase text-[#0f8f88]">Revisão obrigatória</div>
                 <h2 className="mt-1 text-lg font-bold text-slate-950">Revisar cadastro extraído</h2>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Confira os tipos, torres, apartamentos, áreas e fração ideal antes de transformar a extração em base mestre.</p>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Confira razão social, CNPJ, tipos, áreas e fração ideal antes de transformar a extração em base mestre.</p>
               </div>
               {review?.canSave ? (
                 <div className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800">
@@ -219,10 +240,12 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
               </div>
             ) : null}
             <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="grid flex-1 gap-3 sm:grid-cols-3">
+              <div className="grid flex-1 gap-3 sm:grid-cols-5">
                 <Field label="Empreendimento" value={extraction.name} required invalid={!extraction.name.trim()} onChange={(value) => setExtraction({ ...extraction, name: value })} />
                 <Field label="Cidade" value={extraction.city ?? ""} onChange={(value) => setExtraction({ ...extraction, city: value })} />
                 <Field label="Matrícula" value={extraction.registration ?? ""} onChange={(value) => setExtraction({ ...extraction, registration: value })} />
+                <Field label="Razão social" value={extraction.sellerLegalName ?? ""} onChange={(value) => setExtraction({ ...extraction, sellerLegalName: value })} />
+                <Field label="CNPJ" value={extraction.sellerCnpj ?? ""} onChange={(value) => setExtraction({ ...extraction, sellerCnpj: value })} />
               </div>
               <button onClick={() => void save()} disabled={busy || !review?.canSave} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
                 <Save className="h-4 w-4" /> Salvar cadastro
@@ -269,9 +292,9 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
           <h2 className="text-lg font-bold text-slate-950">Empreendimentos cadastrados</h2>
           <div className="mt-4 divide-y divide-slate-100">
             {developments.map((development) => (
-              <div key={development.id} className="flex items-center justify-between gap-4 py-4">
-                <div><div className="font-bold text-slate-900">{development.name}</div><div className="text-sm text-slate-500">{development.city ?? "Cidade não informada"} · Matrícula {development.registration ?? "não informada"}</div><div className="mt-1 text-xs text-slate-500">{summarizeUnitTypes(development)}</div></div>
-                <div className="text-sm font-semibold text-slate-600">{development.units.length} unidades</div>
+              <div key={development.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div><div className="font-bold text-slate-900">{development.name}</div><div className="text-sm text-slate-500">{development.city ?? "Cidade não informada"} · Matrícula {development.registration ?? "não informada"}</div><div className="mt-1 text-xs text-slate-500">{development.sellerLegalName || development.sellerCnpj ? `${development.sellerLegalName ?? "Razão social não informada"} · CNPJ ${development.sellerCnpj ?? "não informado"}` : "Razão social e CNPJ não informados"}</div><div className="mt-1 text-xs text-slate-500">{summarizeUnitTypes(development)}</div></div>
+                <div className="flex items-center gap-4"><div className="text-sm font-semibold text-slate-600">{development.units.length} unidades</div>{canDelete ? <button title="Excluir empreendimento" onClick={() => void removeDevelopment(development)} disabled={busy} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-rose-200 px-3 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"><Trash2 className="h-4 w-4" />Excluir</button> : null}</div>
               </div>
             ))}
             {!developments.length ? <p className="py-8 text-center text-sm text-slate-500">Nenhum empreendimento cadastrado.</p> : null}

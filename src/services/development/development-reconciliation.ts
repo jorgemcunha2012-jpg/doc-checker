@@ -44,6 +44,12 @@ export function reconcileDevelopmentExtractions(
   if (!sameText(ocr.name, vision.name) && ocr.name !== "Empreendimento sem nome" && vision.name !== "Empreendimento sem nome") {
     reviewRequired.add("O nome do empreendimento divergiu entre as duas leituras.");
   }
+  if (ocr.sellerCnpj && vision.sellerCnpj && !sameText(ocr.sellerCnpj, vision.sellerCnpj)) {
+    reviewRequired.add("O CNPJ da proprietária/incorporadora divergiu entre as duas leituras.");
+  }
+  if (ocr.sellerLegalName && vision.sellerLegalName && !sameText(ocr.sellerLegalName, vision.sellerLegalName)) {
+    reviewRequired.add("A razão social da proprietária/incorporadora divergiu entre as duas leituras.");
+  }
   if (ocr.units.length !== vision.units.length) {
     warnings.add(`As leituras encontraram quantidades diferentes de unidades (${ocr.units.length} e ${vision.units.length}).`);
   }
@@ -52,6 +58,8 @@ export function reconcileDevelopmentExtractions(
     name: vision.name !== "Empreendimento sem nome" ? vision.name : ocr.name,
     city: vision.city ?? ocr.city,
     registration: vision.registration ?? ocr.registration,
+    sellerLegalName: vision.sellerLegalName ?? ocr.sellerLegalName,
+    sellerCnpj: vision.sellerCnpj ?? ocr.sellerCnpj,
     units: [...byKey.values()].sort((left, right) => left.tower.localeCompare(right.tower, "pt-BR", { numeric: true }) || left.unit.localeCompare(right.unit, "pt-BR", { numeric: true })),
     quality: {
       reviewRequired: [...reviewRequired],
