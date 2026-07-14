@@ -39,3 +39,21 @@ test("extrai tipos de unidade de matrícula OCR com torres, apartamentos e fraç
     confidence: 88,
   });
 });
+
+test("extrai matrícula escaneada com área privativa coberta e apartamentos nrs", () => {
+  const result = extractDevelopmentFromOcrText(`
+    MAT.: 91.849 - Página 4 de 293.
+    Registro da Incorporação do Empreendimento VITÓRIA ACÁCIA, que será construído em Fortaleza.
+    Tipo A: TORRES 01 a 14 - Apartamentos nrs. 201, 202, 203, 204, 301, 302, 303, 304,
+    com área privativa coberta padrão de 38,08m2, área real total de 65,853768m2 e fração ideal de 0,003540265.
+    Tipo B: TORRES 01, 02, 05 a 08, 10, 12 e 14 - Apartamentos nrs. 101 e 104,
+    com área privativa coberta padrão de 39,08m2, área privativa total de 50,99m2,
+    área real total de 79,705393m2 e fração ideal de 0,003660292.
+  `);
+
+  assert.equal(result.name, "Vitoria Acacia");
+  assert.equal(result.registration, "91849");
+  assert.ok(result.units.some((unit) => unit.tower === "01" && unit.unit === "201" && unit.privateArea === "38,08"));
+  assert.ok(result.units.some((unit) => unit.tower === "14" && unit.unit === "204" && unit.idealFraction === "0,003540265"));
+  assert.ok(result.units.some((unit) => unit.tower === "05" && unit.unit === "101" && unit.privateArea === "39,08"));
+});

@@ -4,7 +4,7 @@ export function extractDevelopmentFromOcrText(text: string): DevelopmentExtracti
   const normalized = normalizeOcrText(text);
   const name = extractName(normalized);
   const city = extractCity(normalized);
-  const registration = normalized.match(/matricula:\s*([0-9. -]+)/)?.[1]?.replace(/\D/g, "") || undefined;
+  const registration = normalized.match(/mat(?:ricula|\.)?\s*[:.]?\s*([0-9][0-9. -]{2,})/)?.[1]?.replace(/\D/g, "") || undefined;
   const units = extractUnits(normalized);
 
   return {
@@ -17,7 +17,7 @@ export function extractDevelopmentFromOcrText(text: string): DevelopmentExtracti
 
 function extractUnits(text: string): DevelopmentExtraction["units"] {
   const units = new Map<string, DevelopmentExtraction["units"][number]>();
-  const areaPattern = /com uma area privativa principal de\s+([0-9]{1,3}[,.][0-9]{2})\s*m?/g;
+  const areaPattern = /(?:com\s+uma\s+)?area\s+privativa\s+(?:principal|coberta\s+padrao)\s+de\s+([0-9]{1,3}[,.][0-9]{2})\s*m?/g;
   let previousEnd = 0;
   let match: RegExpExecArray | null;
 
@@ -25,7 +25,7 @@ function extractUnits(text: string): DevelopmentExtraction["units"] {
     const context = text.slice(previousEnd, match.index);
     const after = text.slice(match.index, match.index + 360);
     const privateArea = normalizeDecimal(match[1]) ?? "";
-    const totalArea = normalizeDecimal(after.match(/area total real de\s+([0-9]{1,3}[,.][0-9]{3,6})\s*m?/)?.[1]);
+    const totalArea = normalizeDecimal(after.match(/(?:area\s+total\s+real|area\s+real\s+total)\s+de\s+([0-9]{1,3}[,.][0-9]{3,6})\s*m?/)?.[1]);
     const idealFraction = normalizeDecimal(after.match(/fracao ideal de\s+([0-9][,.][0-9]{6,12})/)?.[1]);
     const typology = extractTypology(context);
     const pairs = extractTowerUnitPairs(context);
@@ -57,7 +57,7 @@ function extractUnits(text: string): DevelopmentExtraction["units"] {
 
 function extractTowerUnitPairs(context: string) {
   const pairs: Array<{ towers: string[]; units: string[] }> = [];
-  const pattern = /torres?\s+(.{1,140}?)\s*,?\s*apartamentos?\s+de\s+n(?:o|os)?\s+(.{1,90}?)(?=;|,?\s*com uma area|$)/g;
+  const pattern = /torres?\s+(.{1,180}?)(?:\s*-\s*|\s*,\s*|\s+)apartamentos?\s+(?:(?:de\s+)?(?:n(?:r|rs|re|res)|n[ºo]s?)[.\s]*)?(.{1,180}?)(?=,?\s*com(?:\s+uma)?(?:\s+area)?\s*$|;|$)/g;
   let match: RegExpExecArray | null;
 
   while ((match = pattern.exec(context)) !== null) {
@@ -95,8 +95,10 @@ function parseNumberList(value: string, width: number) {
 }
 
 function extractName(text: string) {
-  const match = text.match(/denominado\s+(condominio\s+[^,.\n]+)/);
-  return match ? toDisplayName(match[1]) : undefined;
+  const named = text.match(/denominado\s+(condominio\s+[^,.\n]+)/);
+  if (named) return toDisplayName(named[1]);
+  const empreendimento = text.match(/empreendimento\s+([a-z0-9]+(?:\s+[a-z0-9]+){0,4})(?=,?\s+(?:que\s+sera|a\s+ser\s+construido|objeto|residencial)|[,\.])/);
+  return empreendimento ? toDisplayName(empreendimento[1]) : undefined;
 }
 
 function extractCity(text: string) {
