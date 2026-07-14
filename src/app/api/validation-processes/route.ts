@@ -18,6 +18,8 @@ const ACCEPTED_MIME_TYPES = new Set([
   "image/tiff",
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/rtf",
+  "text/rtf",
 ]);
 
 export async function POST(request: Request) {
@@ -107,6 +109,7 @@ async function isAcceptedFile(file: File) {
     png: bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47,
     jpeg: bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
     zip: bytes[0] === 0x50 && bytes[1] === 0x4b && [0x03, 0x05, 0x07].includes(bytes[2]),
+    rtf: bytes[0] === 0x7b && bytes[1] === 0x5c && bytes[2] === 0x72 && bytes[3] === 0x74 && bytes[4] === 0x66,
     tiff:
       (bytes[0] === 0x49 && bytes[1] === 0x49 && bytes[2] === 0x2a && bytes[3] === 0x00) ||
       (bytes[0] === 0x4d && bytes[1] === 0x4d && bytes[2] === 0x00 && bytes[3] === 0x2a),
@@ -116,6 +119,7 @@ async function isAcceptedFile(file: File) {
     (name.endsWith(".png") && signatures.png) ||
     ((name.endsWith(".jpg") || name.endsWith(".jpeg")) && signatures.jpeg) ||
     (name.endsWith(".docx") && signatures.zip) ||
+    (name.endsWith(".rtf") && signatures.rtf) ||
     ((name.endsWith(".tif") || name.endsWith(".tiff")) && signatures.tiff);
 
   return validContent;
@@ -159,6 +163,7 @@ function canonicalMimeType(file: File) {
   const name = file.name.toLowerCase();
   if (name.endsWith(".pdf")) return "application/pdf";
   if (name.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (name.endsWith(".rtf")) return "application/rtf";
   if (name.endsWith(".tif") || name.endsWith(".tiff")) return "image/tiff";
   if (name.endsWith(".png")) return "image/png";
   if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
@@ -203,6 +208,10 @@ function resolveDocumentType(file: File, validationType: ValidationType): Upload
   }
 
   if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || name.endsWith(".docx")) {
+    return "WORD";
+  }
+
+  if (file.type === "application/rtf" || file.type === "text/rtf" || name.endsWith(".rtf")) {
     return "WORD";
   }
 

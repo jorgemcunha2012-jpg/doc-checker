@@ -71,14 +71,14 @@ export function FileDropZone({
           className="sr-only"
           type="file"
           multiple
-          accept=".pdf,.docx,.tif,.tiff,.jpg,.jpeg,.png,image/jpeg,image/png,image/tiff,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          accept=".pdf,.docx,.rtf,.tif,.tiff,.jpg,.jpeg,.png,image/jpeg,image/png,image/tiff,application/pdf,application/rtf,text/rtf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           onChange={(event) => handleFiles(event.target.files)}
         />
         <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-[#2563eb] shadow-sm ring-1 ring-slate-200">
           <Paperclip className="h-6 w-6" aria-hidden="true" />
         </span>
         <span className="mt-3 text-sm font-semibold text-slate-900">Adicionar documentos para verificação</span>
-        <span className="mt-1 max-w-sm text-xs text-slate-500">PDF, DOCX, TIFF/TIF, PNG ou JPG. Também é possível colar prints com Ctrl+V.</span>
+        <span className="mt-1 max-w-sm text-xs text-slate-500">PDF, DOCX, RTF, TIFF/TIF, PNG ou JPG. Também é possível colar prints com Ctrl+V.</span>
       </label>
 
       <div className="mt-4 space-y-2">

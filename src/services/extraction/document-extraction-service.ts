@@ -6,7 +6,7 @@ import { DeepSeekProvider } from "./deepseek-provider";
 import { KimiProvider } from "./kimi-provider";
 import { extractPdfText, hasEnoughPdfText } from "./pdf-text-service";
 import { extractPdfOcrText } from "./pdf-ocr-service";
-import { extractDocxText } from "./word-text-service";
+import { extractDocxText, extractRtfText } from "./word-text-service";
 import { convertTiffToPngPages } from "./tiff-image-service";
 import type { ExtractionRequest, ExtractionResult, ReconciliationExtractionResult, UploadedDocumentPayload } from "./types";
 import { buildExtractionQuality, missingCriticalFields, validateCriticalEvidence } from "./extraction-quality-service";
@@ -115,8 +115,9 @@ export class DocumentExtractionService {
           usedPdfVisionFallback = true;
           outputs.push(emptyOutput(checklist));
         }
-      } else if (isDocx(document)) {
-        outputs.push(await this.deepSeekProvider.structureText(await extractDocxText(document.buffer), checklist));
+      } else if (isDocx(document) || isRtf(document)) {
+        const text = isRtf(document) ? extractRtfText(document.buffer) : await extractDocxText(document.buffer);
+        outputs.push(await this.deepSeekProvider.structureText(text, checklist));
       } else if (document.mimeType.includes("image")) {
         outputs.push(await this.extractVisualDocument(document, checklist));
       }
@@ -196,9 +197,9 @@ export class DocumentExtractionService {
               extractionMethod: "TEXT" as const,
             };
           }
-          if (isDocx(document)) {
-            const text = await extractDocxText(document.buffer);
-            if (!text.trim()) return { output: null, usedPdfVisionFallback: false, error: "O documento Word não possui texto extraível." };
+          if (isDocx(document) || isRtf(document)) {
+            const text = isRtf(document) ? extractRtfText(document.buffer) : await extractDocxText(document.buffer);
+            if (!text.trim()) return { output: null, usedPdfVisionFallback: false, error: "O documento Word/RTF não possui texto extraível." };
             const extraction = await this.extractTextWithRecovery(text, sourceChecklist, source);
             console.info("[ConferIA] Extração concluída", {
               source,
@@ -491,6 +492,10 @@ function explainExtractionError(message: string, document: UploadedDocumentPaylo
 function isDocx(document: UploadedDocumentPayload) {
   return document.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
     document.name.toLowerCase().endsWith(".docx");
+}
+
+function isRtf(document: UploadedDocumentPayload) {
+  return document.mimeType === "application/rtf" || document.mimeType === "text/rtf" || document.name.toLowerCase().endsWith(".rtf");
 }
 
 function isTiff(document: UploadedDocumentPayload) {
