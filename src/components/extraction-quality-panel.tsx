@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, RefreshCw } from "lucide-react";
 import type { ChecklistField, DocumentSource, ExtractionQualityReport } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
 import { humanFieldLabel } from "@/domain/field-labels";
@@ -17,11 +17,17 @@ export function ExtractionQualityPanel({
   const label = (fieldId: string) => humanFieldLabel(fieldId, checklist);
 
   return (
-    <section className="border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-5 py-4">
-        <h2 className="font-bold text-slate-950">Qualidade da extração</h2>
-        <p className="mt-1 text-sm text-slate-500">Cobertura dos campos críticos antes da comparação documental.</p>
-      </div>
+    <details className="group border border-slate-200 bg-white">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 outline-none focus-visible:ring-2 focus-visible:ring-[#0faaa2] focus-visible:ring-inset group-open:border-b group-open:border-slate-200 [&::-webkit-details-marker]:hidden">
+        <div>
+          <h2 className="font-bold text-slate-950">Qualidade da extração</h2>
+          <p className="mt-1 text-sm text-slate-500">Cobertura dos campos críticos antes da comparação documental.</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="text-xs font-semibold text-slate-500">{assessed.length} fonte(s) avaliada(s)</span>
+          <ChevronDown className="h-5 w-5 text-slate-500 transition-transform group-open:rotate-180" />
+        </div>
+      </summary>
       <div className="grid divide-y divide-slate-100 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
         {assessed.map((report) => (
           <div key={report.source} className="p-5">
@@ -69,6 +75,6 @@ export function ExtractionQualityPanel({
           </div>
         ))}
       </div>
-    </section>
+    </details>
   );
 }
