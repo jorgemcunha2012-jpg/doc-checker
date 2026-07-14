@@ -52,3 +52,16 @@ test("preenche recursos próprios e valor total da composição padronizada", ()
   assert.equal(enriched.fields.find((field) => field.fieldId === "financial.downPayment")?.value, "R$ 50.607,09");
   assert.equal(enriched.fields.find((field) => field.fieldId === "financial.totalValue")?.value, "R$ 237.000,00");
 });
+
+test("prioriza a sequência B.4 da minuta e gera evidência curta para o subsídio", () => {
+  const output = enrichStandardFinancialFields({
+    fields: [{ fieldId: "financial.subsidy", value: "R$ 25,00", confidence: 100, sourceLocation: { rawText: "trecho incorreto" } }],
+  }, "[PÁGINA 2] B.4.1 - Financiamento: B.4.2 - Recursos próprios: B.4.3 - FGTS: B.4.4 - FGTS Futuro: B.4.5 - Subsídio: R$ 186.400,00 R$ 28.063,18 R$ 19.536,82 R$ 0,00 R$ 0,00 B.5 - Despesas", [
+    { id: "financial.subsidy", category: "Dados financeiros", label: "Subsídio", required: false, validationType: "MINUTA", fieldType: "valor_monetario", itemType: "COMPARISON" },
+  ]);
+
+  assert.equal(output.fields[0].value, "R$ 0,00");
+  assert.equal(output.fields[0].sourceLocation?.page, 2);
+  assert.match(output.fields[0].sourceLocation?.rawText ?? "", /B\.4\.5/);
+  assert.doesNotMatch(output.fields[0].sourceLocation?.rawText ?? "", /trecho incorreto/);
+});

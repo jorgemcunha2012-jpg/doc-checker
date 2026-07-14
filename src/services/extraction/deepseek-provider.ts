@@ -101,11 +101,15 @@ export function enrichStandardFinancialFields(
     "financial.subsidy": "B.4.5",
   };
   const allowedIds = new Set(checklist.map((field) => field.id));
+  const composition = extractCompositionValues(text);
 
   return {
     fields: output.fields.map((field) => {
       const item = standardItems[field.fieldId];
-      if (field.value || !allowedIds.has(field.fieldId)) return field;
+      if (!allowedIds.has(field.fieldId)) return field;
+      const deterministic = composition[field.fieldId];
+      if (deterministic) return { ...field, ...deterministic };
+      if (field.value) return field;
       const line = item
         ? text.split(/\r?\n/).find((candidate) => candidate.includes(item) && /R\$\s*[\d.,]+/.test(candidate))
         : field.fieldId === "financial.totalValue"
@@ -124,6 +128,48 @@ export function enrichStandardFinancialFields(
       };
     }),
   };
+}
+
+function extractCompositionValues(text: string): Record<string, { value: string; confidence: number; sourceLocation: { page?: number; section: string; rawText: string } }> {
+  const start = text.search(/B\.4\.1\b/i);
+  if (start < 0) return {};
+  const remaining = text.slice(start);
+  const end = remaining.search(/\bB\.5\b/i);
+  const block = remaining.slice(0, end >= 0 ? end : remaining.length);
+  const labels = [...block.matchAll(/B\.4\.(1|2|3|4|5)\b[^:]*:/gi)];
+  const values = [...block.matchAll(/R\$\s*\d[\d.]*,\d{2}/g)].map((match) => match[0].replace(/\s+/g, " "));
+  if (!labels.length || values.length < labels.length) return {};
+
+  const fieldByItem: Record<string, string | undefined> = {
+    "1": "financial.financing",
+    "2": "financial.downPayment",
+    "3": "financial.fgts",
+    "4": undefined,
+    "5": "financial.subsidy",
+  };
+  const page = pageBefore(text, start);
+  const result: Record<string, { value: string; confidence: number; sourceLocation: { page?: number; section: string; rawText: string } }> = {};
+  labels.forEach((label, index) => {
+    const fieldId = fieldByItem[label[1]];
+    const value = values[index];
+    if (!fieldId || !value) return;
+    result[fieldId] = {
+      value,
+      confidence: 100,
+      sourceLocation: {
+        page,
+        section: "Composição dos recursos",
+        rawText: `${label[0].replace(/\s+/g, " ").trim()} ${value}`.slice(0, 300),
+      },
+    };
+  });
+  return result;
+}
+
+function pageBefore(text: string, index: number) {
+  const pages = [...text.slice(0, index).matchAll(/\[PÁGINA\s+(\d+)\]/gi)];
+  const page = Number(pages.at(-1)?.[1]);
+  return Number.isInteger(page) && page > 0 ? page : undefined;
 }
 
 function keywordGroupsByDomain(checklist: ChecklistField[]) {
