@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
 import type { ChecklistField, DocumentSource, ExtractionQualityReport } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
+import { humanFieldLabel } from "@/domain/field-labels";
 
 export function ExtractionQualityPanel({
   reports,
@@ -13,7 +14,7 @@ export function ExtractionQualityPanel({
     Boolean(report && report.status !== "NOT_ASSESSED"),
   );
   if (!assessed.length) return null;
-  const labels = new Map(checklist.map((field) => [field.id, field.label]));
+  const label = (fieldId: string) => humanFieldLabel(fieldId, checklist);
 
   return (
     <section className="border border-slate-200 bg-white">
@@ -38,28 +39,28 @@ export function ExtractionQualityPanel({
             {(report.recoveredFields ?? []).length ? (
               <div className="mt-3 flex items-start gap-2 text-xs leading-5 text-blue-700">
                 <RefreshCw className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                Recuperados automaticamente: {(report.recoveredFields ?? []).map((fieldId) => labels.get(fieldId) ?? fieldId).join(", ")}.
+                Recuperados automaticamente: {(report.recoveredFields ?? []).map(label).join(", ")}.
               </div>
             ) : null}
             {(report.deterministicFields ?? []).length ? (
               <div className="mt-3 flex items-start gap-2 text-xs leading-5 text-emerald-700">
                 <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                Confirmados por leitura determinística: {(report.deterministicFields ?? []).map((fieldId) => labels.get(fieldId) ?? fieldId).join(", ")}.
+                Confirmados por leitura determinística: {(report.deterministicFields ?? []).map(label).join(", ")}.
               </div>
             ) : null}
             {(report.missingCriticalFields ?? []).length ? (
               <p className="mt-3 text-xs leading-5 text-amber-800">
-                Não extraídos após nova tentativa: {(report.missingCriticalFields ?? []).map((fieldId) => labels.get(fieldId) ?? fieldId).join(", ")}.
+                Não extraídos após nova tentativa: {(report.missingCriticalFields ?? []).map(label).join(", ")}.
               </p>
             ) : null}
             {(report.lowConfidenceCriticalFields ?? []).length ? (
               <p className="mt-3 text-xs leading-5 text-amber-800">
-                Extraídos com baixa confiança: {(report.lowConfidenceCriticalFields ?? []).map((fieldId) => labels.get(fieldId) ?? fieldId).join(", ")}.
+                Extraídos com baixa confiança: {(report.lowConfidenceCriticalFields ?? []).map(label).join(", ")}.
               </p>
             ) : null}
             {(report.ambiguousCriticalFields ?? []).length ? (
               <p className="mt-3 text-xs leading-5 text-rose-700">
-                Com conflito interno na mesma fonte: {(report.ambiguousCriticalFields ?? []).map((fieldId) => labels.get(fieldId) ?? fieldId).join(", ")}.
+                Com conflito interno na mesma fonte: {(report.ambiguousCriticalFields ?? []).map(label).join(", ")}.
               </p>
             ) : null}
             {!(report.missingCriticalFields ?? []).length && !(report.lowConfidenceCriticalFields ?? []).length && !(report.ambiguousCriticalFields ?? []).length ? (
