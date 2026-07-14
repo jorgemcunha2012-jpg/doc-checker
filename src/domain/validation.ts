@@ -71,6 +71,7 @@ export type ChecklistItemType = "COMPARISON" | "DOCUMENT_ATTACHMENT" | "CLAUSE_P
 
 export type ChecklistCategory =
   | "Identificação do contrato"
+  | "Dados da operação"
   | "Dados do comprador"
   | "Dados do adquirente"
   | "Dados do transmitente"

@@ -25,6 +25,14 @@ export function fieldExtractionHint(fieldId: string) {
       "extrair somente a sede ou endereço do vendedor/transmitente na qualificação da parte; nunca usar endereço do imóvel",
     "property.address":
       "extrair somente a localização física do imóvel objeto do negócio, normalmente na descrição do imóvel, matrícula, empreendimento ou unidade; nunca usar domicílio do comprador ou endereço do vendedor",
+    "property.iptu":
+      "extrair a inscrição imobiliária ou inscrição municipal do IPTU; nunca confundir com o número da matrícula do imóvel",
+    "seller.email":
+      "extrair somente o e-mail da empresa transmitente/proprietária; nunca usar o e-mail do comprador ou corretor",
+    "seller.phone":
+      "extrair somente o telefone da empresa transmitente/proprietária; nunca usar o telefone do comprador ou corretor",
+    "property.registryOffice":
+      "extrair o cartório/ofício de registro de imóveis responsável pela matrícula",
   } as Record<string, string>)[fieldId] ?? "";
 }
 

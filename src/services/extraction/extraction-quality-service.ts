@@ -11,6 +11,9 @@ const LOW_CRITICAL_CONFIDENCE_THRESHOLD = 75;
 
 const criticalFieldsBySource: Partial<Record<DocumentSource, string[]>> = {
   MINUTA: [
+    "contract.agencyCode",
+    "contract.financingModality",
+    "contract.housingProgram",
     "buyer.name",
     "buyer.cpf",
     "property.development",
@@ -18,6 +21,7 @@ const criticalFieldsBySource: Partial<Record<DocumentSource, string[]>> = {
     "property.tower",
     "financial.financing",
     "financial.totalValue",
+    "financial.appraisalValue",
   ],
   SIOPI: [
     "buyer.name",
@@ -36,6 +40,7 @@ const criticalFieldsBySource: Partial<Record<DocumentSource, string[]>> = {
     "property.registration",
     "financial.financing",
     "financial.totalValue",
+    "property.iptu",
   ],
   DADOS_RESERVA: [
     "buyer.name",
