@@ -136,7 +136,7 @@ function extractCompositionValues(text: string): Record<string, { value: string;
   const remaining = text.slice(start);
   const end = remaining.search(/\bB\.5\b/i);
   const block = remaining.slice(0, end >= 0 ? end : remaining.length);
-  const labels = [...block.matchAll(/B\.4\.(1|2|3|4|5)\b[^:]*:/gi)];
+  const labels = [...block.matchAll(/B\.4\.\s*(1|2|3|4|5)\b[^:]*:/gi)];
   const values = [...block.matchAll(/R\$\s*\d[\d.]*,\d{2}/g)].map((match) => match[0].replace(/\s+/g, " "));
   if (!labels.length || values.length < labels.length) return {};
 
