@@ -5,7 +5,7 @@ import { extractDevelopmentFromImagesWithOcr } from "@/services/development/deve
 import { KimiProvider } from "@/services/extraction/kimi-provider";
 
 const MAX_SIZE = 20 * 1024 * 1024;
-const MAX_IMAGES = 12;
+const MAX_IMAGES = 40;
 const EXTRACTION_TIMEOUT_MS = 150_000;
 export const maxDuration = 300;
 
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     }
 
     const extraction = await withTimeout(
-      new KimiProvider().extractDevelopment(payload.images),
+      new KimiProvider().extractDevelopment(payload.images, payload.pageNumbers),
       EXTRACTION_TIMEOUT_MS,
       "A extração demorou demais. Tente uma matrícula menor ou cadastre manualmente os tipos encontrados.",
     );
@@ -52,12 +52,13 @@ export async function POST(request: Request) {
 async function readPdfPayload(request: Request, organizationId: string) {
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
-    const body = await request.json() as { storagePath?: string; sourceDocumentName?: string; images?: string[]; imagePaths?: string[] };
+    const body = await request.json() as { storagePath?: string; sourceDocumentName?: string; images?: string[]; imagePaths?: string[]; pageNumbers?: number[] };
     if (Array.isArray(body.images)) {
       const images = body.images.filter((image) => typeof image === "string" && image.startsWith("data:image/")).slice(0, MAX_IMAGES);
       if (!body.sourceDocumentName || !images.length) return null;
       return {
         images,
+        pageNumbers: normalizePageNumbers(body.pageNumbers, images.length),
         sourceDocumentName: body.sourceDocumentName,
         size: images.reduce((total, image) => total + image.length, 0),
       };
@@ -76,6 +77,7 @@ async function readPdfPayload(request: Request, organizationId: string) {
       }));
       return {
         images: downloads,
+        pageNumbers: normalizePageNumbers(body.pageNumbers, downloads.length),
         sourceDocumentName: body.sourceDocumentName,
         size: downloads.reduce((total, image) => total + image.length, 0),
       };
@@ -90,6 +92,7 @@ async function readPdfPayload(request: Request, organizationId: string) {
     }
     return {
       buffer: Buffer.from(await data.arrayBuffer()),
+      pageNumbers: [],
       sourceDocumentName: body.sourceDocumentName,
       size: data.size,
     };
@@ -100,9 +103,17 @@ async function readPdfPayload(request: Request, organizationId: string) {
   if (!(file instanceof File)) return null;
   return {
     buffer: Buffer.from(await file.arrayBuffer()),
+    pageNumbers: [],
     sourceDocumentName: file.name,
     size: file.size,
   };
+}
+
+function normalizePageNumbers(pageNumbers: unknown, length: number) {
+  if (!Array.isArray(pageNumbers) || pageNumbers.length !== length || !pageNumbers.every((page) => Number.isInteger(page) && page > 0)) {
+    return Array.from({ length }, (_, index) => index + 1);
+  }
+  return pageNumbers as number[];
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {

@@ -133,8 +133,8 @@ export class KimiProvider implements DocumentExtractionProvider {
     return coerceExtractionOutput(result, checklist);
   }
 
-  async extractDevelopment(images: string[]): Promise<DevelopmentExtraction> {
-    const attempts = await mapWithConcurrencySettled(images, 3, (image, index) => this.extractDevelopmentPage(image, index + 1));
+  async extractDevelopment(images: string[], pageNumbers = images.map((_, index) => index + 1)): Promise<DevelopmentExtraction> {
+    const attempts = await mapWithConcurrencySettled(images, 3, (image, index) => this.extractDevelopmentPage(image, pageNumbers[index] ?? index + 1));
     const pages = attempts.flatMap((attempt) => attempt.status === "fulfilled" ? [attempt.value] : []);
     if (!pages.length) {
       const failure = attempts.find((attempt) => attempt.status === "rejected");

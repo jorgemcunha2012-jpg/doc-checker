@@ -6,7 +6,7 @@ import type { Development, DevelopmentExtraction } from "@/domain/development";
 import { reviewDevelopmentExtraction, unitTypeSignature } from "@/domain/development";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-const MAX_RENDERED_PAGES = 12;
+const MAX_SELECTED_PAGES = 40;
 
 export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
   const [developments, setDevelopments] = useState<Development[]>([]);
@@ -14,6 +14,9 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
   const [sourceDocumentName, setSourceDocumentName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pageCount, setPageCount] = useState(0);
+  const [pageSelection, setPageSelection] = useState("");
   const review = extraction ? reviewDevelopmentExtraction(extraction) : null;
 
   useEffect(() => {
@@ -28,19 +31,40 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
 
   async function handleFile(file?: File) {
     if (!file) return;
+    setBusy(true);
+    setError("");
+    try {
+      const count = await getPdfPageCount(file);
+      setPendingFile(file);
+      setPageCount(count);
+      setPageSelection(`1-${count}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Não foi possível ler a quantidade de páginas da matrícula.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function extractSelectedPages() {
+    if (!pendingFile) return;
+    let selectedPages: number[];
+    try {
+      selectedPages = parsePageSelection(pageSelection, pageCount);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Selecione páginas válidas para extrair.");
+      return;
+    }
     const controller = new AbortController();
-    // Keep the browser request aligned with the serverless OCR ceiling. The
-    // full matrícula is rendered and read; pages are not silently discarded.
     const timeout = window.setTimeout(() => controller.abort(), 295_000);
     setBusy(true);
     setError("");
     try {
-      const pages = await renderPdfInBrowser(file, MAX_RENDERED_PAGES);
-      const imagePaths = await uploadRenderedPages(file.name, pages, controller.signal);
+      const pages = await renderPdfInBrowser(pendingFile, selectedPages);
+      const imagePaths = await uploadRenderedPages(pendingFile.name, pages, controller.signal);
       const response = await fetch("/api/developments/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceDocumentName: file.name, imagePaths }),
+        body: JSON.stringify({ sourceDocumentName: pendingFile.name, imagePaths, pageNumbers: selectedPages }),
         signal: controller.signal,
       });
       const payload = await response.json().catch(() => ({}));
@@ -50,6 +74,7 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
       }
       setExtraction(payload.extraction);
       setSourceDocumentName(payload.sourceDocumentName);
+      setPendingFile(null);
     } catch (reason) {
       const aborted = reason instanceof DOMException && reason.name === "AbortError";
       setError(aborted
@@ -104,12 +129,35 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
       </div>
         {canManage ? <section className="border border-slate-200 bg-white p-6">
           <h2 className="text-lg font-bold text-slate-950">Novo empreendimento</h2>
-          <p className="mt-1 text-sm text-slate-500">Envie a matrícula mestre. A IA lista torre, apartamento, áreas e fração ideal; revise antes de salvar. PDFs escaneados ou muito longos podem levar mais tempo.</p>
+          <p className="mt-1 text-sm text-slate-500">Envie a matrícula mestre. A IA lista torre, apartamento, áreas e fração ideal; revise antes de salvar. Você pode escolher apenas as páginas relevantes.</p>
           <label className="mt-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-            {busy ? "Extraindo matrícula..." : "Extrair matrícula"}
+            {busy ? "Preparando..." : "Selecionar matrícula"}
             <input className="sr-only" type="file" accept=".pdf,application/pdf" disabled={busy} onChange={(event) => void handleFile(event.target.files?.[0])} />
           </label>
+          {pendingFile ? (
+            <div className="mt-4 border border-blue-200 bg-blue-50/60 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <label className="flex-1 text-xs font-bold text-slate-700">
+                  Páginas para extrair ({pageCount} no arquivo)
+                  <input
+                    className="mt-1 block min-h-10 w-full rounded-md border border-blue-300 bg-white px-3 text-sm font-medium text-slate-900"
+                    value={pageSelection}
+                    onChange={(event) => setPageSelection(event.target.value)}
+                    placeholder="Ex.: 1-3, 8, 12-14"
+                    disabled={busy}
+                  />
+                </label>
+                <div className="flex gap-2">
+                  <button className="min-h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700" disabled={busy} onClick={() => setPendingFile(null)}>Cancelar</button>
+                  <button className="inline-flex min-h-10 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white disabled:opacity-50" disabled={busy} onClick={() => void extractSelectedPages()}>
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />} Extrair páginas
+                  </button>
+                </div>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-600">Use intervalos separados por vírgula. Todas as páginas ficam selecionadas por padrão; a seleção pode ter no máximo {MAX_SELECTED_PAGES} páginas.</p>
+            </div>
+          ) : null}
           <button
             className="ml-2 inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
             onClick={() => {
@@ -218,14 +266,23 @@ export function DevelopmentRegistry({ canManage }: { canManage: boolean }) {
   );
 }
 
-async function renderPdfInBrowser(file: File, maxPages: number) {
+async function getPdfPageCount(file: File) {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.mjs";
+  const document = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const count = document.numPages;
+  await document.destroy();
+  return count;
+}
+
+async function renderPdfInBrowser(file: File, selectedPages: number[]) {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.mjs";
   const document = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
   const images: Blob[] = [];
 
   try {
-    for (let pageNumber = 1; pageNumber <= Math.min(document.numPages, maxPages); pageNumber += 1) {
+    for (const pageNumber of selectedPages) {
       const page = await document.getPage(pageNumber);
       const viewport = page.getViewport({ scale: 1.8 });
       const canvas = window.document.createElement("canvas");
@@ -242,6 +299,28 @@ async function renderPdfInBrowser(file: File, maxPages: number) {
   }
 
   return images;
+}
+
+function parsePageSelection(value: string, pageCount: number) {
+  const pages = new Set<number>();
+  for (const token of value.split(",").map((part) => part.trim()).filter(Boolean)) {
+    const range = token.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (range) {
+      const start = Number(range[1]);
+      const end = Number(range[2]);
+      if (start < 1 || end < start || end > pageCount) throw new Error(`Intervalo inválido: ${token}. Use páginas entre 1 e ${pageCount}.`);
+      for (let page = start; page <= end; page += 1) pages.add(page);
+      continue;
+    }
+    if (!/^\d+$/.test(token)) throw new Error(`Página inválida: ${token}. Use exemplos como 1-3, 8 ou 12-14.`);
+    const page = Number(token);
+    if (page < 1 || page > pageCount) throw new Error(`Página inválida: ${page}. Use páginas entre 1 e ${pageCount}.`);
+    pages.add(page);
+  }
+  const selected = [...pages].sort((left, right) => left - right);
+  if (!selected.length) throw new Error("Selecione ao menos uma página para extrair.");
+  if (selected.length > MAX_SELECTED_PAGES) throw new Error(`Selecione no máximo ${MAX_SELECTED_PAGES} páginas por extração.`);
+  return selected;
 }
 
 async function uploadRenderedPages(fileName: string, pages: Blob[], signal: AbortSignal) {
