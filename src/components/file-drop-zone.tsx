@@ -188,13 +188,14 @@ function resolveDocumentType(file: File, validationType: ValidationType): Upload
 }
 
 function inferDocumentSource(file: File): DocumentSource {
-  if (/itbi|dti|guia/i.test(file.name)) return "ITBI";
-  if (/iptu|inscri[cç][aã]o\s*(imobili[aá]ria|municipal)/i.test(file.name)) return "IPTU";
-  if (/fra[cç][oõ]es?|fracoes?/i.test(file.name)) return "FRACOES";
-  if (/minuta|contrato|instrumento/i.test(file.name)) return "MINUTA";
-  if (/siopi|espelho.*proposta|concess[aã]o/i.test(file.name)) return "SIOPI";
-  if (/matr[ií]cula|registro.*im[oó]vel/i.test(file.name)) return "MATRICULA";
-  if (/certid[aã]o|nascimento|casamento|estado.*civil/i.test(file.name)) return "CERTIDAO";
-  if (/reserva|outlook/i.test(file.name) || file.type.includes("image")) return "DADOS_RESERVA";
+  const name = file.name.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+  if (/itbi|dti|guia/.test(name)) return "ITBI";
+  if (/iptu|inscricao\s*(imobiliaria|municipal)/.test(name)) return "IPTU";
+  if (/fracao/.test(name)) return "FRACOES";
+  if (/minuta|contrato|instrumento/.test(name)) return "MINUTA";
+  if (/siopi|espelho.*proposta|concessao/.test(name)) return "SIOPI";
+  if (/matricula|registro.*imovel/.test(name)) return "MATRICULA";
+  if (/certidao|nascimento|casamento|estado.*civil/.test(name)) return "CERTIDAO";
+  if (/reserva|outlook/.test(name) || file.type.includes("image")) return "DADOS_RESERVA";
   return "DOCUMENTO_COMPLEMENTAR";
 }
