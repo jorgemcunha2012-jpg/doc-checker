@@ -9,7 +9,7 @@ import { extractPdfOcrText } from "./pdf-ocr-service";
 import { extractDocxText } from "./word-text-service";
 import { convertTiffToPngPages } from "./tiff-image-service";
 import type { ExtractionRequest, ExtractionResult, ReconciliationExtractionResult, UploadedDocumentPayload } from "./types";
-import { buildExtractionQuality, missingCriticalFields } from "./extraction-quality-service";
+import { buildExtractionQuality, missingCriticalFields, validateCriticalEvidence } from "./extraction-quality-service";
 import { extractDeterministicFields } from "./deterministic-field-extractor";
 
 export class DocumentExtractionService {
@@ -269,6 +269,7 @@ export class DocumentExtractionService {
         {
           error,
           extractionMethod: extractionMethods.length > 1 ? "MIXED" : extractionMethods[0],
+          evidenceIssues: consolidated.evidenceIssues,
         },
       ),
     };
@@ -550,8 +551,14 @@ function consolidateSourceOutputs(
   checklist: ExtractionRequest["checklist"],
 ) {
   const conflictedFields: string[] = [];
+  const evidenceIssues: string[] = [];
+  const validatedOutputs = outputs.map((output) => {
+    const validated = validateCriticalEvidence(source, output, checklist);
+    evidenceIssues.push(...validated.evidenceIssues);
+    return validated.output;
+  });
   const values: ExtractedFieldValue[] = checklist.flatMap((field): ExtractedFieldValue[] => {
-    const candidates = outputs
+    const candidates = validatedOutputs
       .flatMap((output) => output.fields)
       .filter((candidate) => candidate.fieldId === field.id && candidate.value != null && String(candidate.value).trim());
     if (field.allowMultiple) {
@@ -594,7 +601,7 @@ function consolidateSourceOutputs(
     }];
   });
 
-  return { values, conflictedFields };
+  return { values, conflictedFields, evidenceIssues: [...new Set(evidenceIssues)] };
 }
 
 function alignParticipantIdentities(values: ExtractedFieldValue[]) {

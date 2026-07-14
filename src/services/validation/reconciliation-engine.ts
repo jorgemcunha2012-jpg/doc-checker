@@ -122,6 +122,19 @@ export class ReconciliationEngine {
       );
     }
 
+    const evidenceIssues = input.participatingSources.filter((source) =>
+      input.qualityBySource?.[source]?.evidenceIssues?.some((issue) => issue === conflictId),
+    );
+    if (evidenceIssues.length) {
+      return result(
+        organizationId,
+        field,
+        valuesBySource,
+        "REVIEW_REQUIRED",
+        `Evidência insuficiente ou incompatível para o campo na fonte ${joinSources(evidenceIssues)}.`,
+      );
+    }
+
     const unreadableExpectedSources = input.unreadableSources.filter((source) => field.expectedSources?.includes(source));
     if (unreadableExpectedSources.length) {
       return result(

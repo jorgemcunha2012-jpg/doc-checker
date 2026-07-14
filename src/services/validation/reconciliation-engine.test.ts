@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { DocumentSource, ExtractedFieldValue } from "@/domain/validation";
+import type { DocumentSource, ExtractedFieldValue, ExtractionQualityReport } from "@/domain/validation";
 import { ReconciliationEngine, type ReconciliationInput } from "./reconciliation-engine";
 
 const engine = new ReconciliationEngine();
@@ -25,6 +25,20 @@ test("identifica a única fonte divergente", () => {
 
   assert.equal(field(result, "buyer.cpf").status, "DIVERGENCE");
   assert.match(field(result, "buyer.cpf").observation, /apenas na fonte ITBI/);
+});
+
+test("não aceita campo crítico quando a evidência não contém o valor extraído", () => {
+  const result = run(
+    [value("financial.subsidy", "MINUTA", "R$ 25,00")],
+    ["MINUTA", "ITBI"],
+    {},
+    [],
+    {},
+    { MINUTA: { evidenceIssues: ["financial.subsidy"] } as ExtractionQualityReport },
+  );
+
+  assert.equal(field(result, "financial.subsidy").status, "REVIEW_REQUIRED");
+  assert.match(field(result, "financial.subsidy").observation, /Evidência insuficiente/);
 });
 
 test("encaminha ausência e baixa confiança para revisão", () => {
@@ -228,6 +242,7 @@ function run(
   conflictedFieldsBySource: ReconciliationInput["conflictedFieldsBySource"] = {},
   unreadableSources: DocumentSource[] = [],
   sourceErrors: ReconciliationInput["sourceErrors"] = {},
+  qualityBySource: ReconciliationInput["qualityBySource"] = {},
 ) {
   return engine.run("org_test", {
     values,
@@ -235,6 +250,7 @@ function run(
     conflictedFieldsBySource,
     unreadableSources,
     sourceErrors,
+    qualityBySource,
     usedPdfVisionFallback: false,
   });
 }

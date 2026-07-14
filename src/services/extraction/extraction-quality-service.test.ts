@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getChecklist } from "@/domain/checklists";
 import type { ExtractedFieldValue, ProviderExtractionOutput } from "@/domain/validation";
-import { buildExtractionQuality, missingCriticalFields } from "./extraction-quality-service";
+import { buildExtractionQuality, missingCriticalFields, validateCriticalEvidence } from "./extraction-quality-service";
 
 test("identifica campo crítico ausente e registra recuperação", () => {
   const checklist = getChecklist("RECONCILIATION");
@@ -18,7 +18,9 @@ test("identifica campo crítico ausente e registra recuperação", () => {
   };
 
   const missing = missingCriticalFields("MINUTA", output, checklist);
-  assert.deepEqual(missing.map((field) => field.id), ["financial.financing"]);
+  assert.ok(missing.some((field) => field.id === "financial.financing"));
+  assert.ok(missing.some((field) => field.id === "buyer.rg"));
+  assert.ok(missing.some((field) => field.id === "financial.subsidy"));
 
   const values: ExtractedFieldValue[] = [
     ...output.fields.map((field) => ({ ...field, source: "MINUTA" as const })),
@@ -26,8 +28,8 @@ test("identifica campo crítico ausente e registra recuperação", () => {
   ];
   const quality = buildExtractionQuality("MINUTA", values, checklist, ["financial.financing"], [], [], false);
 
-  assert.equal(quality.status, "COMPLETE");
-  assert.equal(quality.coverage, 100);
+  assert.equal(quality.status, "PARTIAL");
+  assert.ok(quality.coverage < 100);
   assert.deepEqual(quality.recoveredFields, ["financial.financing"]);
 });
 
@@ -72,6 +74,36 @@ test("sinaliza baixa confiança e conflito interno em campo crítico", () => {
   assert.deepEqual(quality.lowConfidenceCriticalFields, ["buyer.cpf"]);
   assert.deepEqual(quality.ambiguousCriticalFields, ["buyer.cpf"]);
   assert.deepEqual(quality.deterministicFields, ["financial.financing"]);
+});
+
+test("bloqueia valor financeiro que não aparece na evidência", () => {
+  const checklist = getChecklist("RECONCILIATION");
+  const validated = validateCriticalEvidence("MINUTA", {
+    fields: [{
+      fieldId: "financial.subsidy",
+      value: "R$ 25,00",
+      confidence: 100,
+      sourceLocation: { page: 2, rawText: "B.4. 5 - Valor do desconto: R$ 12.495,00" },
+    }],
+  }, checklist);
+
+  assert.equal(validated.output.fields[0].value, null);
+  assert.deepEqual(validated.evidenceIssues, ["financial.subsidy"]);
+});
+
+test("aceita CPF quando o valor está mascarado no trecho de evidência", () => {
+  const checklist = getChecklist("RECONCILIATION");
+  const validated = validateCriticalEvidence("MINUTA", {
+    fields: [{
+      fieldId: "buyer.cpf",
+      value: "61942276303",
+      confidence: 96,
+      sourceLocation: { page: 2, rawText: "CPF: 619.422.763-03" },
+    }],
+  }, checklist);
+
+  assert.equal(validated.output.fields[0].value, "61942276303");
+  assert.deepEqual(validated.evidenceIssues, []);
 });
 
 function extracted(fieldId: string, value: string, confidence = 95) {
