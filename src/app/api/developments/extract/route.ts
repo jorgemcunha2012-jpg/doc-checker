@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AuthError, requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { audit } from "@/services/process/process-repository";
 import { extractDevelopmentFromImagesWithOcr } from "@/services/development/development-ocr-service";
 import { KimiProvider } from "@/services/extraction/kimi-provider";
 import { reconcileDevelopmentExtractions } from "@/services/development/development-reconciliation";
@@ -11,18 +12,38 @@ const EXTRACTION_TIMEOUT_MS = 150_000;
 export const maxDuration = 300;
 
 export async function POST(request: Request) {
+  let user: Awaited<ReturnType<typeof requireUser>> | null = null;
+  const attemptId = crypto.randomUUID();
+  const startedAt = Date.now();
+  let sourceDocumentName = "Arquivo não identificado";
+  let pageNumbers: number[] = [];
   try {
-    const user = await requireUser();
+    user = await requireUser();
     const payload = await readPdfPayload(request, user.organizationId);
+    sourceDocumentName = payload?.sourceDocumentName ?? sourceDocumentName;
+    pageNumbers = payload?.pageNumbers ?? [];
     if (!payload || !payload.sourceDocumentName.toLowerCase().endsWith(".pdf") || payload.size > MAX_SIZE) {
+      await auditExtraction(user, "DEVELOPMENT_EXTRACTION_FAILED", attemptId, startedAt, sourceDocumentName, pageNumbers, {
+        stage: "VALIDATION",
+        reason: "Arquivo ausente, inválido ou maior que 20 MB.",
+      });
       return NextResponse.json({ error: "Envie uma matrícula em PDF de até 20 MB." }, { status: 400 });
     }
     if (!payload.images?.length) {
+      await auditExtraction(user, "DEVELOPMENT_EXTRACTION_FAILED", attemptId, startedAt, sourceDocumentName, pageNumbers, {
+        stage: "RENDERING",
+        reason: "Nenhuma página renderizada foi recebida do navegador.",
+      });
       return NextResponse.json({
         error: "Renderize a matrícula pelo navegador antes de extrair. Atualize a página e tente novamente.",
       }, { status: 422 });
     }
-    const startedAt = Date.now();
+    await auditExtraction(user, "DEVELOPMENT_EXTRACTION_STARTED", attemptId, startedAt, sourceDocumentName, pageNumbers, {
+      stage: "EXTRACTION",
+      imageCount: payload.images.length,
+    });
+    let ocrError: string | undefined;
+    let visionError: string | undefined;
     const [ocrExtraction, visionExtraction] = await Promise.all([
       withTimeout(
         extractDevelopmentFromImagesWithOcr(payload.images, payload.pageNumbers),
@@ -30,6 +51,7 @@ export async function POST(request: Request) {
         "O OCR da matrícula demorou demais.",
       ).catch((error) => {
         console.warn("[ConferIA] OCR da matrícula falhou", error);
+        ocrError = error instanceof Error ? error.message : "Falha desconhecida no OCR.";
         return null;
       }),
       withTimeout(
@@ -38,6 +60,7 @@ export async function POST(request: Request) {
         "A visão da IA demorou demais.",
       ).catch((error) => {
         console.warn("[ConferIA] Visão da IA da matrícula falhou", error);
+        visionError = error instanceof Error ? error.message : "Falha desconhecida na visão da IA.";
         return null;
       }),
     ]);
@@ -49,14 +72,51 @@ export async function POST(request: Request) {
       reviewRequired: extraction?.quality?.reviewRequired.length ?? 0,
     });
     if (!extraction?.units.length) {
+      await auditExtraction(user, "DEVELOPMENT_EXTRACTION_FAILED", attemptId, startedAt, sourceDocumentName, pageNumbers, {
+        stage: "RECONCILIATION",
+        reason: [ocrError, visionError].filter(Boolean).join(" | ") || "As leituras não encontraram tipos com área privativa suficiente.",
+        ocrUnits: ocrExtraction?.units.length ?? 0,
+        visionUnits: visionExtraction?.units.length ?? 0,
+      });
       return NextResponse.json({ error: "A IA não encontrou combinações de torre, unidade e área privativa." }, { status: 422 });
     }
+    await auditExtraction(user, "DEVELOPMENT_EXTRACTION_FINISHED", attemptId, startedAt, sourceDocumentName, pageNumbers, {
+      stage: "RECONCILIATION",
+      ocrUnits: ocrExtraction?.units.length ?? 0,
+      visionUnits: visionExtraction?.units.length ?? 0,
+      extractedUnits: extraction.units.length,
+      reviewRequired: extraction.quality?.reviewRequired.length ?? 0,
+    });
     return NextResponse.json({ extraction, sourceDocumentName: payload.sourceDocumentName });
   } catch (error) {
+    if (user) {
+      await auditExtraction(user, "DEVELOPMENT_EXTRACTION_FAILED", attemptId, startedAt, sourceDocumentName, pageNumbers, {
+        stage: "UNEXPECTED",
+        reason: error instanceof Error ? error.message : "Falha inesperada na extração.",
+      });
+    }
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error(error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Falha ao extrair o cadastro." }, { status: 500 });
   }
+}
+
+async function auditExtraction(
+  user: Awaited<ReturnType<typeof requireUser>>,
+  eventType: "DEVELOPMENT_EXTRACTION_STARTED" | "DEVELOPMENT_EXTRACTION_FINISHED" | "DEVELOPMENT_EXTRACTION_FAILED",
+  attemptId: string,
+  startedAt: number,
+  sourceDocumentName: string,
+  pageNumbers: number[],
+  metadata: Record<string, unknown>,
+) {
+  await audit(user, eventType, "development_extraction", attemptId, {
+    sourceDocumentName,
+    pageNumbers,
+    pageCount: pageNumbers.length,
+    durationMs: Date.now() - startedAt,
+    ...metadata,
+  });
 }
 
 async function readPdfPayload(request: Request, organizationId: string) {
