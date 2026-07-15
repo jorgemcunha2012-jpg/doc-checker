@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { AuthError, requireMasterAdmin } from "@/lib/auth";
+import { AuthError, requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
 export async function GET() {
   try {
-    const admin = await requireMasterAdmin();
+    const admin = await requireAdmin();
     const { data, error } = await createSupabaseAdminClient()
       .from("audit_events")
       .select("id, event_type, entity_type, entity_id, metadata, created_at, profiles!audit_events_actor_id_fkey(name)")

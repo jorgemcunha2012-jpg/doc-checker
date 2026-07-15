@@ -36,8 +36,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     }
 
     if (action === "ACTIVATE" || action === "DEACTIVATE") {
-      if (!isMasterAdmin(admin)) {
-        return NextResponse.json({ error: "Somente o administrador master pode ativar ou desativar usuários." }, { status: 403 });
+      if (isMasterAdmin({ email: target.email, role: target.role }) && !isMasterAdmin(admin)) {
+        return NextResponse.json({ error: "Somente o administrador master pode alterar a situação do master." }, { status: 403 });
       }
       const active = action === "ACTIVATE";
       const { error } = await supabase.from("profiles").update({ active, updated_at: new Date().toISOString() }).eq("id", userId).eq("organization_id", admin.organizationId);
