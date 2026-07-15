@@ -188,6 +188,94 @@ export async function deleteDevelopment(organizationId: string, developmentId: s
   return Boolean(data);
 }
 
+export async function updateDevelopment(
+  organizationId: string,
+  developmentId: string,
+  sourceDocumentName: string,
+  extraction: DevelopmentExtraction,
+) {
+  const current = (await listDevelopments(organizationId)).find((item) => item.id === developmentId);
+  if (!current) return null;
+
+  const updated: Development = {
+    ...current,
+    name: extraction.name,
+    city: extraction.city,
+    registration: extraction.registration,
+    sellerLegalName: extraction.sellerLegalName,
+    sellerCnpj: extraction.sellerCnpj,
+    sourceDocumentName: sourceDocumentName || current.sourceDocumentName,
+    units: extraction.units.map((unit) => ({
+      ...unit,
+      id: crypto.randomUUID(),
+      developmentId,
+    })),
+  };
+
+  if (!isSupabaseConfigured()) {
+    localDevelopments.set(developmentId, updated);
+    return updated;
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const developmentPayload = {
+    name: updated.name,
+    city: updated.city ?? null,
+    registration: updated.registration ?? null,
+    seller_legal_name: updated.sellerLegalName ?? null,
+    seller_cnpj: updated.sellerCnpj ?? null,
+    source_document_name: updated.sourceDocumentName,
+    updated_at: new Date().toISOString(),
+  };
+  let { error } = await supabase
+    .from("developments")
+    .update(developmentPayload)
+    .eq("id", developmentId)
+    .eq("organization_id", organizationId);
+  if (error?.message.includes("seller_legal_name") || error?.message.includes("seller_cnpj")) {
+    const legacyPayload = Object.fromEntries(Object.entries(developmentPayload).filter(([key]) => key !== "seller_legal_name" && key !== "seller_cnpj"));
+    ({ error } = await supabase.from("developments").update(legacyPayload).eq("id", developmentId).eq("organization_id", organizationId));
+  }
+  if (error) throw new Error(error.message);
+
+  const { error: deleteUnitsError } = await supabase
+    .from("development_units")
+    .delete()
+    .eq("development_id", developmentId)
+    .eq("organization_id", organizationId);
+  if (deleteUnitsError) throw new Error(deleteUnitsError.message);
+
+  let { error: unitsError } = await supabase.from("development_units").insert(updated.units.map((unit) => unitRow(unit)));
+  if (unitsError?.message.includes("iptu_registration")) {
+    ({ error: unitsError } = await supabase.from("development_units").insert(updated.units.map((unit) => unitRow(unit, true))));
+  }
+  if (unitsError) throw new Error(unitsError.message);
+  return updated;
+
+  function unitRow(unit: Development["units"][number], withoutIptu = false) {
+    const row = {
+      id: unit.id,
+      development_id: developmentId,
+      organization_id: organizationId,
+      tower: unit.tower || "TIPO",
+      unit: unit.unit || unit.typology || "TIPO",
+      private_area: unit.privateArea,
+      total_area: unit.totalArea ?? null,
+      ideal_fraction: unit.idealFraction ?? null,
+      iptu_registration: unit.iptuRegistration ?? null,
+      typology: unit.typology ?? null,
+      registration: unit.registration ?? null,
+      confidence: unit.confidence,
+    };
+    if (withoutIptu) {
+      const { iptu_registration, ...legacyRow } = row;
+      void iptu_registration;
+      return legacyRow;
+    }
+    return row;
+  }
+}
+
 function compareUnits(left: Development["units"][number], right: Development["units"][number]) {
   return left.tower.localeCompare(right.tower, "pt-BR", { numeric: true }) ||
     left.unit.localeCompare(right.unit, "pt-BR", { numeric: true });

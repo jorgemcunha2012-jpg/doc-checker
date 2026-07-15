@@ -11,6 +11,7 @@ const MAX_SELECTED_PAGES = 40;
 export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boolean; canDelete: boolean }) {
   const [developments, setDevelopments] = useState<Development[]>([]);
   const [extraction, setExtraction] = useState<DevelopmentExtraction | null>(null);
+  const [editingDevelopmentId, setEditingDevelopmentId] = useState<string | null>(null);
   const [sourceDocumentName, setSourceDocumentName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -98,9 +99,9 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
     setBusy(true);
     setError("");
     const response = await fetch("/api/developments", {
-      method: "POST",
+      method: editingDevelopmentId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ extraction, sourceDocumentName }),
+      body: JSON.stringify({ id: editingDevelopmentId ?? undefined, extraction, sourceDocumentName }),
     });
     const payload = await response.json();
     setBusy(false);
@@ -109,8 +110,34 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
       return;
     }
     setExtraction(null);
+    setEditingDevelopmentId(null);
     setSourceDocumentName("");
     await loadDevelopments();
+  }
+
+  function editDevelopment(development: Development) {
+    setError("");
+    setEditingDevelopmentId(development.id);
+    setSourceDocumentName(development.sourceDocumentName);
+    setExtraction({
+      name: development.name,
+      city: development.city,
+      registration: development.registration,
+      sellerLegalName: development.sellerLegalName,
+      sellerCnpj: development.sellerCnpj,
+      units: development.units.map((unit) => ({
+        tower: unit.tower,
+        unit: unit.unit,
+        privateArea: unit.privateArea,
+        totalArea: unit.totalArea,
+        idealFraction: unit.idealFraction,
+        iptuRegistration: unit.iptuRegistration,
+        typology: unit.typology,
+        registration: unit.registration,
+        confidence: unit.confidence,
+        evidence: unit.evidence,
+      })),
+    });
   }
 
   async function removeDevelopment(development: Development) {
@@ -182,6 +209,7 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
           <button
             className="ml-2 inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
             onClick={() => {
+              setEditingDevelopmentId(null);
               setSourceDocumentName("Cadastro manual");
               setExtraction({ name: "", sellerLegalName: "", sellerCnpj: "", units: [{ tower: "", unit: "", privateArea: "", totalArea: "", idealFraction: "", iptuRegistration: "", confidence: 100 }] });
             }}
@@ -197,8 +225,8 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
             <div className="mb-5 flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="text-xs font-bold uppercase text-[#0f8f88]">Revisão obrigatória</div>
-                <h2 className="mt-1 text-lg font-bold text-slate-950">Revisar cadastro extraído</h2>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Confira razão social, CNPJ, tipos, áreas e fração ideal antes de transformar a extração em base mestre.</p>
+                <h2 className="mt-1 text-lg font-bold text-slate-950">{editingDevelopmentId ? "Editar empreendimento" : "Revisar cadastro extraído"}</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Confira razão social, CNPJ, tipos, áreas e fração ideal antes de salvar as informações na base mestre.</p>
               </div>
               {review?.canSave ? (
                 <div className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800">
@@ -248,7 +276,7 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
                 <Field label="CNPJ" value={extraction.sellerCnpj ?? ""} onChange={(value) => setExtraction({ ...extraction, sellerCnpj: value })} />
               </div>
               <button onClick={() => void save()} disabled={busy || !review?.canSave} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
-                <Save className="h-4 w-4" /> Salvar cadastro
+                <Save className="h-4 w-4" /> {editingDevelopmentId ? "Atualizar cadastro" : "Salvar cadastro"}
               </button>
             </div>
             <div className="mt-5 overflow-x-auto">
@@ -294,7 +322,7 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
             {developments.map((development) => (
               <div key={development.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div><div className="font-bold text-slate-900">{development.name}</div><div className="text-sm text-slate-500">{development.city ?? "Cidade não informada"} · Matrícula {development.registration ?? "não informada"}</div><div className="mt-1 text-xs text-slate-500">{development.sellerLegalName || development.sellerCnpj ? `${development.sellerLegalName ?? "Razão social não informada"} · CNPJ ${development.sellerCnpj ?? "não informado"}` : "Razão social e CNPJ não informados"}</div><div className="mt-1 text-xs text-slate-500">{summarizeUnitTypes(development)}</div></div>
-                <div className="flex items-center gap-4"><div className="text-sm font-semibold text-slate-600">{development.units.length} unidades</div>{canDelete ? <button title="Excluir empreendimento" onClick={() => void removeDevelopment(development)} disabled={busy} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-rose-200 px-3 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"><Trash2 className="h-4 w-4" />Excluir</button> : null}</div>
+                <div className="flex items-center gap-3"><div className="text-sm font-semibold text-slate-600">{development.units.length} unidades</div>{canManage ? <button title="Editar empreendimento" onClick={() => editDevelopment(development)} disabled={busy} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"><Save className="h-4 w-4" />Editar</button> : null}{canDelete ? <button title="Excluir empreendimento" onClick={() => void removeDevelopment(development)} disabled={busy} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-rose-200 px-3 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"><Trash2 className="h-4 w-4" />Excluir</button> : null}</div>
               </div>
             ))}
             {!developments.length ? <p className="py-8 text-center text-sm text-slate-500">Nenhum empreendimento cadastrado.</p> : null}
