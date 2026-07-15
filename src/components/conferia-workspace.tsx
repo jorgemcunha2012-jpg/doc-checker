@@ -136,6 +136,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
   const selectedDevelopment = developments.find((development) => development.id === developmentId);
   const hasDocuments =
     new Set(documents.map((document) => document.source).filter(Boolean)).size + (developmentUnitId ? 1 : 0) >= 2;
+  const sourceCount = new Set(documents.map((document) => document.source).filter(Boolean)).size;
   const isProcessing = isSubmitting || process?.status === "PENDING" || process?.status === "EXTRACTING" || process?.status === "COMPARING";
 
   const processSteps = useMemo(
@@ -299,28 +300,28 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
         </div>
       </header> : null}
 
-      <section className={embedded ? "mb-6" : "border-b border-slate-200 bg-[#f8fafc]"}>
+      <section className={embedded ? "mb-7" : "border-b border-[var(--border)] bg-[var(--canvas)]"}>
         <div className="mx-auto max-w-7xl px-5 py-9 sm:py-12">
-          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase text-[#2563eb]">
+          <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">
             <Sparkles className="h-4 w-4" />
             Checklist inteligente com IA
           </div>
-          <h1 className="mt-3 max-w-3xl text-3xl font-bold text-slate-950 sm:text-4xl">Conferência documental imobiliária</h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">Envie os documentos que deseja verificar. A ConferIA compara os dados das telas com a minuta e demais documentos do processo, destacando o que confere, diverge ou precisa de revisão.</p>
+          <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-[-0.04em] text-[var(--foreground)] sm:text-4xl">Prepare uma nova conferência</h1>
+          <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--muted)]">Escolha a referência do imóvel e organize os documentos por origem. A ConferIA identifica, extrai e compara os dados automaticamente.</p>
         </div>
       </section>
 
       <div className={`mx-auto max-w-7xl ${embedded ? "" : "px-5 py-8"}`}>
         <section className="space-y-5">
-          <div className="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="text-xl font-bold text-slate-950">Nova conferência</h2>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Selecione uma base de empreendimento e envie os documentos do comprador. Sem uma base cadastrada, utilize ao menos duas fontes documentais.</p>
+                <h2 className="text-xl font-semibold text-[var(--foreground)]">Dados para comparação</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--muted)]">Conclua as duas etapas abaixo. Sem cadastro mestre, adicione documentos de pelo menos duas fontes.</p>
               </div>
             </div>
             <button
-              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-[#2563eb] px-5 py-2 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="app-button-primary hidden min-h-11 shrink-0 items-center justify-center gap-2 px-5 py-2 text-sm font-semibold lg:inline-flex"
               disabled={!hasDocuments || isProcessing}
               onClick={handleRunValidation}
             >
@@ -329,28 +330,28 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
             </button>
           </div>
 
-          <section className="border border-slate-200 bg-white p-5 sm:p-6">
+          <section className="app-card p-5 sm:p-6">
             <div className="flex flex-col gap-1">
-              <div className="text-xs font-bold uppercase text-[#0f8f88]">Etapa 1</div>
-              <h2 className="text-base font-bold text-slate-950">Base do empreendimento</h2>
-              <p className="text-sm text-slate-500">Selecione a unidade de referência. Torre, apartamento, áreas, fração ideal, empreendimento e matrícula serão conferidos contra os documentos do comprador.</p>
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">Etapa 1</div>
+              <h2 className="mt-1 text-lg font-semibold text-[var(--foreground)]">Identificação do imóvel</h2>
+              <p className="text-sm leading-6 text-[var(--muted)]">Se houver uma unidade cadastrada, use-a como fonte de referência para áreas, fração ideal e matrícula.</p>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="text-xs font-bold text-slate-600">Empreendimento
-                <select className="mt-1 block min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900" value={developmentId} onChange={(event) => { setDevelopmentId(event.target.value); setDevelopmentUnitId(""); }}>
+              <label className="text-xs font-medium text-[var(--muted)]">Empreendimento
+                <select className="app-input mt-1 block w-full px-3 text-sm" value={developmentId} onChange={(event) => { setDevelopmentId(event.target.value); setDevelopmentUnitId(""); }}>
                   <option value="">Sem cadastro mestre</option>
                   {developments.map((development) => <option key={development.id} value={development.id}>{development.name}</option>)}
                 </select>
               </label>
-              <label className="text-xs font-bold text-slate-600">Tipo de unidade
-                <select disabled={!selectedDevelopment} className="mt-1 block min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 disabled:bg-slate-100" value={developmentUnitId} onChange={(event) => setDevelopmentUnitId(event.target.value)}>
+              <label className="text-xs font-medium text-[var(--muted)]">Tipo de unidade
+                <select disabled={!selectedDevelopment} className="app-input mt-1 block w-full px-3 text-sm disabled:bg-slate-100" value={developmentUnitId} onChange={(event) => setDevelopmentUnitId(event.target.value)}>
                   <option value="">Selecione a unidade</option>
                   {selectedDevelopment?.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.typology || `Torre ${unit.tower} · Apto ${unit.unit}`} · {unit.privateArea} priv. · {unit.totalArea || "-"} total · fração {unit.idealFraction || "-"} · IPTU {unit.iptuRegistration || "-"}</option>)}
                 </select>
               </label>
             </div>
             {currentUser.role === "ADMIN" ? (
-              <a href="/developments" className="mt-4 inline-flex min-h-9 items-center text-sm font-bold text-[#0f8f88] hover:text-[#0b736e]">
+              <a href="/developments" className="mt-4 inline-flex min-h-9 items-center text-sm font-medium text-[var(--primary)] hover:text-[var(--primary-hover)]">
                 Cadastrar nova base de empreendimento
               </a>
             ) : null}
@@ -364,6 +365,18 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
             description="Envie telas, minuta, ITBI, matrícula, certidões e demais documentos específicos desta conferência."
           />
           {documents.length ? <AnalysisEstimate documents={documents} /> : null}
+
+          {!isProcessing && !run ? (
+            <div className="sticky bottom-4 z-20 rounded-2xl border border-[var(--border)] bg-white/95 p-3 shadow-[0_18px_50px_rgb(16_42_58/0.18)] backdrop-blur sm:flex sm:items-center sm:justify-between sm:gap-4 sm:p-4">
+              <div className="mb-3 sm:mb-0">
+                <div className="text-sm font-semibold text-[var(--foreground)]">{hasDocuments ? "Tudo pronto para conferir" : "Complete as fontes da conferência"}</div>
+                <div className="mt-1 text-xs text-[var(--muted)]">{hasDocuments ? `${documents.length} arquivo(s) em ${sourceCount} fonte(s)${developmentUnitId ? " e uma unidade de referência" : ""}.` : developmentUnitId ? "Adicione ao menos uma fonte documental." : "Adicione documentos de pelo menos duas fontes diferentes."}</div>
+              </div>
+              <button className="app-button-primary inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 px-5 text-sm font-semibold sm:w-auto" disabled={!hasDocuments} onClick={handleRunValidation}>
+                <UploadCloud className="h-4 w-4" /> Iniciar conferência
+              </button>
+            </div>
+          ) : null}
 
           {isProcessing ? <ProcessingPanel steps={processSteps} elapsedSeconds={elapsedSeconds} documents={documents} /> : null}
           {process?.status === "FAILED" ? <ProcessError message={process.error} /> : null}

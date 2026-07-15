@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FileText, ImageIcon, Paperclip, Clipboard, Eye, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { FileText, ImageIcon, Paperclip, Clipboard, Eye, X, MonitorUp, ScrollText, Landmark, Files } from "lucide-react";
 import { uploadDocumentSources, documentSourceLabels, type DocumentSource, type UploadedDocument, type ValidationType } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
 
@@ -25,24 +25,29 @@ export function FileDropZone({
   description = "Envie os documentos que deseja verificar. Prints das telas, minuta e anexos podem ser combinados na mesma conferência.",
 }: FileDropZoneProps) {
   const [previewDocument, setPreviewDocument] = useState<ClientUploadedDocument | null>(null);
+  const [uploadMessage, setUploadMessage] = useState("");
 
-  function handleFiles(files: FileList | null) {
+  function handleFiles(files: FileList | null, requestedSource?: DocumentSource) {
     if (!files?.length) {
       return;
     }
 
-    const nextDocuments = Array.from(files).map<ClientUploadedDocument>((file) => ({
+    const existing = new Set(documents.map((document) => `${document.name}:${document.sizeBytes}`));
+    const acceptedFiles = Array.from(files).filter((file) => !existing.has(`${file.name}:${file.size}`));
+    const duplicates = files.length - acceptedFiles.length;
+    const nextDocuments = acceptedFiles.map<ClientUploadedDocument>((file) => ({
       id: crypto.randomUUID(),
       organizationId: defaultOrganization.id,
       name: file.name,
       type: resolveDocumentType(file, validationType),
       mimeType: file.type || "application/octet-stream",
       sizeBytes: file.size,
-      source: validationType === "RECONCILIATION" ? inferDocumentSource(file) : undefined,
+      source: validationType === "RECONCILIATION" ? requestedSource ?? inferDocumentSource(file) : undefined,
       file,
     }));
 
     onDocumentsChange([...documents, ...nextDocuments]);
+    setUploadMessage(duplicates ? `${duplicates} arquivo(s) duplicado(s) não foram adicionados.` : `${nextDocuments.length} arquivo(s) adicionado(s).`);
   }
 
   function removeDocument(id: string) {
@@ -54,46 +59,40 @@ export function FileDropZone({
   }
 
   return (
-    <section className="border border-slate-200 bg-white">
+    <section className="app-card overflow-hidden">
       <div className="p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-base font-bold text-slate-950">{title}</h2>
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">Etapa 2</div>
+          <h2 className="mt-1 text-lg font-semibold text-[var(--foreground)]">{title.replace(/^Etapa 2\s*·\s*/, "")}</h2>
+          <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{description}</p>
         </div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 p-2 text-slate-500" title="Também aceita Ctrl+V">
+        <div className="rounded-xl bg-[var(--surface-subtle)] p-2.5 text-[var(--muted)]" title="Também aceita Ctrl+V">
           <Clipboard className="h-5 w-5" aria-hidden="true" />
         </div>
       </div>
 
-      <label className="mt-5 flex min-h-40 cursor-pointer flex-col items-center justify-center border border-dashed border-slate-300 bg-slate-50/60 px-4 py-6 text-center transition hover:border-[#2563eb] hover:bg-blue-50/50">
-        <input
-          className="sr-only"
-          type="file"
-          multiple
-          accept=".pdf,.docx,.rtf,.tif,.tiff,.jpg,.jpeg,.png,image/jpeg,image/png,image/tiff,application/pdf,application/rtf,text/rtf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          onChange={(event) => handleFiles(event.target.files)}
-        />
-        <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-[#2563eb] shadow-sm ring-1 ring-slate-200">
-          <Paperclip className="h-6 w-6" aria-hidden="true" />
-        </span>
-        <span className="mt-3 text-sm font-semibold text-slate-900">Adicionar documentos para verificação</span>
-        <span className="mt-1 max-w-sm text-xs text-slate-500">PDF, DOCX, RTF, TIFF/TIF, PNG ou JPG. Também é possível colar prints com Ctrl+V.</span>
-      </label>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <SourceUpload icon={MonitorUp} title="Dados da reserva" description="Prints, telas e propostas" count={documents.filter((item) => item.source === "DADOS_RESERVA" || item.source === "SIOPI").length} onFiles={(files) => handleFiles(files, "DADOS_RESERVA")} />
+        <SourceUpload icon={ScrollText} title="Minuta ou contrato" description="PDF, DOCX ou RTF" count={documents.filter((item) => item.source === "MINUTA").length} onFiles={(files) => handleFiles(files, "MINUTA")} />
+        <SourceUpload icon={Landmark} title="ITBI e imóvel" description="ITBI, matrícula, IPTU e certidões" count={documents.filter((item) => ["ITBI", "MATRICULA", "IPTU", "CERTIDAO"].includes(item.source ?? "")).length} onFiles={(files) => handleFiles(files, "ITBI")} />
+        <SourceUpload icon={Files} title="Outros documentos" description="Anexos e documentos complementares" count={documents.filter((item) => item.source === "DOCUMENTO_COMPLEMENTAR").length} onFiles={(files) => handleFiles(files, "DOCUMENTO_COMPLEMENTAR")} />
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--muted)]"><span>PDF, DOCX, RTF, TIFF/TIF, PNG ou JPG · também aceita Ctrl+V</span>{uploadMessage ? <span role="status" className="font-medium text-[var(--primary)]">{uploadMessage}</span> : null}</div>
 
       <div className="mt-4 space-y-2">
         {documents.map((document) => (
-          <div key={document.id} className="flex flex-col gap-2 border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div key={document.id} className="flex flex-col gap-2 rounded-xl bg-[var(--surface-subtle)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-blue-50 text-[#2563eb]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--primary)] shadow-sm">
                 {document.mimeType.includes("image") ? <ImageIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
               </span>
-              <span className="truncate text-sm font-medium text-slate-800">{document.name}</span>
+              <span className="min-w-0"><span className="block truncate text-sm font-medium text-[var(--foreground)]">{document.name}</span><span className="block text-[11px] text-[var(--muted)]">{formatFileSize(document.sizeBytes)}</span></span>
             </div>
             <div className="flex items-center gap-2">
               <select
                 aria-label={`Fonte de ${document.name}`}
-                className="min-h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-slate-700 outline-none focus:border-[#2563eb]"
+                className="app-input min-h-9 px-2 text-xs font-medium"
                 value={document.source ?? "SIOPI"}
                 onChange={(event) => updateDocumentSource(document.id, event.target.value as DocumentSource)}
               >
@@ -124,14 +123,35 @@ export function FileDropZone({
   );
 }
 
+function SourceUpload({ icon: Icon, title, description, count, onFiles }: { icon: typeof MonitorUp; title: string; description: string; count: number; onFiles: (files: FileList | null) => void }) {
+  return (
+    <label className="group flex min-h-28 cursor-pointer items-center gap-4 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-subtle)] p-4 transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]">
+      <input className="sr-only" type="file" multiple accept=".pdf,.docx,.rtf,.tif,.tiff,.jpg,.jpeg,.png,image/jpeg,image/png,image/tiff,application/pdf,application/rtf,text/rtf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => { onFiles(event.target.files); event.target.value = ""; }} />
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--primary)] shadow-sm"><Icon className="h-5 w-5" /></span>
+      <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[var(--foreground)]">{title}</span><span className="mt-1 block text-xs text-[var(--muted)]">{description}</span><span className="mt-2 block text-xs font-medium text-[var(--primary)]">{count ? `${count} arquivo(s) · adicionar mais` : "Adicionar arquivo"}</span></span>
+      <Paperclip className="h-4 w-4 text-slate-400 group-hover:text-[var(--primary)]" />
+    </label>
+  );
+}
+
 function DocumentPreview({ document, onClose }: { document: ClientUploadedDocument; onClose: () => void }) {
   const [url, setUrl] = useState("");
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const objectUrl = URL.createObjectURL(document.file);
     setUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
   }, [document.file]);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   const isTiff = document.mimeType === "image/tiff" || /\.tiff?$/i.test(document.name);
   const isDocx = document.mimeType.includes("wordprocessingml") || /\.docx$/i.test(document.name);
@@ -143,7 +163,7 @@ function DocumentPreview({ document, onClose }: { document: ClientUploadedDocume
           <div className="truncate text-sm font-bold text-slate-950">{document.name}</div>
           <div className="text-xs text-slate-500">{documentSourceLabels[document.source ?? "DOCUMENTO_COMPLEMENTAR"]}</div>
         </div>
-        <button className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950" onClick={onClose} title="Fechar visualização">
+        <button ref={closeButtonRef} className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950" onClick={onClose} title="Fechar visualização">
           <X className="h-5 w-5" />
         </button>
       </div>
@@ -165,6 +185,12 @@ function DocumentPreview({ document, onClose }: { document: ClientUploadedDocume
       </div>
     </div>
   );
+}
+
+function formatFileSize(bytes?: number) {
+  if (!bytes) return "Tamanho não informado";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function resolveDocumentType(file: File, validationType: ValidationType): UploadedDocument["type"] {

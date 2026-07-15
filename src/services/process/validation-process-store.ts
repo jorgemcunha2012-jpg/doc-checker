@@ -11,6 +11,12 @@ export function getValidationProcess(id: string) {
   return processes.get(id);
 }
 
+export function listValidationProcesses() {
+  return [...processes.values()].sort(
+    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  );
+}
+
 export function updateValidationProcess(id: string, patch: Partial<ValidationProcess>) {
   const current = processes.get(id);
 

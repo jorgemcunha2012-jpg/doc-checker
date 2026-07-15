@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: process.cwd(),
   serverExternalPackages: ["@napi-rs/canvas"],
   outputFileTracingIncludes: {
     "/api/developments/extract": [
