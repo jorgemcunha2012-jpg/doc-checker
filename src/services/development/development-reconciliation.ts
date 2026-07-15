@@ -10,6 +10,10 @@ export function reconcileDevelopmentExtractions(
 
   const reviewRequired = new Set<string>();
   const warnings = new Set<string>();
+  const detectedTypologies = new Set<string>([
+    ...(ocr.quality?.detectedTypologies ?? []),
+    ...(vision.quality?.detectedTypologies ?? []),
+  ]);
   for (const issue of ocr.quality?.reviewRequired ?? []) reviewRequired.add(`OCR: ${issue}`);
   for (const issue of vision.quality?.reviewRequired ?? []) reviewRequired.add(`Visão IA: ${issue}`);
   for (const warning of ocr.quality?.warnings ?? []) warnings.add(`OCR: ${warning}`);
@@ -65,6 +69,7 @@ export function reconcileDevelopmentExtractions(
       reviewRequired: [...reviewRequired],
       warnings: [...warnings],
       sourcesCompared: ["OCR", "Visão IA"],
+      detectedTypologies: [...detectedTypologies],
     },
   };
 }
@@ -76,6 +81,7 @@ function addQuality(extraction: DevelopmentExtraction, reviewRequired: string[],
       reviewRequired: [...new Set([...(extraction.quality?.reviewRequired ?? []), ...reviewRequired])],
       warnings: [...new Set([...(extraction.quality?.warnings ?? []), ...warnings])],
       sourcesCompared: extraction.quality?.sourcesCompared,
+      detectedTypologies: extraction.quality?.detectedTypologies,
     },
   };
 }

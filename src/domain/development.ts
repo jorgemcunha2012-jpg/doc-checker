@@ -45,6 +45,7 @@ export type DevelopmentExtractionQuality = {
   reviewRequired: string[];
   warnings: string[];
   sourcesCompared?: string[];
+  detectedTypologies?: string[];
 };
 
 export type DevelopmentExtractionReview = {

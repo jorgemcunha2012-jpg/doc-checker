@@ -64,7 +64,7 @@ export async function POST(request: Request) {
         return null;
       }),
     ]);
-    const extraction = reconcileDevelopmentExtractions(ocrExtraction?.units.length ? ocrExtraction : null, visionExtraction?.units.length ? visionExtraction : null);
+    const extraction = reconcileDevelopmentExtractions(ocrExtraction, visionExtraction);
     console.info("[ConferIA] Leituras independentes da matrícula concluídas", {
       durationMs: Date.now() - startedAt,
       ocrUnits: ocrExtraction?.units.length ?? 0,
@@ -77,8 +77,20 @@ export async function POST(request: Request) {
         reason: [ocrError, visionError].filter(Boolean).join(" | ") || "As leituras não encontraram tipos com área privativa suficiente.",
         ocrUnits: ocrExtraction?.units.length ?? 0,
         visionUnits: visionExtraction?.units.length ?? 0,
+        detectedTypologies: extraction?.quality?.detectedTypologies ?? [],
       });
-      return NextResponse.json({ error: "A IA não encontrou combinações de torre, unidade e área privativa." }, { status: 422 });
+      const typologies = extraction?.quality?.detectedTypologies ?? [];
+      return NextResponse.json({
+        error: typologies.length
+          ? `A matrícula foi lida, mas não apresenta área privativa associada aos tipos ${typologies.join(", ")}. Torre e apartamento são opcionais; tipo e área privativa são obrigatórios para criar a base do empreendimento. Envie as páginas do memorial com as áreas dos tipos ou use o cadastro manual.`
+          : "A matrícula não apresentou tipos de unidade com área privativa legível. Torre e apartamento são opcionais; tipo e área privativa são obrigatórios para criar a base do empreendimento. Verifique se foram enviadas as páginas do memorial descritivo ou use o cadastro manual.",
+        details: {
+          detectedTypologies: typologies,
+          ocrUnits: ocrExtraction?.units.length ?? 0,
+          visionUnits: visionExtraction?.units.length ?? 0,
+          reviewRequired: extraction?.quality?.reviewRequired ?? [],
+        },
+      }, { status: 422 });
     }
     await auditExtraction(user, "DEVELOPMENT_EXTRACTION_FINISHED", attemptId, startedAt, sourceDocumentName, pageNumbers, {
       stage: "RECONCILIATION",

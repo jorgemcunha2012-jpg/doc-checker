@@ -65,3 +65,26 @@ test("extrai matrícula escaneada com área privativa coberta e apartamentos nrs
   assert.ok(result.units.some((unit) => unit.typology === "Tipo A" && unit.privateArea === "38,08"));
   assert.ok(result.units.some((unit) => unit.typology === "Tipo B" && unit.idealFraction === "0,003660292"));
 });
+
+test("reconhece área privativa total e não exige torre ou apartamento", () => {
+  const result = extractDevelopmentFromOcrText(`
+    Matrícula 78367. Empreendimento JÓQUEI CONDOMÍNIO CLUBE.
+    Tipo A, área privativa total de 72,50 m², área real total de 100,00 m².
+    Tipo B: área privativa coberta de 84.25 m2, fração ideal de 0,0021.
+  `);
+
+  assert.equal(result.units.length, 2);
+  assert.ok(result.units.some((unit) => unit.typology === "Tipo A" && unit.privateArea === "72,50"));
+  assert.ok(result.units.some((unit) => unit.typology === "Tipo B" && unit.privateArea === "84,25"));
+});
+
+test("identifica tipos quando a matrícula não traz suas áreas", () => {
+  const result = extractDevelopmentFromOcrText(`
+    Matrícula 78367. O empreendimento terá apartamentos do Tipo A e Tipo B.
+    Torre 1 a 3, com distribuição de unidades autônomas.
+  `);
+
+  assert.equal(result.units.length, 0);
+  assert.deepEqual(result.quality?.detectedTypologies, ["Tipo A", "Tipo B"]);
+  assert.match(result.quality?.reviewRequired.join(" ") ?? "", /nenhuma área privativa/i);
+});
