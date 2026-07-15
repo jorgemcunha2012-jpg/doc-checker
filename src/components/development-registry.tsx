@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, Building2, CheckCircle2, FileUp, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import type { Development, DevelopmentExtraction } from "@/domain/development";
 import { reviewDevelopmentExtraction, unitTypeSignature } from "@/domain/development";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const MAX_SELECTED_PAGES = 40;
 
@@ -62,12 +61,19 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
     try {
       const pages = await renderPdfInBrowser(pendingFile, selectedPages);
       const imagePaths = await uploadRenderedPages(pendingFile.name, pages, controller.signal);
-      const response = await fetch("/api/developments/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceDocumentName: pendingFile.name, imagePaths, pageNumbers: selectedPages }),
-        signal: controller.signal,
-      });
+      let response: Response;
+      try {
+        response = await fetch("/api/developments/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sourceDocumentName: pendingFile.name, imagePaths, pageNumbers: selectedPages }),
+          signal: controller.signal,
+        });
+      } catch (reason) {
+        throw new Error(reason instanceof TypeError && reason.message === "Failed to fetch"
+          ? "Não foi possível iniciar a extração no servidor. Verifique a conexão e tente novamente."
+          : reason instanceof Error ? reason.message : "Não foi possível iniciar a extração no servidor.");
+      }
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
         setError(payload.error ?? "Não foi possível extrair a matrícula.");
@@ -390,28 +396,29 @@ function parsePageSelection(value: string, pageCount: number) {
 }
 
 async function uploadRenderedPages(fileName: string, pages: Blob[], signal: AbortSignal) {
-  const supabase = createSupabaseBrowserClient();
-  if (!supabase) throw new Error("Supabase não configurado para upload das páginas renderizadas.");
   const paths: string[] = [];
 
   for (let index = 0; index < pages.length; index += 1) {
     const page = pages[index];
-    const uploadResponse = await fetch("/api/developments/extract/upload-url", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fileName: `${fileName.replace(/\.pdf$/i, "")}-pagina-${index + 1}.jpg`,
-        fileSize: page.size,
-        mimeType: "image/jpeg",
-      }),
-      signal,
-    });
+    const pageName = `${fileName.replace(/\.pdf$/i, "")}-pagina-${index + 1}.jpg`;
+    const form = new FormData();
+    form.append("page", page, pageName);
+    form.append("fileName", pageName);
+    let uploadResponse: Response;
+    try {
+      uploadResponse = await fetch("/api/developments/extract/upload-url", {
+        method: "POST",
+        body: form,
+        signal,
+      });
+    } catch (reason) {
+      throw new Error(reason instanceof TypeError && reason.message === "Failed to fetch"
+        ? `Não foi possível enviar a página ${index + 1} ao servidor. Verifique a conexão e tente novamente.`
+        : reason instanceof Error ? reason.message : `Não foi possível enviar a página ${index + 1}.`);
+    }
     const uploadPayload = await uploadResponse.json().catch(() => ({}));
-    if (!uploadResponse.ok) throw new Error(uploadPayload.error ?? "Não foi possível preparar upload da página renderizada.");
-    const { error } = await supabase.storage
-      .from("process-documents")
-      .uploadToSignedUrl(uploadPayload.storagePath, uploadPayload.token, page);
-    if (error) throw new Error(`Não foi possível enviar página renderizada: ${error.message}`);
+    if (!uploadResponse.ok) throw new Error(`Upload da página ${index + 1} falhou: ${uploadPayload.error ?? "resposta inválida do servidor"}`);
+    if (!uploadPayload.storagePath) throw new Error(`Upload da página ${index + 1} não retornou o caminho armazenado.`);
     paths.push(uploadPayload.storagePath);
   }
 
