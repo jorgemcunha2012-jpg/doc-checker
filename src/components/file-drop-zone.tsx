@@ -135,6 +135,7 @@ function DocumentPreview({ document, onClose }: { document: ClientUploadedDocume
 
   const isTiff = document.mimeType === "image/tiff" || /\.tiff?$/i.test(document.name);
   const isDocx = document.mimeType.includes("wordprocessingml") || /\.docx$/i.test(document.name);
+  const isRtf = document.mimeType === "application/rtf" || document.mimeType === "text/rtf" || /\.rtf$/i.test(document.name);
   const isImage = document.mimeType.includes("image") && !isTiff;
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/80 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label={`Visualização de ${document.name}`}>
@@ -153,7 +154,7 @@ function DocumentPreview({ document, onClose }: { document: ClientUploadedDocume
         ) : isImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt={document.name} className="max-h-full max-w-full object-contain" />
-        ) : isTiff || isDocx ? (
+        ) : isTiff || isDocx || isRtf ? (
           <div className="max-w-md px-6 text-center">
             <FileText className="mx-auto h-10 w-10 text-slate-400" />
             <p className="mt-3 text-sm font-bold text-slate-700">Pré-visualização não disponível neste navegador</p>
@@ -177,6 +178,10 @@ function resolveDocumentType(file: File, validationType: ValidationType): Upload
   }
 
   if (file.type.includes("wordprocessingml") || /\.docx$/i.test(file.name)) {
+    return "WORD";
+  }
+
+  if (file.type === "application/rtf" || file.type === "text/rtf" || /\.rtf$/i.test(file.name)) {
     return "WORD";
   }
 
