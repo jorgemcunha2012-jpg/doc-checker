@@ -19,6 +19,8 @@ export function fieldExtractionHint(fieldId: string) {
       "no print de pagamento é opcional; só preencha se houver FGTS explícito no print; na Minuta extraia somente o item FGTS dentro da seção B.4 Valor de composição dos recursos",
     "financial.subsidy":
       "no print de pagamento é opcional; só preencha se houver subsídio/desconto explícito no print; na Minuta extraia somente o item subsídio/desconto dentro da seção B.4 Valor de composição dos recursos",
+    "financial.housingEntry":
+      "na Minuta, Entrada Moradia corresponde exclusivamente ao valor de recursos próprios do item B.4.2 dentro da composição dos recursos; não inferir de sinal, entrada ou outro valor",
     "buyer.address":
       "extrair somente o domicílio/endereço residencial do comprador, adquirente ou cliente na qualificação pessoal; nunca usar endereço do imóvel, empreendimento ou unidade",
     "seller.address":
