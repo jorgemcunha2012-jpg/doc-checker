@@ -285,7 +285,7 @@ export class DocumentExtractionService {
     const deterministicFields = deterministic.fields
       .filter((field) => field.value != null && String(field.value).trim())
       .map((field) => field.fieldId);
-    const initial = mergeRecoveryOutput(await this.deepSeekProvider.structureText(text, checklist), deterministic, checklist);
+    const initial = mergeRecoveryOutput(await this.deepSeekProvider.structureText(text, checklist), deterministic, checklist, true);
     const missing = missingCriticalFields(source, initial, checklist);
     if (!missing.length) return { output: initial, recoveredFields: [], deterministicFields };
 
@@ -301,7 +301,7 @@ export class DocumentExtractionService {
         recoveredFields,
       });
       return {
-        output: mergeRecoveryOutput(mergeRecoveryOutput(initial, recovery, checklist), deterministic, checklist),
+        output: mergeRecoveryOutput(mergeRecoveryOutput(initial, recovery, checklist), deterministic, checklist, true),
         recoveredFields,
         deterministicFields,
       };
@@ -538,13 +538,16 @@ function mergeRecoveryOutput(
   initial: ProviderExtractionOutput,
   recovery: ProviderExtractionOutput,
   checklist: ExtractionRequest["checklist"],
+  preferRecovery = false,
 ): ProviderExtractionOutput {
   return {
     fields: checklist.flatMap((field) => {
       const initialValues = initial.fields.filter((value) => value.fieldId === field.id);
+      const recoveredValues = recovery.fields.filter((value) => value.fieldId === field.id);
+      const hasRecoveredValue = recoveredValues.some((value) => value.value != null && String(value.value).trim());
+      if (preferRecovery && hasRecoveredValue) return recoveredValues;
       const hasInitialValue = initialValues.some((value) => value.value != null && String(value.value).trim());
       if (hasInitialValue) return initialValues;
-      const recoveredValues = recovery.fields.filter((value) => value.fieldId === field.id);
       return recoveredValues.length ? recoveredValues : initialValues;
     }),
   };
