@@ -248,6 +248,33 @@ test("reconhece o formato DTI pelo conteúdo mesmo se a fonte vier classificada 
   assert.equal(value(output, "property.registration"), "69465");
 });
 
+test("lê DTI de Fortaleza com campos achatados e rótulos sem dois-pontos", () => {
+  const output = extractDeterministicFields(
+    [
+      "DECLARAÇÃO TRANSMISSÃO IMOBILIÁRIA (DTI)",
+      "DADOS DO ADQUIRENTE Nome DEIZIANE LEITE BARROS / JOSE NILTON PINHEIRO FILHO CPF/CPJ 03749079358 / 41557883300 Endereço RUA MINAS GERAIS, 1648, PANAMERICANO, FORTALEZA, CE Email LEITEBARROS@GMAIL.COM",
+      "DADOS DO TRANSMITENTE Nome JOQUEI CLUBE EMPREENDIMENTOS IMOBILIARIOS SPE LTDA CPF/CNPJ 20.911.538/0001-65 Endereço RUA GENERAL SAMPAIO 835, CENTRO, FORTALEZA/CE",
+      "NATUREZA DA TRANSAÇÃO COMPRA E VENDA DATA DO INSTRUMENTO 13/02/2026",
+      "DADOS DO IMÓVEL OBJETO DA TRANSAÇÃO Inscrição do IPTU 1028037-5 Endereço PROFESSOR MANOEL LOURENÇO, JÓQUEI CLUBE - FORTALEZA/CE Número 1294 Complemento BL.T2 AP205 Tipo do imóvel APARTAMENTO Nº Matrícula 2391 Área do Terreno (m²) 10.957,49m² Área Privativa (m²) 48,95m² Área Comum (m²) 34,108800m² Área Total (m²) 83,058800m²",
+      "DECLARAÇÃO DE VALORES DA TRANSAÇÃO IMOBILIÁRIA Valor não financiado R$ 140.898,50 Valor financiado (SFH) R$ 259.101,50 Valor TOTAL DECLARADO R$ 400.000,00 RESPONSÁVEL PELAS INFORMAÇÕES",
+    ].join(" "),
+    getChecklist("RECONCILIATION"),
+    "ITBI",
+  );
+
+  assert.equal(value(output, "buyer.name"), "DEIZIANE LEITE BARROS / JOSE NILTON PINHEIRO FILHO");
+  assert.equal(value(output, "seller.legalName"), "JOQUEI CLUBE EMPREENDIMENTOS IMOBILIARIOS SPE LTDA");
+  assert.equal(value(output, "property.iptu"), "1028037-5");
+  assert.equal(value(output, "property.registration"), "2391");
+  assert.equal(value(output, "property.tower"), "2");
+  assert.equal(value(output, "property.unit"), "205");
+  assert.equal(value(output, "property.landArea"), "10.957,49");
+  assert.equal(value(output, "property.privateArea"), "48,95");
+  assert.equal(value(output, "property.totalArea"), "83,058800");
+  assert.equal(value(output, "financial.financing"), "259.101,50");
+  assert.equal(value(output, "seller.phone"), null);
+});
+
 test("extrai razão social e CNPJ da matrícula para confronto com a minuta", () => {
   const output = extractDeterministicFields(
     [
