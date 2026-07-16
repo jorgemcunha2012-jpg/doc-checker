@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AuthError, requireAdmin } from "@/lib/auth";
+import { AuthError, isMasterAdmin, requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
 
@@ -12,7 +12,10 @@ export async function GET() {
       .eq("organization_id", admin.organizationId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return NextResponse.json({ users: data });
+    return NextResponse.json({ users: (data ?? []).map((profile) => ({
+      ...profile,
+      is_master_admin: isMasterAdmin({ email: profile.email, role: profile.role }),
+    })) });
   } catch (error) {
     return authResponse(error);
   }

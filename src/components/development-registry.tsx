@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, Building2, CheckCircle2, FileUp, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import type { Development, DevelopmentExtraction } from "@/domain/development";
 import { reviewDevelopmentExtraction, unitTypeSignature } from "@/domain/development";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const MAX_SELECTED_PAGES = 40;
 
 export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boolean; canDelete: boolean }) {
   const [developments, setDevelopments] = useState<Development[]>([]);
   const [extraction, setExtraction] = useState<DevelopmentExtraction | null>(null);
+  const [editingDevelopmentId, setEditingDevelopmentId] = useState<string | null>(null);
   const [sourceDocumentName, setSourceDocumentName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -61,12 +61,19 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
     try {
       const pages = await renderPdfInBrowser(pendingFile, selectedPages);
       const imagePaths = await uploadRenderedPages(pendingFile.name, pages, controller.signal);
-      const response = await fetch("/api/developments/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceDocumentName: pendingFile.name, imagePaths, pageNumbers: selectedPages }),
-        signal: controller.signal,
-      });
+      let response: Response;
+      try {
+        response = await fetch("/api/developments/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sourceDocumentName: pendingFile.name, imagePaths, pageNumbers: selectedPages }),
+          signal: controller.signal,
+        });
+      } catch (reason) {
+        throw new Error(reason instanceof TypeError && reason.message === "Failed to fetch"
+          ? "Não foi possível iniciar a extração no servidor. Verifique a conexão e tente novamente."
+          : reason instanceof Error ? reason.message : "Não foi possível iniciar a extração no servidor.");
+      }
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
         setError(payload.error ?? "Não foi possível extrair a matrícula.");
@@ -98,9 +105,9 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
     setBusy(true);
     setError("");
     const response = await fetch("/api/developments", {
-      method: "POST",
+      method: editingDevelopmentId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ extraction, sourceDocumentName }),
+      body: JSON.stringify({ id: editingDevelopmentId ?? undefined, extraction, sourceDocumentName }),
     });
     const payload = await response.json();
     setBusy(false);
@@ -109,8 +116,35 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
       return;
     }
     setExtraction(null);
+    setEditingDevelopmentId(null);
     setSourceDocumentName("");
     await loadDevelopments();
+  }
+
+  function editDevelopment(development: Development) {
+    setError("");
+    setEditingDevelopmentId(development.id);
+    setSourceDocumentName(development.sourceDocumentName);
+    setExtraction({
+      name: development.name,
+      city: development.city,
+      registration: development.registration,
+      sellerLegalName: development.sellerLegalName,
+      sellerCnpj: development.sellerCnpj,
+      units: development.units.map((unit) => ({
+        tower: unit.tower,
+        unit: unit.unit,
+        privateArea: unit.privateArea,
+        commonArea: unit.commonArea,
+        totalArea: unit.totalArea,
+        idealFraction: unit.idealFraction,
+        iptuRegistration: unit.iptuRegistration,
+        typology: unit.typology,
+        registration: unit.registration,
+        confidence: unit.confidence,
+        evidence: unit.evidence,
+      })),
+    });
   }
 
   async function removeDevelopment(development: Development) {
@@ -134,7 +168,7 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
     }
   }
 
-  function updateUnit(index: number, key: "tower" | "unit" | "privateArea" | "totalArea" | "idealFraction" | "iptuRegistration" | "typology", value: string) {
+  function updateUnit(index: number, key: "tower" | "unit" | "privateArea" | "commonArea" | "totalArea" | "idealFraction" | "iptuRegistration" | "typology", value: string) {
     if (!extraction) return;
     setExtraction({
       ...extraction,
@@ -182,8 +216,9 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
           <button
             className="ml-2 inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
             onClick={() => {
+              setEditingDevelopmentId(null);
               setSourceDocumentName("Cadastro manual");
-              setExtraction({ name: "", sellerLegalName: "", sellerCnpj: "", units: [{ tower: "", unit: "", privateArea: "", totalArea: "", idealFraction: "", iptuRegistration: "", confidence: 100 }] });
+              setExtraction({ name: "", sellerLegalName: "", sellerCnpj: "", units: [{ tower: "", unit: "", privateArea: "", commonArea: "", totalArea: "", idealFraction: "", iptuRegistration: "", confidence: 100 }] });
             }}
           >
             <Plus className="h-4 w-4" /> Criar manualmente
@@ -197,8 +232,8 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
             <div className="mb-5 flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="text-xs font-bold uppercase text-[#0f8f88]">Revisão obrigatória</div>
-                <h2 className="mt-1 text-lg font-bold text-slate-950">Revisar cadastro extraído</h2>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Confira razão social, CNPJ, tipos, áreas e fração ideal antes de transformar a extração em base mestre.</p>
+                <h2 className="mt-1 text-lg font-bold text-slate-950">{editingDevelopmentId ? "Editar empreendimento" : "Revisar cadastro extraído"}</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Confira razão social, CNPJ, tipos, áreas e fração ideal antes de salvar as informações na base mestre.</p>
               </div>
               {review?.canSave ? (
                 <div className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800">
@@ -248,18 +283,18 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
                 <Field label="CNPJ" value={extraction.sellerCnpj ?? ""} onChange={(value) => setExtraction({ ...extraction, sellerCnpj: value })} />
               </div>
               <button onClick={() => void save()} disabled={busy || !review?.canSave} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
-                <Save className="h-4 w-4" /> Salvar cadastro
+                <Save className="h-4 w-4" /> {editingDevelopmentId ? "Atualizar cadastro" : "Salvar cadastro"}
               </button>
             </div>
             <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left text-sm">
+              <table className="w-full min-w-[980px] text-left text-sm">
                 <thead className="border-b border-slate-200 text-xs uppercase text-slate-500">
-                  <tr><th className="py-3">Tipo</th><th>Torre</th><th>Unidade</th><th>Área privativa</th><th>Área total</th><th>Fração ideal</th><th>Inscrição IPTU</th><th>Confiança</th><th /></tr>
+                  <tr><th className="py-3">Tipo</th><th>Torre</th><th>Unidade</th><th>Área privativa</th><th>Área comum</th><th>Área total</th><th>Fração ideal</th><th>Inscrição IPTU</th><th>Confiança</th><th /></tr>
                 </thead>
                 <tbody>
                   {extraction.units.map((unit, index) => (
                     <tr key={`${unit.tower}-${unit.unit}-${index}`} className="border-b border-slate-100">
-                      {(["typology", "tower", "unit", "privateArea", "totalArea", "idealFraction", "iptuRegistration"] as const).map((key) => (
+                      {(["typology", "tower", "unit", "privateArea", "commonArea", "totalArea", "idealFraction", "iptuRegistration"] as const).map((key) => (
                         <td key={key} className="py-2 pr-3">
                           <input
                             className={`w-full rounded border px-2 py-1.5 ${isRequiredUnitField(key) && !String(unit[key] ?? "").trim() ? "border-amber-400 bg-amber-50" : unit.confidence < 80 ? "border-amber-200 bg-amber-50/50" : "border-slate-300"}`}
@@ -282,7 +317,7 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
                 </span>
               ))}
             </div>
-            <button onClick={() => setExtraction({ ...extraction, units: [...extraction.units, { tower: "", unit: "", privateArea: "", totalArea: "", idealFraction: "", iptuRegistration: "", confidence: 100 }] })} className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-blue-600">
+            <button onClick={() => setExtraction({ ...extraction, units: [...extraction.units, { tower: "", unit: "", privateArea: "", commonArea: "", totalArea: "", idealFraction: "", iptuRegistration: "", confidence: 100 }] })} className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-blue-600">
               <Plus className="h-4 w-4" /> Adicionar unidade
             </button>
           </section>
@@ -294,7 +329,7 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
             {developments.map((development) => (
               <div key={development.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div><div className="font-bold text-slate-900">{development.name}</div><div className="text-sm text-slate-500">{development.city ?? "Cidade não informada"} · Matrícula {development.registration ?? "não informada"}</div><div className="mt-1 text-xs text-slate-500">{development.sellerLegalName || development.sellerCnpj ? `${development.sellerLegalName ?? "Razão social não informada"} · CNPJ ${development.sellerCnpj ?? "não informado"}` : "Razão social e CNPJ não informados"}</div><div className="mt-1 text-xs text-slate-500">{summarizeUnitTypes(development)}</div></div>
-                <div className="flex items-center gap-4"><div className="text-sm font-semibold text-slate-600">{development.units.length} unidades</div>{canDelete ? <button title="Excluir empreendimento" onClick={() => void removeDevelopment(development)} disabled={busy} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-rose-200 px-3 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"><Trash2 className="h-4 w-4" />Excluir</button> : null}</div>
+                <div className="flex items-center gap-3"><div className="text-sm font-semibold text-slate-600">{development.units.length} unidades</div>{canManage ? <button title="Editar empreendimento" onClick={() => editDevelopment(development)} disabled={busy} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"><Save className="h-4 w-4" />Editar</button> : null}{canDelete ? <button title="Excluir empreendimento" onClick={() => void removeDevelopment(development)} disabled={busy} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-rose-200 px-3 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"><Trash2 className="h-4 w-4" />Excluir</button> : null}</div>
               </div>
             ))}
             {!developments.length ? <p className="py-8 text-center text-sm text-slate-500">Nenhum empreendimento cadastrado.</p> : null}
@@ -362,28 +397,29 @@ function parsePageSelection(value: string, pageCount: number) {
 }
 
 async function uploadRenderedPages(fileName: string, pages: Blob[], signal: AbortSignal) {
-  const supabase = createSupabaseBrowserClient();
-  if (!supabase) throw new Error("Supabase não configurado para upload das páginas renderizadas.");
   const paths: string[] = [];
 
   for (let index = 0; index < pages.length; index += 1) {
     const page = pages[index];
-    const uploadResponse = await fetch("/api/developments/extract/upload-url", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fileName: `${fileName.replace(/\.pdf$/i, "")}-pagina-${index + 1}.jpg`,
-        fileSize: page.size,
-        mimeType: "image/jpeg",
-      }),
-      signal,
-    });
+    const pageName = `${fileName.replace(/\.pdf$/i, "")}-pagina-${index + 1}.jpg`;
+    const form = new FormData();
+    form.append("page", page, pageName);
+    form.append("fileName", pageName);
+    let uploadResponse: Response;
+    try {
+      uploadResponse = await fetch("/api/developments/extract/upload-url", {
+        method: "POST",
+        body: form,
+        signal,
+      });
+    } catch (reason) {
+      throw new Error(reason instanceof TypeError && reason.message === "Failed to fetch"
+        ? `Não foi possível enviar a página ${index + 1} ao servidor. Verifique a conexão e tente novamente.`
+        : reason instanceof Error ? reason.message : `Não foi possível enviar a página ${index + 1}.`);
+    }
     const uploadPayload = await uploadResponse.json().catch(() => ({}));
-    if (!uploadResponse.ok) throw new Error(uploadPayload.error ?? "Não foi possível preparar upload da página renderizada.");
-    const { error } = await supabase.storage
-      .from("process-documents")
-      .uploadToSignedUrl(uploadPayload.storagePath, uploadPayload.token, page);
-    if (error) throw new Error(`Não foi possível enviar página renderizada: ${error.message}`);
+    if (!uploadResponse.ok) throw new Error(`Upload da página ${index + 1} falhou: ${uploadPayload.error ?? "resposta inválida do servidor"}`);
+    if (!uploadPayload.storagePath) throw new Error(`Upload da página ${index + 1} não retornou o caminho armazenado.`);
     paths.push(uploadPayload.storagePath);
   }
 
@@ -401,7 +437,7 @@ function canvasToJpegBlob(canvas: HTMLCanvasElement) {
 
 function summarizeUnitTypes(development: Development) {
   const signatures = new Set(development.units.map((unit) =>
-    `${unit.typology || "Tipo"} · ${unit.privateArea || "-"} priv. · ${unit.totalArea || "-"} total · fração ${unit.idealFraction || "-"} · IPTU ${unit.iptuRegistration || "-"}`,
+    `${unit.typology || "Tipo"} · ${unit.privateArea || "-"} priv. · ${unit.commonArea || "-"} comum · ${unit.totalArea || "-"} total · fração ${unit.idealFraction || "-"} · IPTU ${unit.iptuRegistration || "-"}`,
   ));
   return `${signatures.size} tipo(s) cadastrado(s)`;
 }

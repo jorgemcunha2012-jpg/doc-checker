@@ -8,6 +8,22 @@ const MAX_SIZE = 20 * 1024 * 1024;
 export async function POST(request: Request) {
   try {
     const user = await requireUser();
+    if (request.headers.get("content-type")?.includes("multipart/form-data")) {
+      const form = await request.formData();
+      const file = form.get("page");
+      const fileName = form.get("fileName");
+      if (!(file instanceof File) || typeof fileName !== "string" || file.type !== "image/jpeg" || file.size <= 0 || file.size > MAX_SIZE) {
+        return NextResponse.json({ error: "A página renderizada é inválida ou excede 20 MB." }, { status: 400 });
+      }
+      const storagePath = `${user.organizationId}/development-extractions/rendered-pages/${randomUUID()}-${safeFileName(fileName)}`;
+      const supabase = createSupabaseAdminClient();
+      const { error } = await supabase.storage.from("process-documents").upload(storagePath, Buffer.from(await file.arrayBuffer()), {
+        contentType: "image/jpeg",
+        upsert: false,
+      });
+      if (error) return NextResponse.json({ error: `Não foi possível armazenar a página renderizada: ${error.message}` }, { status: 500 });
+      return NextResponse.json({ storagePath });
+    }
     const body = await request.json() as { fileName?: string; fileSize?: number; mimeType?: string };
     const fileName = body.fileName?.trim();
     const fileSize = Number(body.fileSize ?? 0);

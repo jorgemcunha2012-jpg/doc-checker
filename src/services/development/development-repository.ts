@@ -18,6 +18,7 @@ type DevelopmentRow = {
     tower: string;
     unit: string;
     private_area: string;
+    common_area?: string | null;
     total_area: string | null;
     ideal_fraction: string | null;
     iptu_registration?: string | null;
@@ -37,10 +38,10 @@ export async function listDevelopments(organizationId: string): Promise<Developm
   let error: { message: string } | null;
   ({ data, error } = await supabase
     .from("developments")
-    .select("id, organization_id, name, city, registration, seller_legal_name, seller_cnpj, source_document_name, created_at, development_units(id, tower, unit, private_area, total_area, ideal_fraction, iptu_registration, typology, registration, confidence)")
+    .select("id, organization_id, name, city, registration, seller_legal_name, seller_cnpj, source_document_name, created_at, development_units(id, tower, unit, private_area, common_area, total_area, ideal_fraction, iptu_registration, typology, registration, confidence)")
     .eq("organization_id", organizationId)
     .order("name"));
-  if (error?.message.includes("seller_legal_name") || error?.message.includes("seller_cnpj") || error?.message.includes("iptu_registration")) {
+  if (error?.message.includes("seller_legal_name") || error?.message.includes("seller_cnpj") || error?.message.includes("iptu_registration") || error?.message.includes("common_area")) {
     ({ data, error } = await supabase
       .from("developments")
       .select("id, organization_id, name, city, registration, source_document_name, created_at, development_units(id, tower, unit, private_area, total_area, ideal_fraction, typology, registration, confidence)")
@@ -65,6 +66,7 @@ export async function listDevelopments(organizationId: string): Promise<Developm
       tower: unit.tower === "TIPO" ? "" : unit.tower,
       unit: unit.tower === "TIPO" ? "" : unit.unit,
       privateArea: unit.private_area,
+      commonArea: unit.common_area ?? undefined,
       totalArea: unit.total_area ?? undefined,
       idealFraction: unit.ideal_fraction ?? undefined,
       iptuRegistration: unit.iptu_registration ?? undefined,
@@ -137,6 +139,7 @@ export async function createDevelopment(
       tower: unit.tower || "TIPO",
       unit: unit.unit || unit.typology || "TIPO",
       private_area: unit.privateArea,
+      common_area: unit.commonArea ?? null,
       total_area: unit.totalArea ?? null,
       ideal_fraction: unit.idealFraction ?? null,
       iptu_registration: unit.iptuRegistration ?? null,
@@ -145,7 +148,7 @@ export async function createDevelopment(
       confidence: unit.confidence,
     })),
   );
-  if (unitsError?.message.includes("iptu_registration")) {
+  if (unitsError?.message.includes("iptu_registration") || unitsError?.message.includes("common_area")) {
     ({ error: unitsError } = await supabase.from("development_units").insert(
       development.units.map((unit) => ({
         id: unit.id,
@@ -186,6 +189,96 @@ export async function deleteDevelopment(organizationId: string, developmentId: s
     .maybeSingle();
   if (error) throw new Error(error.message);
   return Boolean(data);
+}
+
+export async function updateDevelopment(
+  organizationId: string,
+  developmentId: string,
+  sourceDocumentName: string,
+  extraction: DevelopmentExtraction,
+) {
+  const current = (await listDevelopments(organizationId)).find((item) => item.id === developmentId);
+  if (!current) return null;
+
+  const updated: Development = {
+    ...current,
+    name: extraction.name,
+    city: extraction.city,
+    registration: extraction.registration,
+    sellerLegalName: extraction.sellerLegalName,
+    sellerCnpj: extraction.sellerCnpj,
+    sourceDocumentName: sourceDocumentName || current.sourceDocumentName,
+    units: extraction.units.map((unit) => ({
+      ...unit,
+      id: crypto.randomUUID(),
+      developmentId,
+    })),
+  };
+
+  if (!isSupabaseConfigured()) {
+    localDevelopments.set(developmentId, updated);
+    return updated;
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const developmentPayload = {
+    name: updated.name,
+    city: updated.city ?? null,
+    registration: updated.registration ?? null,
+    seller_legal_name: updated.sellerLegalName ?? null,
+    seller_cnpj: updated.sellerCnpj ?? null,
+    source_document_name: updated.sourceDocumentName,
+    updated_at: new Date().toISOString(),
+  };
+  let { error } = await supabase
+    .from("developments")
+    .update(developmentPayload)
+    .eq("id", developmentId)
+    .eq("organization_id", organizationId);
+  if (error?.message.includes("seller_legal_name") || error?.message.includes("seller_cnpj")) {
+    const legacyPayload = Object.fromEntries(Object.entries(developmentPayload).filter(([key]) => key !== "seller_legal_name" && key !== "seller_cnpj"));
+    ({ error } = await supabase.from("developments").update(legacyPayload).eq("id", developmentId).eq("organization_id", organizationId));
+  }
+  if (error) throw new Error(error.message);
+
+  const { error: deleteUnitsError } = await supabase
+    .from("development_units")
+    .delete()
+    .eq("development_id", developmentId)
+    .eq("organization_id", organizationId);
+  if (deleteUnitsError) throw new Error(deleteUnitsError.message);
+
+  let { error: unitsError } = await supabase.from("development_units").insert(updated.units.map((unit) => unitRow(unit)));
+  if (unitsError?.message.includes("iptu_registration") || unitsError?.message.includes("common_area")) {
+    ({ error: unitsError } = await supabase.from("development_units").insert(updated.units.map((unit) => unitRow(unit, true))));
+  }
+  if (unitsError) throw new Error(unitsError.message);
+  return updated;
+
+  function unitRow(unit: Development["units"][number], withoutIptu = false) {
+    const row = {
+      id: unit.id,
+      development_id: developmentId,
+      organization_id: organizationId,
+      tower: unit.tower || "TIPO",
+      unit: unit.unit || unit.typology || "TIPO",
+      private_area: unit.privateArea,
+      total_area: unit.totalArea ?? null,
+      common_area: unit.commonArea ?? null,
+      ideal_fraction: unit.idealFraction ?? null,
+      iptu_registration: unit.iptuRegistration ?? null,
+      typology: unit.typology ?? null,
+      registration: unit.registration ?? null,
+      confidence: unit.confidence,
+    };
+    if (withoutIptu) {
+      const { iptu_registration, common_area, ...legacyRow } = row;
+      void iptu_registration;
+      void common_area;
+      return legacyRow;
+    }
+    return row;
+  }
 }
 
 function compareUnits(left: Development["units"][number], right: Development["units"][number]) {

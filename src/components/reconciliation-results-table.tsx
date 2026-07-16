@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { documentSourceLabels, type DocumentSource, type FieldComparisonResult, type HumanReview, type ReconciliationStatus, type User } from "@/domain/validation";
 import { statusCopy } from "@/lib/validation-copy";
 import { StatusBadge } from "./status-badge";
+import { InfoTooltip } from "./info-tooltip";
 
 type Filter = "ALL" | ReconciliationStatus | "MISSING";
 
@@ -194,7 +195,7 @@ function ResultRow({
         {result.humanReview?.status === "APPROVED" ? (
           <div>
             <span className="inline-flex min-w-32 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">Verificado</span>
-            <div className="mt-1 text-[11px] text-slate-400">Automático: {statusCopy[result.status]}</div>
+            <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-400">Automático: {statusCopy[result.status]} <InfoTooltip text="Este foi o resultado calculado pelo motor antes da validação humana. A validação manual não apaga a decisão automática." /></div>
           </div>
         ) : <StatusBadge status={result.status} />}
       </td>
@@ -296,12 +297,12 @@ function SourceValueCell({ source, result }: { source: DocumentSource; result: F
   return (
     <div>
       <HighlightedValue value={sourceValue.value} diffTokens={sourceValue.diffTokens} />
-      <div className="mt-1 text-xs font-semibold text-slate-500">{sourceValue.confidence}% confiança</div>
+      <div className="mt-1 flex items-center gap-1 text-xs font-semibold text-slate-500">{sourceValue.confidence}% confiança <InfoTooltip text="Estimativa de segurança da extração deste campo, baseada na qualidade da evidência, no método de leitura e na consistência encontrada. Não é a probabilidade de o documento ser verdadeiro." /></div>
       {location ? (
         <details className="mt-2">
           <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-teal-700">
             <FileSearch className="h-3.5 w-3.5" />
-            Ver evidência
+            Ver evidência <InfoTooltip text="Mostra a localização e o trecho original usado para extrair este valor. A evidência permite conferir de onde o dado veio." />
           </summary>
           <div className="mt-2 rounded-md border border-slate-200 bg-white p-2 text-xs leading-5 text-slate-600">
             {location.page ? <div>Página {location.page}</div> : null}

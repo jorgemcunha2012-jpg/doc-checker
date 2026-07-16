@@ -285,9 +285,21 @@ export class DocumentExtractionService {
     const deterministicFields = deterministic.fields
       .filter((field) => field.value != null && String(field.value).trim())
       .map((field) => field.fieldId);
-    const initial = mergeRecoveryOutput(await this.deepSeekProvider.structureText(text, checklist), deterministic, checklist);
+    let providerOutput: ProviderExtractionOutput = { fields: [] };
+    let providerFailed = false;
+    try {
+      providerOutput = await this.deepSeekProvider.structureText(text, checklist);
+    } catch (error) {
+      providerFailed = true;
+      console.warn("[ConferIA] Provider textual indisponível; preservando extração determinística", {
+        source,
+        error: sanitizeExtractionError(error),
+        deterministicFields,
+      });
+    }
+    const initial = mergeRecoveryOutput(providerOutput, deterministic, checklist, true);
     const missing = missingCriticalFields(source, initial, checklist);
-    if (!missing.length) return { output: initial, recoveredFields: [], deterministicFields };
+    if (!missing.length || providerFailed) return { output: initial, recoveredFields: [], deterministicFields };
 
     try {
       const recovery = await this.deepSeekProvider.structureText(text, missing);
@@ -301,7 +313,7 @@ export class DocumentExtractionService {
         recoveredFields,
       });
       return {
-        output: mergeRecoveryOutput(mergeRecoveryOutput(initial, recovery, checklist), deterministic, checklist),
+        output: mergeRecoveryOutput(mergeRecoveryOutput(initial, recovery, checklist), deterministic, checklist, true),
         recoveredFields,
         deterministicFields,
       };
@@ -538,13 +550,16 @@ function mergeRecoveryOutput(
   initial: ProviderExtractionOutput,
   recovery: ProviderExtractionOutput,
   checklist: ExtractionRequest["checklist"],
+  preferRecovery = false,
 ): ProviderExtractionOutput {
   return {
     fields: checklist.flatMap((field) => {
       const initialValues = initial.fields.filter((value) => value.fieldId === field.id);
+      const recoveredValues = recovery.fields.filter((value) => value.fieldId === field.id);
+      const hasRecoveredValue = recoveredValues.some((value) => value.value != null && String(value.value).trim());
+      if (preferRecovery && hasRecoveredValue) return recoveredValues;
       const hasInitialValue = initialValues.some((value) => value.value != null && String(value.value).trim());
       if (hasInitialValue) return initialValues;
-      const recoveredValues = recovery.fields.filter((value) => value.fieldId === field.id);
       return recoveredValues.length ? recoveredValues : initialValues;
     }),
   };

@@ -23,6 +23,27 @@ test("extrai composição financeira padronizada da minuta sem depender da IA", 
   assert.equal(value(output, "financial.totalValue"), "R$ 237.000,00");
 });
 
+test("extrai área do terreno quando o contrato informa o valor na descrição do terreno", () => {
+  const output = extractDeterministicFields(
+    "D1 - O terreno possui 22.688,71m² de área total, constituído de 30 torres.",
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "property.terrainArea"), "22.688,71m²");
+  assert.equal(value(output, "property.landArea"), "22.688,71m²");
+});
+
+test("aceita variações do rótulo de área do terreno no ITBI", () => {
+  const output = extractDeterministicFields(
+    "Área do terreno (m²): 180,00",
+    getChecklist("RECONCILIATION"),
+    "ITBI",
+  );
+
+  assert.equal(value(output, "property.landArea"), "180,00");
+});
+
 test("extrai dados principais da tela de reserva", () => {
   const output = extractDeterministicFields(
     [
@@ -163,6 +184,95 @@ test("extrai campos de ITBI preenchível a partir dos campos de formulário do P
   assert.equal(value(output, "property.tower"), "02");
   assert.equal(value(output, "financial.financing"), "271.704,42");
   assert.equal(value(output, "financial.totalValue"), "350.000,00");
+});
+
+test("extrai DTI preenchível mesmo quando os rótulos vêm como Text e CPFCNPJ", () => {
+  const output = extractDeterministicFields(
+    [
+      "Nome: JOAO ERIC ANTONIO BEZERRA OLIVEIRA /LARISSA FERREIRA DOS SANTOS",
+      "CPFCNPJ: 028.349.913-32/ 074.805.813-35",
+      "Telefone: (85) 99793-2496",
+      "Endereço: R Pedro Macário, 151, Tabuba em Caucaia/CE",
+      "Email: jeric.oliveira@gmail.com",
+      "Text1: SPE CAUCAIA CT EMPREENDIMENTOS IMOBILIARIOS LTDA",
+      "Text2: 53.635.373/0001-03",
+      "Endereço_2: RUA GENERAL SAMPAIO, 835 - SALA 301, CENTRO, FORTALEZA/CE",
+      "Inscrição do IPTU: 147158-9",
+      "Text3: RUA TABUZIOS, TABUBA, CAUCAIA/CE",
+      "Text8: 70",
+      "Text6: Apartamento",
+      "Text4: 69465",
+      "Área do terreno m²: 10.006,00",
+      "Área privativa m²: 48,19m²",
+      "Área comum m²: 41,524337m²",
+      "Área total m²: 89,714337m²",
+      "Complemento: T3 , AP 201",
+      "Compra Venda etc: COMPRA E VENDA",
+      "Valor Financiado: 360.000,00",
+      "Valor Não Financiado: 55.000,00",
+      "Valor Total Declarado: 415.000,00",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "ITBI",
+  );
+
+  assert.equal(value(output, "buyer.name"), "JOAO ERIC ANTONIO BEZERRA OLIVEIRA /LARISSA FERREIRA DOS SANTOS");
+  assert.equal(value(output, "buyer.cpf"), "028.349.913-32");
+  assert.equal(value(output, "seller.legalName"), "SPE CAUCAIA CT EMPREENDIMENTOS IMOBILIARIOS LTDA");
+  assert.equal(value(output, "seller.cnpj"), "53.635.373/0001-03");
+  assert.equal(value(output, "property.iptu"), "147158-9");
+  assert.equal(value(output, "property.registration"), "69465");
+  assert.equal(value(output, "property.address"), "RUA TABUZIOS, TABUBA, CAUCAIA/CE");
+  assert.equal(value(output, "property.tower"), "3");
+  assert.equal(value(output, "property.unit"), "201");
+  assert.equal(value(output, "property.landArea"), "10.006,00");
+  assert.equal(value(output, "financial.financing"), "360.000,00");
+  assert.equal(value(output, "financial.nonFinancedValue"), "55.000,00");
+});
+
+test("reconhece o formato DTI pelo conteúdo mesmo se a fonte vier classificada diferente", () => {
+  const output = extractDeterministicFields(
+    [
+      "DECLARAÇÃO DE TRANSAÇÃO IMOBILIÁRIA - DTI",
+      "[CAMPOS DE FORMULARIO]",
+      "Nome: JOAO ERIC ANTONIO BEZERRA OLIVEIRA",
+      "Área do terreno m²: 10.006,00",
+      "Text4: 69465",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "buyer.name"), "JOAO ERIC ANTONIO BEZERRA OLIVEIRA");
+  assert.equal(value(output, "property.landArea"), "10.006,00");
+  assert.equal(value(output, "property.registration"), "69465");
+});
+
+test("lê DTI de Fortaleza com campos achatados e rótulos sem dois-pontos", () => {
+  const output = extractDeterministicFields(
+    [
+      "DECLARAÇÃO TRANSMISSÃO IMOBILIÁRIA (DTI)",
+      "DADOS DO ADQUIRENTE Nome DEIZIANE LEITE BARROS / JOSE NILTON PINHEIRO FILHO CPF/CPJ 03749079358 / 41557883300 Endereço RUA MINAS GERAIS, 1648, PANAMERICANO, FORTALEZA, CE Email LEITEBARROS@GMAIL.COM",
+      "DADOS DO TRANSMITENTE Nome JOQUEI CLUBE EMPREENDIMENTOS IMOBILIARIOS SPE LTDA CPF/CNPJ 20.911.538/0001-65 Endereço RUA GENERAL SAMPAIO 835, CENTRO, FORTALEZA/CE",
+      "NATUREZA DA TRANSAÇÃO COMPRA E VENDA DATA DO INSTRUMENTO 13/02/2026",
+      "DADOS DO IMÓVEL OBJETO DA TRANSAÇÃO Inscrição do IPTU 1028037-5 Endereço PROFESSOR MANOEL LOURENÇO, JÓQUEI CLUBE - FORTALEZA/CE Número 1294 Complemento BL.T2 AP205 Tipo do imóvel APARTAMENTO Nº Matrícula 2391 Área do Terreno (m²) 10.957,49m² Área Privativa (m²) 48,95m² Área Comum (m²) 34,108800m² Área Total (m²) 83,058800m²",
+      "DECLARAÇÃO DE VALORES DA TRANSAÇÃO IMOBILIÁRIA Valor não financiado R$ 140.898,50 Valor financiado (SFH) R$ 259.101,50 Valor TOTAL DECLARADO R$ 400.000,00 RESPONSÁVEL PELAS INFORMAÇÕES",
+    ].join(" "),
+    getChecklist("RECONCILIATION"),
+    "ITBI",
+  );
+
+  assert.equal(value(output, "buyer.name"), "DEIZIANE LEITE BARROS / JOSE NILTON PINHEIRO FILHO");
+  assert.equal(value(output, "seller.legalName"), "JOQUEI CLUBE EMPREENDIMENTOS IMOBILIARIOS SPE LTDA");
+  assert.equal(value(output, "property.iptu"), "1028037-5");
+  assert.equal(value(output, "property.registration"), "2391");
+  assert.equal(value(output, "property.tower"), "2");
+  assert.equal(value(output, "property.unit"), "205");
+  assert.equal(value(output, "property.landArea"), "10.957,49");
+  assert.equal(value(output, "property.privateArea"), "48,95");
+  assert.equal(value(output, "property.totalArea"), "83,058800");
+  assert.equal(value(output, "financial.financing"), "259.101,50");
+  assert.equal(value(output, "seller.phone"), null);
 });
 
 test("extrai razão social e CNPJ da matrícula para confronto com a minuta", () => {

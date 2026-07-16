@@ -14,3 +14,14 @@ test("extrai o número do contrato quando a minuta o apresenta como número do p
   assert.equal(field?.value, "12345-AB/2026");
   assert.equal(field?.sourceLocation?.section, "Ressalvas / identificação do processo");
 });
+
+test("extrai número do contrato no rodapé com símbolo ordinal e máscara", () => {
+  const output = extractDeterministicFields(
+    "QUADRO RESUMO\nB.4 - VALOR DE COMPOSIÇÃO DOS RECURSOS\nCONTRATO Nº 8.7877.2824034-7\n2",
+    getChecklist("MINUTA"),
+    "MINUTA",
+  );
+
+  const field = output.fields.find((item) => item.fieldId === "contract.number");
+  assert.equal(field?.value, "8.7877.2824034-7");
+});

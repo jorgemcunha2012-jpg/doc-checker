@@ -12,6 +12,7 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     text("contract.number", "Ressalvas / identificação do processo", 94, [
       /(?:n[úu]mero\s+do\s+(?:contrato|processo)|n[ºo.]?\s*do\s+(?:contrato|processo))\s*[:#-]?\s*([A-Z0-9./-]{3,40})/i,
       /\bprocesso\s*(?:n[úu]mero|n[ºo.]?)?\s*[:#-]\s*([A-Z0-9./-]{3,40})/i,
+      /\b(?:contrato|processo)\b[\s\r\n]*(?:n(?:[º°o.]|[úu]mero|umero)?[\s\r\n]*)?[:#-]?[\s\r\n]*([0-9][A-Z0-9./-]{3,40})/i,
       /\bcontrato\s*(?:n[úu]mero|n[ºo.]?)?\s*[:#-]\s*([A-Z0-9./-]{3,40})/i,
     ]),
     text("contract.agencyCode", "Identificação do contrato", 90, [/(?:ag[eê]ncia|c[oó]digo\s+da\s+ag[eê]ncia)[^:\n\r]*:\s*([A-Z0-9./-]+)/i]),
@@ -39,7 +40,16 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     text("property.registryOffice", "Descrição do imóvel", 88, [/(?:cart[oó]rio|of[ií]cio)\s+(?:de\s+)?registro\s+de\s+im[oó]veis?[^:\n\r]*:?\s*([^\n\r]+)/i]),
     text("property.type", "Descrição do imóvel", 88, [/(?:tipo\s+do\s+im[oó]vel|tipo\s+da\s+unidade)[^:\n\r]*:\s*([^\n\r]+)/i]),
     text("property.floor", "Descrição do imóvel", 88, [/(?:pavimento|andar)[^:\n\r:]*:\s*([A-Z0-9-]+)/i]),
-    text("property.terrainArea", "Descrição do imóvel", 86, [/área\s+do\s+terreno[^\d]*(\d+[\d.,]*\s*m[²2]?)/i]),
+    text("property.terrainArea", "Descrição do imóvel", 96, [
+      /área\s+(?:total\s+)?do\s+terreno[^\d]*(\d+[\d.,]*\s*m[²2]?)/i,
+      /\bterreno\b[^.\n\r]{0,100}?\b(?:possui|tem)\b\s*(\d+[\d.,]*\s*m[²2]?)/i,
+      /\bterreno\b[^.\n\r]{0,120}?área\s+total\s+(?:de\s*)?(\d+[\d.,]*\s*m[²2]?)/i,
+    ]),
+    text("property.landArea", "Descrição do imóvel", 96, [
+      /área\s+(?:total\s+)?do\s+terreno[^\d]*(\d+[\d.,]*\s*m[²2]?)/i,
+      /\bterreno\b[^.\n\r]{0,100}?\b(?:possui|tem)\b\s*(\d+[\d.,]*\s*m[²2]?)/i,
+      /\bterreno\b[^.\n\r]{0,120}?área\s+total\s+(?:de\s*)?(\d+[\d.,]*\s*m[²2]?)/i,
+    ]),
   ],
   DADOS_RESERVA: [
     text("buyer.name", "Dados da reserva", 92, [
@@ -83,44 +93,76 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
   ],
   ITBI: [
     text("buyer.name", "ITBI", 94, [
+      /\bNome\s*:\s*([^\n\r]+)/i,
       /Texto1\s*:\s*([A-ZÀ-Ú\s]+?)(?=\d{11}\b)/i,
       /NomeRazão Social_4\s*:\s*([^\n\r]+)/i,
       /Nome\/Razão Social_4\s*:\s*([^\n\r]+)/i,
     ]),
     text("buyer.cpf", "ITBI", 94, [
+      /CPF\s*\/??\s*CNPJ\s*:\s*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i,
+      /CPFCNPJ\s*:\s*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i,
       /Texto1\s*:\s*[A-ZÀ-Ú\s]+?(\d{11})\b/i,
       /Texto12\s*:\s*(\d{11})\b/i,
       /\bCPF\b[^\d]*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i,
     ]),
-    text("buyer.email", "ITBI", 92, [/Email_4\s*:\s*([^\s\n\r]+@[^\s\n\r]+)/i]),
+    text("buyer.email", "ITBI", 92, [
+      /Email_4\s*:\s*([^\s\n\r]+@[^\s\n\r]+)/i,
+      /\bEmail\s*:\s*([^\s\n\r]+@[^\s\n\r]+)/i,
+    ]),
     text("buyer.address", "ITBI", 90, [/Endereço\s*:\s*([^\n\r]+)/i]),
     text("seller.legalName", "ITBI", 94, [
+      /Text1\s*:\s*([^\n\r]+)/i,
       /Texto2\s*:\s*([^\n\r]+)/i,
       /NomeRazão Social\s*:\s*([^\n\r]+)/i,
     ]),
     text("seller.cnpj", "ITBI", 94, [
+      /Text2\s*:\s*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i,
       /Texto3\s*:\s*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i,
       /Texto11\s*:\s*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i,
       /\bCNPJ\b[^\d]*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i,
     ]),
+    text("seller.address", "ITBI", 90, [/Endereço_2\s*:\s*([^\n\r]+)/i]),
     text("seller.email", "ITBI", 90, [/(?:Email|E-mail)[^:\n\r]*:\s*([^\s\n\r]+@[^\s\n\r]+)/i]),
     text("seller.phone", "ITBI", 88, [/(?:Telefone|Celular)[^:\n\r]*:\s*([+()\d\s.-]{8,24})/i]),
     text("transaction.instrumentDate", "ITBI", 88, [/(?:data\s+do\s+instrumento|data\s+da\s+transa[cç][aã]o)[^:\n\r]*:\s*([^\n\r]+)/i]),
-    text("transaction.nature", "ITBI", 88, [/natureza\s+da\s+transa[cç][aã]o[^:\n\r]*:\s*([^\n\r]+)/i]),
+    text("transaction.nature", "ITBI", 88, [
+      /natureza\s+da\s+transa[cç][aã]o[^:\n\r]*:\s*([^\n\r]+)/i,
+      /Compra\s+Venda\s+etc\s*:\s*([^\n\r]+)/i,
+    ]),
     text("transaction.transferredPercentage", "ITBI", 88, [/(?:%\s*transmitido|percentual\s+transmitido)[^:\n\r]*:\s*([\d.,]+\s*%?)/i]),
-    text("property.iptu", "ITBI", 94, [/Texto6\s*:\s*([A-Z0-9./-]+)/i]),
-    text("property.type", "ITBI", 88, [/(?:tipo\s+do\s+im[oó]vel|tipo)[^:\n\r]*:\s*([^\n\r]+)/i]),
-    text("property.address", "ITBI", 90, [/Endereço_2\s*:\s*([^\n\r]+)/i]),
-    text("property.unit", "ITBI", 90, [/Complemento\s*:\s*[^\n\r]*?(?:APT|APTO|APARTAMENTO)\s*([A-Z0-9-]+)/i]),
-    text("property.tower", "ITBI", 90, [/Complemento\s*:\s*[^\n\r]*?TORRE\s*([A-Z0-9-]+)/i]),
+    text("property.iptu", "ITBI", 94, [
+      /Inscri[cç][aã]o\s+do\s+IPTU\s*:\s*([A-Z0-9./-]+)/i,
+      /Texto6\s*:\s*([A-Z0-9./-]+)/i,
+    ]),
+    text("property.registration", "ITBI", 94, [
+      /Matr[ií]cula\s*:\s*([A-Z0-9./-]+)/i,
+      /Text4\s*:\s*([A-Z0-9./-]+)/i,
+    ]),
+    text("property.type", "ITBI", 88, [
+      /Text6\s*:\s*([^\n\r]+)/i,
+      /(?:tipo\s+do\s+im[oó]vel|tipo)[^:\n\r]*:\s*([^\n\r]+)/i,
+    ]),
+    text("property.address", "ITBI", 90, [
+      /Text3\s*:\s*([^\n\r]+)/i,
+      /Endereço_2\s*:\s*([^\n\r]+)/i,
+    ]),
+    text("property.unit", "ITBI", 90, [/Complemento\s*:\s*[^\n\r]*?(?:APT|APTO|APARTAMENTO|AP)\s*([A-Z0-9-]+)/i]),
+    text("property.tower", "ITBI", 90, [
+      /Complemento\s*:\s*[^\n\r]*?TORRE\s*([A-Z0-9-]+)/i,
+      /Complemento\s*:\s*[^\n\r]*?\bT\s*([A-Z0-9-]+)\s*,/i,
+    ]),
     text("property.privateArea", "ITBI", 92, [/Área privativa m²\s*:\s*([^\n\r]+)/i]),
     text("property.commonArea", "ITBI", 92, [/Área comum m²\s*:\s*([^\n\r]+)/i]),
     text("property.totalArea", "ITBI", 92, [/Área total m²\s*:\s*([^\n\r]+)/i]),
-    text("property.landArea", "ITBI", 90, [/Área do terreno m²\s*:\s*([^\n\r]+)/i]),
+    text("property.landArea", "ITBI", 96, [
+      /área\s+do\s+terreno(?:\s*\(?\s*m[²2]\s*\)?)?\s*:\s*(\d+[\d.,]*\s*m?[²2]?)/i,
+      /área\s+terreno[^:\n\r]*[:\-]\s*([^\n\r]+)/i,
+    ]),
     text("property.idealFraction", "ITBI", 92, [/Fração ideal\s*:\s*([^\n\r]+)/i]),
     money("financial.financing", "ITBI", 92, [
       /Valor financiado SFH\s*:\s*(\d[\d.,]*)/i,
       /VALOR FINANCIADO\s*R\$\s*(\d[\d.,]*)/i,
+      /Valor financiado\s*:\s*(?:R\$\s*)?(\d[\d.,]*)/i,
       /valor financiado[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
     ]),
     money("financial.nonFinancedValue", "ITBI", 90, [/Valor não financiado\s*:\s*(\d[\d.,]*)/i]),
@@ -165,7 +207,8 @@ export function extractDeterministicFields(
   source: DocumentSource,
 ): ProviderExtractionOutput {
   const allowed = new Set(checklist.map((field) => field.id));
-  const definitions = sourceDefinitions[source] ?? [];
+  const resolvedSource = looksLikeDti(text) ? "ITBI" : source;
+  const definitions = sourceDefinitions[resolvedSource] ?? [];
   const fields = checklist.map((field): ExtractedField => {
     if (!allowed.has(field.id)) return empty(field.id);
     const definition = definitions.find((item) => item.fieldId === field.id);
@@ -196,7 +239,154 @@ export function extractDeterministicFields(
     };
   });
 
-  return { fields };
+  const output = { fields };
+  return resolvedSource === "ITBI" ? mergeDtiStructuredFields(output, text, checklist) : output;
+}
+
+function looksLikeDti(text: string) {
+  const hasDtiHeader = /declara[cç][aã]o\s+de\s+transa[cç][aã]o\s+imobili[aá]ria|\bDTI\b/i.test(text);
+  const hasDtiFields = /[áa]rea\s+do\s+terreno|valor\s+total\s+declarado|\[CAMPOS\s+DE\s+FORMULARIO\]/i.test(text);
+  return hasDtiHeader && hasDtiFields;
+}
+
+function mergeDtiStructuredFields(output: ProviderExtractionOutput, text: string, checklist: ChecklistField[]) {
+  const allowed = new Set(checklist.map((field) => field.id));
+  const compact = text.replace(/\s+/g, " ").trim();
+  const buyerBlock = between(compact, /DADOS\s+DO\s+ADQUIRENTE/i, /DADOS\s+DO\s+TRANSMITENTE/i);
+  const sellerBlock = between(compact, /DADOS\s+DO\s+TRANSMITENTE/i, /NATUREZA\s+DA\s+TRANSA[CÇ][AÃ]O/i);
+  const propertyBlock = between(compact, /DADOS\s+DO\s+IM[ÓO]VEL\s+OBJETO\s+DA\s+TRANSA[CÇ][AÃ]O/i, /DECLARA[CÇ][AÃ]O\s+DE\s+VALORES/i);
+  const financialBlock = between(compact, /DECLARA[CÇ][AÃ]O\s+DE\s+VALORES/i, /RESPONS[ÁA]VEL\s+PELAS\s+INFORMA[CÇ][ÕO]ES/i) || compact;
+  const values: Record<string, string | undefined> = {
+    "buyer.name": betweenLabel(buyerBlock, /Nome(?:\s*\/\s*Raz[ãa]o\s+Social)?/i, /CPF\s*\/\s*CNPJ|CPF\s*\/\s*CPJ|CPFCNPJ|Endere[cç]o|Email/i),
+    "buyer.cpf": firstDigits(betweenLabel(buyerBlock, /CPF\s*\/\s*CNPJ|CPF\s*\/\s*CPJ|CPFCNPJ/i, /Endere[cç]o|Email|Telefone/i), 11),
+    "buyer.address": betweenLabel(buyerBlock, /Endere[cç]o/i, /Email|Telefone/i),
+    "buyer.email": emailValue(buyerBlock),
+    "buyer.phone": phoneValue(buyerBlock),
+    "seller.legalName": betweenLabel(sellerBlock, /Nome(?:\s*\/\s*Raz[ãa]o\s+Social)?/i, /CPF\s*\/\s*CNPJ|CPF\s*\/\s*CPJ|CPFCNPJ|Endere[cç]o|Email/i),
+    "seller.cnpj": firstDigits(betweenLabel(sellerBlock, /CPF\s*\/\s*CNPJ|CPF\s*\/\s*CPJ|CPFCNPJ/i, /Endere[cç]o|Email|Telefone/i), 14),
+    "seller.address": betweenLabel(sellerBlock, /Endere[cç]o/i, /Email|Telefone/i),
+    "seller.email": emailValue(sellerBlock),
+    "seller.phone": phoneValue(sellerBlock),
+    "transaction.nature": betweenLabel(compact, /NATUREZA\s+DA\s+TRANSA[CÇ][AÃ]O/i, /DATA\s+DO|INTERMEDIA[CÇ][AÃ]O|DADOS\s+DO\s+IM[ÓO]VEL/i),
+    "property.iptu": betweenLabel(propertyBlock, /(?:Inscri[cç][ãa]o\s+do\s+IPTU|Inscr\.?\s+IPTU)/i, /Endere[cç]o|N[úu]mero|Complemento/i),
+    "property.address": betweenLabel(propertyBlock, /Endere[cç]o/i, /Loteamento|N[úu]mero|Complemento|Quadra/i),
+    "property.type": betweenLabel(propertyBlock, /Tipo(?:\s+de)?\s+Im[óo]vel/i, /N[ºo°]?\.?\s*Matr[íi]cula|Matr[íi]cula|[ÁA]rea/i),
+    "property.registration": betweenLabel(propertyBlock, /(?:N[ºo]\s*)?Matr[íi]cula/i, /[ÁA]rea/i),
+    "property.privateArea": areaAfterLabel(propertyBlock, /[ÁA]rea\s+Privativa/i),
+    "property.commonArea": areaAfterLabel(propertyBlock, /[ÁA]rea\s+Comum/i),
+    "property.totalArea": areaAfterLabel(propertyBlock, /[ÁA]rea\s+Total/i),
+    "property.landArea": areaAfterLabel(propertyBlock, /[ÁA]rea\s+(?:do\s+)?Terreno/i),
+    "property.unit": firstMatchValue(propertyBlock, /Complemento[^\n\r]*?(?:A\s*P|APTO?|APARTAMENTO)\s*([A-Z0-9-]+)/i),
+    "property.tower": firstMatchValue(propertyBlock, /Complemento[^\n\r]*?\b(?:TORRE|T)\s*0*(\d{1,2})\b/i),
+    "financial.financing": moneyAfterLabel(financialBlock, /Valor\s+financiado(?:\s*\(SFH\))?/i),
+    "financial.nonFinancedValue": moneyAfterLabel(financialBlock, /Valor\s+n[ãa]o\s+financiado/i),
+    "financial.totalValue": moneyAfterLabel(financialBlock, /Valor\s+TOTAL\s+DECLARADO/i),
+  };
+
+  const structuredFields = new Set([
+    "buyer.name", "buyer.cpf", "buyer.address", "buyer.email", "buyer.phone",
+    "seller.legalName", "seller.cnpj", "seller.address", "seller.email", "seller.phone",
+    "transaction.nature", "property.iptu", "property.address", "property.type",
+    "property.registration", "property.privateArea", "property.commonArea", "property.totalArea",
+    "property.landArea", "property.unit", "property.tower", "financial.financing",
+    "financial.nonFinancedValue", "financial.totalValue",
+  ]);
+  for (const field of checklist) {
+    if (!allowed.has(field.id) || !values[field.id]) continue;
+    const value = values[field.id]!.trim();
+    if (!value) continue;
+    const existing = output.fields.find((item) => item.fieldId === field.id);
+    if (!existing || !existing.value || existing.confidence < 94 || field.fieldType === "area") {
+      if (existing) {
+        existing.value = value;
+        existing.confidence = 96;
+        existing.sourceLocation = { section: "DTI", rawText: value.slice(0, 500) };
+      }
+    }
+  }
+  for (const field of output.fields) {
+    if (!structuredFields.has(field.fieldId) || values[field.fieldId]) continue;
+    if (
+      (field.fieldId.startsWith("seller.") && sellerBlock) ||
+      (propertyBlock && ["property.type", "property.unit", "property.tower"].includes(field.fieldId)) ||
+      (compact && field.fieldId === "transaction.nature" && /NATUREZA\s+DA\s+TRANSA[CÇ][AÃ]O/i.test(compact))
+    ) {
+      field.value = null;
+      field.confidence = 0;
+      field.sourceLocation = undefined;
+    }
+  }
+  return output;
+}
+
+function between(value: string, start: RegExp, end: RegExp) {
+  const startMatch = value.match(start);
+  if (!startMatch || startMatch.index == null) return "";
+  const from = startMatch.index + startMatch[0].length;
+  const rest = value.slice(from);
+  const endMatch = rest.match(end);
+  return rest.slice(0, endMatch?.index ?? rest.length).trim();
+}
+
+function betweenLabel(value: string, label: RegExp, next: RegExp) {
+  if (!value) return undefined;
+  const labelMatch = value.match(label);
+  if (!labelMatch || labelMatch.index == null) return undefined;
+  const rest = value.slice(labelMatch.index + labelMatch[0].length).replace(/^\s*[:*\-]?\s*/, "");
+  const nextMatch = rest.match(next);
+  return cleanStructuredValue(rest.slice(0, nextMatch?.index ?? rest.length));
+}
+
+function firstMatchValue(value: string, pattern: RegExp) {
+  return value.match(pattern)?.[1]?.trim();
+}
+
+function firstDigits(value: string | undefined, length: number) {
+  if (!value) return undefined;
+  const match = value.match(length === 11 ? /\d{3}\D?\d{3}\D?\d{3}\D?\d{2}/ : /\d{2}\D?\d{3}\D?\d{3}\D?\d{4}\D?\d{2}/);
+  return match?.[0];
+}
+
+function emailValue(value: string) {
+  return value.match(/[\w.+-]+@[\w.-]+\.[A-Z]{2,}/i)?.[0];
+}
+
+function phoneValue(value: string) {
+  const labeled = value.match(/(?:Telefone|Fone|Celular)\s*:?\s*(\+?\d[\d() .-]{7,}\d)/i)?.[1]?.trim();
+  if (!labeled) return undefined;
+  const digits = labeled.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 11 ? labeled : undefined;
+}
+
+function areaAfterLabel(value: string, label: RegExp) {
+  const labelMatch = value.match(label);
+  if (!labelMatch || labelMatch.index == null) return undefined;
+  const rest = value.slice(labelMatch.index + labelMatch[0].length);
+  const match = rest.match(/^[^\d]{0,20}(\d[\d\s.,]*?)(?=\s*m\s*[²2]?\b|\s+(?:FRA[CÇ][AÃ]O|[ÁA]REA|DECLARA[CÇ][AÃ]O|$))/i);
+  return cleanStructuredNumber(match?.[1]);
+}
+
+function moneyAfterLabel(value: string, label: RegExp) {
+  const labelMatch = value.match(label);
+  if (!labelMatch || labelMatch.index == null) return undefined;
+  const rest = value.slice(labelMatch.index + labelMatch[0].length);
+  const match = rest.match(/^[^\d]{0,20}(\d[\d\s.,]*?)(?=\s+(?:VALOR|OBS|RESPONS|$))/i);
+  return cleanStructuredNumber(match?.[1]);
+}
+
+function cleanStructuredNumber(value: string | undefined) {
+  if (!value) return undefined;
+  const cleaned = value.replace(/\s+/g, "").replace(/m[²2]?/gi, "").replace(/[^\d.,-]/g, "");
+  return cleaned || undefined;
+}
+
+function cleanStructuredValue(value: string) {
+  const cleaned = value
+    .replace(/^\s*\([^)]*\)\s*/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.;])/g, "$1")
+    .trim();
+  return cleaned || undefined;
 }
 
 function reservationAddress(text: string) {

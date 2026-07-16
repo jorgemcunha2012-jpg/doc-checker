@@ -16,7 +16,8 @@ export async function extractDocxText(buffer: Buffer) {
 
 /** Extracts readable text from common RTF files without a native office runtime. */
 export function extractRtfText(buffer: Buffer) {
-  const input = buffer.toString("latin1");
+  const content = buffer.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf])) ? buffer.subarray(3) : buffer;
+  const input = content.toString("latin1").replace(/^\uFEFF/, "");
   if (!/^\s*\{\\rtf/i.test(input)) throw new Error("Arquivo RTF inválido ou corrompido.");
 
   const output: string[] = [];

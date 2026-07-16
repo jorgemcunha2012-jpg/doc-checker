@@ -97,6 +97,8 @@ export function enrichStandardFinancialFields(
   const standardItems: Record<string, string> = {
     "financial.financing": "B.4.1",
     "financial.downPayment": "B.4.2",
+    // In the minuta, Entrada Moradia is the own-resources amount in B.4.2.
+    "financial.housingEntry": "B.4.2",
     "financial.fgts": "B.4.3",
     "financial.subsidy": "B.4.5",
   };
@@ -107,7 +109,8 @@ export function enrichStandardFinancialFields(
     fields: output.fields.map((field) => {
       const item = standardItems[field.fieldId];
       if (!allowedIds.has(field.fieldId)) return field;
-      const deterministic = composition[field.fieldId];
+      const deterministic = composition[field.fieldId] ??
+        (field.fieldId === "financial.housingEntry" ? composition["financial.downPayment"] : undefined);
       if (deterministic) return { ...field, ...deterministic };
       if (field.value) return field;
       const line = item

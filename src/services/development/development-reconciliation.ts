@@ -10,6 +10,10 @@ export function reconcileDevelopmentExtractions(
 
   const reviewRequired = new Set<string>();
   const warnings = new Set<string>();
+  const detectedTypologies = new Set<string>([
+    ...(ocr.quality?.detectedTypologies ?? []),
+    ...(vision.quality?.detectedTypologies ?? []),
+  ]);
   for (const issue of ocr.quality?.reviewRequired ?? []) reviewRequired.add(`OCR: ${issue}`);
   for (const issue of vision.quality?.reviewRequired ?? []) reviewRequired.add(`Visão IA: ${issue}`);
   for (const warning of ocr.quality?.warnings ?? []) warnings.add(`OCR: ${warning}`);
@@ -65,6 +69,7 @@ export function reconcileDevelopmentExtractions(
       reviewRequired: [...reviewRequired],
       warnings: [...warnings],
       sourcesCompared: ["OCR", "Visão IA"],
+      detectedTypologies: [...detectedTypologies],
     },
   };
 }
@@ -76,12 +81,13 @@ function addQuality(extraction: DevelopmentExtraction, reviewRequired: string[],
       reviewRequired: [...new Set([...(extraction.quality?.reviewRequired ?? []), ...reviewRequired])],
       warnings: [...new Set([...(extraction.quality?.warnings ?? []), ...warnings])],
       sourcesCompared: extraction.quality?.sourcesCompared,
+      detectedTypologies: extraction.quality?.detectedTypologies,
     },
   };
 }
 
 function unitKey(unit: { tower: string; unit: string }) {
-  const candidate = unit as typeof unit & { typology?: string; privateArea?: string; totalArea?: string; idealFraction?: string };
+  const candidate = unit as typeof unit & { typology?: string; privateArea?: string; commonArea?: string; totalArea?: string; idealFraction?: string };
   // A type is the identity of a registry record. Areas are compared as data,
   // so an area mismatch must be reported as a divergence, not as two missing types.
   if (candidate.typology?.trim()) return normalize(candidate.typology);
@@ -89,12 +95,12 @@ function unitKey(unit: { tower: string; unit: string }) {
 }
 
 function sameUnitData(left: unitForType, right: unitForType) {
-  return [left.privateArea, left.totalArea, left.idealFraction, left.iptuRegistration, left.typology].every((value, index) =>
-    sameText(String(value ?? ""), String([right.privateArea, right.totalArea, right.idealFraction, right.iptuRegistration, right.typology][index] ?? "")),
+  return [left.privateArea, left.commonArea, left.totalArea, left.idealFraction, left.iptuRegistration, left.typology].every((value, index) =>
+    sameText(String(value ?? ""), String([right.privateArea, right.commonArea, right.totalArea, right.idealFraction, right.iptuRegistration, right.typology][index] ?? "")),
   );
 }
 
-type unitForType = { tower: string; unit: string; privateArea: string; totalArea?: string; idealFraction?: string; iptuRegistration?: string; typology?: string; confidence: number };
+type unitForType = { tower: string; unit: string; privateArea: string; commonArea?: string; totalArea?: string; idealFraction?: string; iptuRegistration?: string; typology?: string; confidence: number };
 
 function unitLabel(unit: { tower: string; unit: string; typology?: string; privateArea?: string }) {
   return unit.typology?.trim() ? `${unit.typology} · área ${unit.privateArea ?? "não informada"}` : `Torre ${unit.tower} · apartamento ${unit.unit}`;

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { DevelopmentExtraction } from "@/domain/development";
 import { AuthError, requireAdmin, requireUser } from "@/lib/auth";
 import { audit } from "@/services/process/process-repository";
-import { createDevelopment, deleteDevelopment, listDevelopments } from "@/services/development/development-repository";
+import { createDevelopment, deleteDevelopment, listDevelopments, updateDevelopment } from "@/services/development/development-repository";
 
 export async function GET() {
   try {
@@ -41,6 +41,26 @@ export async function DELETE(request: Request) {
     if (!deleted) return NextResponse.json({ error: "Empreendimento não encontrado." }, { status: 404 });
     await audit(user, "DEVELOPMENT_DELETED", "development", body.id, {});
     return NextResponse.json({ ok: true });
+  } catch (error) {
+    return handleError(error);
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await requireUser();
+    const body = await request.json() as { id?: string; sourceDocumentName?: string; extraction?: DevelopmentExtraction };
+    if (!body.id || !body.extraction?.name || !body.extraction.units?.length) {
+      return NextResponse.json({ error: "Informe o empreendimento e ao menos uma unidade." }, { status: 400 });
+    }
+    const development = await updateDevelopment(user.organizationId, body.id, body.sourceDocumentName ?? "", body.extraction);
+    if (!development) return NextResponse.json({ error: "Empreendimento não encontrado." }, { status: 404 });
+    await audit(user, "DEVELOPMENT_UPDATED", "development", development.id, {
+      name: development.name,
+      units: development.units.length,
+      sourceDocumentName: development.sourceDocumentName,
+    });
+    return NextResponse.json({ development });
   } catch (error) {
     return handleError(error);
   }

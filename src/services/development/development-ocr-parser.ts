@@ -8,7 +8,8 @@ export function extractDevelopmentFromOcrText(text: string): DevelopmentExtracti
   const sellerCnpj = normalized.match(/\bcnpj\b[^\d]*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i)?.[1];
   const sellerLegalName = extractSellerLegalName(normalized);
   const units = extractUnits(normalized);
-  const quality = validateUnits(units);
+  const detectedTypologies = extractTypologies(normalized);
+  const quality = validateUnits(units, detectedTypologies);
 
   return {
     name: name || "Empreendimento sem nome",
@@ -17,13 +18,13 @@ export function extractDevelopmentFromOcrText(text: string): DevelopmentExtracti
     sellerLegalName,
     sellerCnpj,
     units,
-    quality,
+    quality: { ...quality, detectedTypologies },
   };
 }
 
 function extractUnits(text: string): DevelopmentExtraction["units"] {
   const units = new Map<string, DevelopmentExtraction["units"][number]>();
-  const areaPattern = /(?:com\s+uma\s+)?area\s+privativa\s+(?:principal|coberta\s+padrao)\s+de\s+([0-9]{1,3}[,.][0-9]{2})\s*m?/g;
+  const areaPattern = /(?:com\s+uma\s+)?area\s+privativa(?:\s+(?:principal|coberta\s+padrao|coberta|total|util))?\s*(?:de|:)?\s*([0-9][0-9.]*[,.][0-9]{2,6})\s*m?/g;
   let previousEnd = 0;
   let match: RegExpExecArray | null;
 
@@ -31,7 +32,8 @@ function extractUnits(text: string): DevelopmentExtraction["units"] {
     const context = text.slice(previousEnd, match.index);
     const after = text.slice(match.index, match.index + 360);
     const privateArea = normalizeDecimal(match[1]) ?? "";
-    const totalArea = normalizeDecimal(after.match(/(?:area\s+total\s+real|area\s+real\s+total)\s+de\s+([0-9]{1,3}[,.][0-9]{3,6})\s*m?/)?.[1]);
+    const commonArea = normalizeDecimal(after.match(/(?:area\s+(?:de\s+uso\s+)?comum|area\s+comum\s+real)\s*(?:de|:)?\s*([0-9][0-9.]*[,.][0-9]{2,6})\s*m?/)?.[1]);
+    const totalArea = normalizeDecimal(after.match(/(?:area\s+total\s+real|area\s+real\s+total)\s+de\s+([0-9][0-9.]*[,.][0-9]{3,6})\s*m?/)?.[1]);
     const idealFraction = normalizeDecimal(after.match(/fracao ideal de\s+([0-9][,.][0-9]{6,12})/)?.[1]);
     const iptuRegistration = after.match(/(?:inscricao\s+(?:imobiliaria|municipal)|inscricao\s+do\s+imovel|iptu)\s*[:.]?\s*([a-z0-9./-]{3,30})/i)?.[1] ||
       context.match(/(?:inscricao\s+(?:imobiliaria|municipal)|inscricao\s+do\s+imovel|iptu)\s*[:.]?\s*([a-z0-9./-]{3,30})/i)?.[1];
@@ -41,6 +43,7 @@ function extractUnits(text: string): DevelopmentExtraction["units"] {
       tower: "",
       unit: "",
       privateArea,
+      ...(commonArea ? { commonArea } : {}),
       totalArea,
       idealFraction,
       ...(iptuRegistration ? { iptuRegistration } : {}),
@@ -60,7 +63,7 @@ function extractUnits(text: string): DevelopmentExtraction["units"] {
   );
 }
 
-function validateUnits(units: DevelopmentExtraction["units"]): NonNullable<DevelopmentExtraction["quality"]> {
+function validateUnits(units: DevelopmentExtraction["units"], detectedTypologies: string[]): NonNullable<DevelopmentExtraction["quality"]> {
   const reviewRequired = new Set<string>();
   const warnings = new Set<string>();
   for (const unit of units) {
@@ -74,7 +77,11 @@ function validateUnits(units: DevelopmentExtraction["units"]): NonNullable<Devel
     if (fraction !== null && (fraction <= 0 || fraction >= 1)) reviewRequired.add(`${label} possui fração ideal fora do intervalo esperado.`);
     if (!unit.totalArea || !unit.idealFraction) warnings.add(`${label} não possui todas as áreas/fração ideal legíveis.`);
   }
-  if (!units.length) reviewRequired.add("Nenhuma unidade foi identificada com evidência suficiente.");
+  if (!units.length) {
+    reviewRequired.add(detectedTypologies.length
+      ? `Tipos identificados (${detectedTypologies.join(", ")}), mas nenhuma área privativa foi associada a eles.`
+      : "Nenhum tipo de unidade com área privativa foi identificado com evidência suficiente.");
+  }
   return { reviewRequired: [...reviewRequired], warnings: [...warnings] };
 }
 
@@ -109,6 +116,13 @@ function extractTypology(context: string) {
   return raw ? `Tipo ${raw.toUpperCase()}` : undefined;
 }
 
+function extractTypologies(text: string) {
+  return [...new Set([...text.matchAll(/\btipo\s+([a-z0-9-]{1,12})/g)]
+    .map((match) => match[1]?.replace(/[^a-z0-9-]/g, ""))
+    .filter(Boolean)
+    .map((value) => `Tipo ${value.toUpperCase()}`))];
+}
+
 function normalizeOcrText(text: string) {
   return text
     .normalize("NFD")
@@ -122,7 +136,9 @@ function normalizeOcrText(text: string) {
 }
 
 function normalizeDecimal(value?: string) {
-  return value?.replace(".", ",").trim();
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed.includes(",") ? trimmed.replace(/\./g, "") : trimmed.replace(".", ",");
 }
 
 function parseDecimal(value?: string) {

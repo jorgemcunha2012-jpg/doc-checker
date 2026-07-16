@@ -53,6 +53,23 @@ test("preenche recursos próprios e valor total da composição padronizada", ()
   assert.equal(enriched.fields.find((field) => field.fieldId === "financial.totalValue")?.value, "R$ 237.000,00");
 });
 
+test("preenche Entrada Moradia exclusivamente pelo B.4.2 com evidência da composição", () => {
+  const checklist = getChecklist("RECONCILIATION");
+  const output = {
+    fields: checklist.map((field) => ({ fieldId: field.id, value: null, confidence: 0 })),
+  };
+  const text = "[PÁGINA 2] B.4.1 - Financiamento: R$ 144.583,19 B.4.2 - Valor dos recursos próprios: R$ 51.892,81 B.4.3 - FGTS: R$ 0,00 B.4.5 - Subsídio: R$ 19.524,00 B.5 - Despesas";
+
+  const enriched = enrichStandardFinancialFields(output, text, checklist);
+  const entry = enriched.fields.find((field) => field.fieldId === "financial.housingEntry");
+
+  assert.equal(entry?.value, "R$ 51.892,81");
+  assert.equal(entry?.confidence, 100);
+  assert.equal(entry?.sourceLocation?.page, 2);
+  assert.match(entry?.sourceLocation?.section ?? "", /composição dos recursos/i);
+  assert.match(entry?.sourceLocation?.rawText ?? "", /B\.4\.2/);
+});
+
 test("prioriza a sequência B.4 da minuta e gera evidência curta para o subsídio", () => {
   const output = enrichStandardFinancialFields({
     fields: [{ fieldId: "financial.subsidy", value: "R$ 25,00", confidence: 100, sourceLocation: { rawText: "trecho incorreto" } }],

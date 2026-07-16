@@ -46,3 +46,11 @@ test("extrai caracteres Unicode RTF", () => {
   const rtf = String.raw`{\rtf1\ansi\uc1 Cidade: S\u227?o Paulo}`;
   assert.equal(extractRtfText(Buffer.from(rtf, "latin1")), "Cidade: São Paulo");
 });
+
+test("aceita RTF com BOM e espaços antes do cabeçalho", () => {
+  const rtf = Buffer.concat([
+    Buffer.from([0xef, 0xbb, 0xbf]),
+    Buffer.from(String.raw`  {\rtf1\ansi Nome: Jo\'e3o\par}`, "latin1"),
+  ]);
+  assert.equal(extractRtfText(rtf), "Nome: João");
+});

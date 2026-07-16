@@ -6,7 +6,7 @@ import type { DocumentSource, ExtractionQualityReport } from "@/domain/validatio
 import { processCode } from "@/lib/process-code";
 import { extractionAlert } from "@/lib/extraction-alerts";
 
-type ManagedUser = { id: string; name: string; email: string; role: string; active: boolean; must_change_password: boolean };
+type ManagedUser = { id: string; name: string; email: string; role: string; active: boolean; must_change_password: boolean; is_master_admin?: boolean };
 type ManagedProcess = {
   id: string;
   processing_status: string;
@@ -34,12 +34,14 @@ export function AdminDashboard({ isMasterAdmin, embedded = false }: { isMasterAd
   const [loading, setLoading] = useState(true); const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null); const [filter, setFilter] = useState("ALL");
   const load = useCallback(async () => {
     setLoading(true);
-    const requests: Promise<Response>[] = [fetch("/api/admin/users")];
-    if (isMasterAdmin) requests.push(fetch("/api/processes"), fetch("/api/admin/audit"));
+    const requests: Promise<Response>[] = [fetch("/api/admin/users"), fetch("/api/admin/audit")];
+    if (isMasterAdmin) requests.push(fetch("/api/processes"));
     const [u, p, a] = await Promise.all(requests);
     if (u.ok) setUsers((await u.json()).users);
-    if (p?.ok) setProcesses((await p.json()).processes);
-    if (a?.ok) setEvents((await a.json()).events);
+    const auditResponse = isMasterAdmin ? a : p;
+    const processResponse = isMasterAdmin ? p : undefined;
+    if (processResponse?.ok) setProcesses((await processResponse.json()).processes);
+    if (auditResponse?.ok) setEvents((await auditResponse.json()).events);
     setLoading(false);
   }, [isMasterAdmin]);
   useEffect(() => { void load(); const timer = window.setInterval(load, 15000); return () => window.clearInterval(timer); }, [load]);
@@ -49,6 +51,10 @@ export function AdminDashboard({ isMasterAdmin, embedded = false }: { isMasterAd
       return anomaly ? [{ process, ...anomaly }] : [];
     }).sort((left, right) => right.durationMs - left.durationMs),
     [processes],
+  );
+  const extractionAttempts = useMemo(
+    () => events.filter((event) => event.entity_type === "development_extraction"),
+    [events],
   );
   const visible = useMemo(
     () => filter === "ALL"
@@ -91,11 +97,13 @@ export function AdminDashboard({ isMasterAdmin, embedded = false }: { isMasterAd
         <div className="border border-slate-200 bg-white p-5"><h2 className="font-bold">Documentos em análise agora</h2><p className="mt-1 text-sm text-slate-500">Atualiza automaticamente a cada 15 segundos.</p><div className="mt-4 divide-y divide-slate-100">{inProgressProcesses.length ? inProgressProcesses.map((process) => <div key={process.id} className="py-3"><div className="flex items-center justify-between gap-3"><div><div className="text-xs font-bold text-[#0f8f88]">{processCode(process.id)}</div><div className="text-sm font-bold">{process.profiles?.name ?? "Usuário"}</div></div><div className="text-xs font-bold text-blue-600">{process.process_documents.length} documento(s)</div></div><div className="mt-1 text-xs text-slate-500">Iniciado em {new Date(process.started_at).toLocaleString("pt-BR")} · {durationLabel(process.started_at, process.completed_at)}</div><div className="mt-2 space-y-1">{process.process_documents.map((document) => <div key={`${process.id}-${document.name}`} className="truncate text-sm text-slate-700">{document.name}</div>)}</div></div>) : <div className="py-6 text-sm text-slate-500">Nenhum documento em análise neste momento.</div>}</div></div>
         <div className="border border-slate-200 bg-white p-5"><h2 className="font-bold">Log recente</h2><div className="mt-4 space-y-3">{events.slice(0, 8).map((event) => <div key={event.id} className="border-l-2 border-slate-200 pl-3"><div className="text-sm font-bold text-slate-800">{eventLabel(event.event_type)}</div><div className="text-xs text-slate-500">{event.profiles?.name ?? "Sistema"} · {new Date(event.created_at).toLocaleString("pt-BR")}{eventDurationLabel(event) ? ` · ${eventDurationLabel(event)}` : ""}</div></div>)}{events.length === 0 ? <div className="text-sm text-slate-500">Nenhum evento registrado ainda.</div> : null}</div></div>
       </section> : null}
+      {extractionAttempts.length ? <section className="border border-slate-200 bg-white p-5"><div className="flex items-start justify-between gap-4"><div><h2 className="font-bold">Tentativas de extração de matrícula</h2><p className="mt-1 text-sm text-slate-500">Inclui sucessos e falhas, com etapa, páginas, duração e motivo registrado.</p></div><span className="text-xs font-bold text-slate-500">{extractionAttempts.length} registro(s)</span></div><div className="mt-4 divide-y divide-slate-100">{extractionAttempts.slice(0, 30).map((event) => <div key={event.id} className="py-3"><div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><div className={`text-sm font-bold ${event.event_type === "DEVELOPMENT_EXTRACTION_FAILED" ? "text-rose-700" : event.event_type === "DEVELOPMENT_EXTRACTION_FINISHED" ? "text-emerald-700" : "text-blue-700"}`}>{eventLabel(event.event_type)}</div><div className="text-xs text-slate-500">{event.profiles?.name ?? "Sistema"} · {new Date(event.created_at).toLocaleString("pt-BR")}</div></div><div className="mt-1 text-sm text-slate-700">{String(event.metadata?.sourceDocumentName ?? "Arquivo não informado")}</div><div className="mt-1 text-xs text-slate-500">Etapa: {String(event.metadata?.stage ?? "-")} · {String(event.metadata?.pageCount ?? 0)} página(s) · {formatDuration(Number(event.metadata?.durationMs ?? 0))}</div>{event.event_type === "DEVELOPMENT_EXTRACTION_FAILED" ? <div className="mt-2 text-xs font-semibold text-rose-700">Motivo: {String(event.metadata?.reason ?? "Motivo não registrado")}</div> : <div className="mt-2 text-xs text-slate-600">Unidades encontradas: {String(event.metadata?.extractedUnits ?? event.metadata?.ocrUnits ?? 0)} · Revisões apontadas: {String(event.metadata?.reviewRequired ?? 0)}</div>}</div>)}</div></section> : null}
       <section className="border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><Users className="h-5 w-5 text-blue-600" /><h2 className="font-bold">Usuários</h2></div>
         <form onSubmit={createUser} className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]"><input name="name" required placeholder="Nome" className="min-h-10 rounded-md border border-slate-300 px-3 text-sm" /><input name="email" required type="email" placeholder="Email" className="min-h-10 rounded-md border border-slate-300 px-3 text-sm" /><button className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white"><Plus className="h-4 w-4" />Criar Analista</button></form>
         {temporaryPassword ? <div className="mt-4 flex items-center justify-between gap-3 border border-amber-200 bg-amber-50 p-3 text-sm"><div><strong>Senha temporária:</strong> <code>{temporaryPassword}</code><div className="text-xs text-amber-700">Copie agora. Ela não será exibida novamente.</div></div><button onClick={() => navigator.clipboard.writeText(temporaryPassword)} title="Copiar"><Copy className="h-4 w-4" /></button></div> : null}
-        <div className="mt-4 divide-y divide-slate-100">{users.map((user) => <div key={user.id} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="text-sm font-bold">{user.name}</div><div className="text-xs text-slate-500">{user.email} · {user.active ? "Ativo" : "Desativado"}{user.must_change_password ? " · Troca de senha pendente" : ""}</div></div>{isMasterAdmin && user.role !== "ADMIN" ? <div className="flex gap-2"><button onClick={() => userAction(user.id, "RESET_PASSWORD")} className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold"><KeyRound className="h-3.5 w-3.5" />Redefinir senha</button><button onClick={() => userAction(user.id, user.active ? "DEACTIVATE" : "ACTIVATE")} className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold"><Power className="h-3.5 w-3.5" />{user.active ? "Desativar" : "Ativar"}</button></div> : null}</div>)}</div>
+        <div className="mt-4 divide-y divide-slate-100">{users.map((user) => <div key={user.id} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="text-sm font-bold">{user.name}{user.is_master_admin ? " · Master" : ""}</div><div className="text-xs text-slate-500">{user.email} · {user.active ? "Ativo" : "Desativado"}{user.must_change_password ? " · Troca de senha pendente" : ""}</div></div>{(isMasterAdmin || !user.is_master_admin) ? <div className="flex gap-2"><button onClick={() => userAction(user.id, "RESET_PASSWORD")} className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold"><KeyRound className="h-3.5 w-3.5" />Redefinir senha</button><button onClick={() => userAction(user.id, user.active ? "DEACTIVATE" : "ACTIVATE")} className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold"><Power className="h-3.5 w-3.5" />{user.active ? "Desativar" : "Ativar"}</button></div> : null}</div>)}</div>
       </section>
+      {!isMasterAdmin ? <section className="border border-slate-200 bg-white p-5"><h2 className="font-bold">Log de acesso da organização</h2><p className="mt-1 text-sm text-slate-500">Eventos registrados somente para a sua organização.</p><div className="mt-4 space-y-3">{events.slice(0, 100).map((event) => <div key={event.id} className="border-l-2 border-slate-200 pl-3"><div className="text-sm font-bold text-slate-800">{eventLabel(event.event_type)}</div><div className="text-xs text-slate-500">{event.profiles?.name ?? "Sistema"} · {new Date(event.created_at).toLocaleString("pt-BR")}{eventDurationLabel(event) ? ` · ${eventDurationLabel(event)}` : ""}</div></div>)}{events.length === 0 ? <div className="text-sm text-slate-500">Nenhum evento registrado ainda.</div> : null}</div></section> : null}
       {isMasterAdmin ? <section className="border border-slate-200 bg-white"><div className="flex items-center justify-between border-b p-5"><h2 className="font-bold">Processos da equipe</h2><select className="rounded-md border px-3 py-2 text-sm" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">Todos</option><option value="ANOMALY">Com alerta</option><option value="IN_PROGRESS">Em andamento</option><option value="PENDING_REVIEW">Pendentes</option><option value="FULLY_CHECKED">Conferidos</option><option value="FAILED">Falhas</option></select></div>
         {loading ? <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div> : <div className="divide-y">{visible.map((process) => { const anomaly = processAnomaly(process); return <div key={process.id} className="grid gap-3 p-4 sm:grid-cols-[180px_1fr_1fr_150px_100px]"><div><div className="text-xs font-bold text-[#0f8f88]">{processCode(process.id)}</div><div className="text-sm font-bold">{process.profiles?.name ?? "Usuário"}</div><div className="text-xs text-slate-500">{new Date(process.started_at).toLocaleString("pt-BR")}</div></div><div>{process.process_documents.map((document) => <div key={document.name} className="truncate text-sm text-slate-700">{document.name}</div>)}</div><div><div className="text-sm font-bold text-slate-600">{durationLabel(process.started_at, process.completed_at)}</div>{anomaly ? <div className={`mt-1 text-xs font-bold ${anomaly.severity === "critical" ? "text-rose-700" : "text-amber-700"}`}>{anomaly.label}</div> : null}</div><div className="text-sm font-bold text-slate-600">{statusLabel(process.final_status)}</div><Link href={`/admin/processes/${process.id}`} className="text-sm font-bold text-blue-600">Ver resultado</Link></div>; })}</div>}
       </section> : null}
@@ -196,6 +204,9 @@ function eventLabel(type: string) {
     PROCESS_FINISHED: "Processo concluído",
     PROCESS_SLOW: "Processo concluído acima do tempo esperado",
     PROCESS_FAILED: "Processo com falha",
+    DEVELOPMENT_EXTRACTION_STARTED: "Extração de matrícula iniciada",
+    DEVELOPMENT_EXTRACTION_FINISHED: "Extração de matrícula concluída",
+    DEVELOPMENT_EXTRACTION_FAILED: "Falha na extração de matrícula",
     REVIEW_APPROVED: "Item validado",
     REVIEW_REVOKED: "Validação desfeita",
     LEARNING_RULE_RECORDED: "Aprendizado supervisionado registrado",

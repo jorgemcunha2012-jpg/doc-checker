@@ -6,6 +6,7 @@ export type DevelopmentUnit = {
   tower: string;
   unit: string;
   privateArea: string;
+  commonArea?: string;
   totalArea?: string;
   idealFraction?: string;
   iptuRegistration?: string;
@@ -45,6 +46,7 @@ export type DevelopmentExtractionQuality = {
   reviewRequired: string[];
   warnings: string[];
   sourcesCompared?: string[];
+  detectedTypologies?: string[];
 };
 
 export type DevelopmentExtractionReview = {
@@ -66,6 +68,7 @@ export function developmentUnitValues(
     { fieldId: "property.development", source, value: development.name, confidence },
     { fieldId: "property.registration", source, value: unit.registration ?? development.registration ?? null, confidence },
     { fieldId: "property.privateArea", source, value: unit.privateArea, confidence },
+    { fieldId: "property.commonArea", source, value: unit.commonArea ?? null, confidence },
     { fieldId: "property.totalArea", source, value: unit.totalArea ?? null, confidence },
     { fieldId: "property.idealFraction", source, value: unit.idealFraction ?? null, confidence },
     { fieldId: "property.iptu", source, value: unit.iptuRegistration ?? null, confidence },
@@ -97,10 +100,11 @@ export function reviewDevelopmentExtraction(extraction: DevelopmentExtraction): 
   };
 }
 
-export function unitTypeSignature(unit: Pick<DevelopmentUnit, "privateArea" | "totalArea" | "idealFraction" | "typology">) {
+export function unitTypeSignature(unit: Pick<DevelopmentUnit, "privateArea" | "commonArea" | "totalArea" | "idealFraction" | "typology">) {
   return [
     unit.typology?.trim() || "Tipo não informado",
     unit.privateArea.trim() || "-",
+    unit.commonArea?.trim() || "-",
     unit.totalArea?.trim() || "-",
     unit.idealFraction?.trim() || "-",
   ].join("::");

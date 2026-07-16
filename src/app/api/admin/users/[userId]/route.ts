@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import { AuthError, requireMasterAdmin } from "@/lib/auth";
+import { AuthError, isMasterAdmin, requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
 
 export async function PATCH(request: Request, context: { params: Promise<{ userId: string }> }) {
   try {
-    const admin = await requireMasterAdmin();
+    const admin = await requireAdmin();
     const { userId } = await context.params;
     const { action } = await request.json();
     const supabase = createSupabaseAdminClient();
     const { data: target, error: targetError } = await supabase
       .from("profiles")
-      .select("id")
+      .select("id, email, role")
       .eq("id", userId)
       .eq("organization_id", admin.organizationId)
       .maybeSingle();
@@ -19,6 +19,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     if (!target) return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
 
     if (action === "RESET_PASSWORD") {
+      if (isMasterAdmin({ email: target.email, role: target.role }) && !isMasterAdmin(admin)) {
+        return NextResponse.json({ error: "Somente o administrador master pode redefinir a senha do master." }, { status: 403 });
+      }
       const password = `Cf!${crypto.randomUUID().replaceAll("-", "").slice(0, 14)}9a`;
       const { error } = await supabase.auth.admin.updateUserById(userId, { password });
       if (error) throw error;
@@ -33,6 +36,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     }
 
     if (action === "ACTIVATE" || action === "DEACTIVATE") {
+      if (isMasterAdmin({ email: target.email, role: target.role }) && !isMasterAdmin(admin)) {
+        return NextResponse.json({ error: "Somente o administrador master pode alterar a situação do master." }, { status: 403 });
+      }
       const active = action === "ACTIVATE";
       const { error } = await supabase.from("profiles").update({ active, updated_at: new Date().toISOString() }).eq("id", userId).eq("organization_id", admin.organizationId);
       if (error) throw error;
