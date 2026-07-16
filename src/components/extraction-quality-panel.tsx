@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, RefreshCw } from "lucide-reac
 import type { ChecklistField, DocumentSource, ExtractionQualityReport } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
 import { humanFieldLabel } from "@/domain/field-labels";
+import { InfoTooltip } from "./info-tooltip";
 
 export function ExtractionQualityPanel({
   reports,
@@ -39,7 +40,7 @@ export function ExtractionQualityPanel({
                 <h3 className="text-sm font-bold text-slate-900">{documentSourceLabels[report.source]}</h3>
               </div>
               <span className={`text-sm font-bold ${report.status === "COMPLETE" ? "text-emerald-700" : "text-amber-700"}`}>
-                {report.coverage}% de cobertura
+                <span className="flex items-center gap-1">{report.coverage}% de cobertura <InfoTooltip text="Percentual dos campos críticos esperados que foram localizados e extraídos nesta fonte. Cobertura alta não garante que os valores estejam corretos, apenas que foram encontrados para conferência." /></span>
               </span>
             </div>
             {(report.recoveredFields ?? []).length ? (

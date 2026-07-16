@@ -11,6 +11,7 @@ import { LogoutButton } from "./logout-button";
 import Link from "next/link";
 import type { Development } from "@/domain/development";
 import { ExtractionQualityPanel } from "./extraction-quality-panel";
+import { InfoTooltip } from "./info-tooltip";
 
 const validationType = "RECONCILIATION" as const;
 const usesPersistentReviews = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -387,19 +388,19 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
               ) : null}
 
               <div className={`grid gap-3 ${run.validationType === "RECONCILIATION" ? "md:grid-cols-5" : "md:grid-cols-4"}`}>
-                <SummaryCard label="Total de campos conferidos" value={run.summary.totalChecked} tone="neutral" />
-                <SummaryCard label="Campos conferidos" value={finalResultCounts(run).checked} tone="success" />
-                <SummaryCard label="Divergências pendentes" value={finalResultCounts(run).divergences} tone="danger" />
-                <SummaryCard label="Revisões pendentes" value={finalResultCounts(run).reviews} tone="warning" />
+                <SummaryCard label="Total de campos conferidos" value={run.summary.totalChecked} tone="neutral" hint="Quantidade de linhas do checklist que entraram na comparação entre as fontes participantes." />
+                <SummaryCard label="Campos conferidos" value={finalResultCounts(run).checked} tone="success" hint="Campos com valores equivalentes ou aprovados manualmente por um usuário." />
+                <SummaryCard label="Divergências pendentes" value={finalResultCounts(run).divergences} tone="danger" hint="Campos em que a engine encontrou uma diferença relevante e ainda não houve validação humana." />
+                <SummaryCard label="Revisões pendentes" value={finalResultCounts(run).reviews} tone="warning" hint="Campos que precisam de análise humana por ausência, baixa confiança, conflito ou resultado inconclusivo." />
                 {run.validationType === "RECONCILIATION" ? (
-                  <SummaryCard label="Campos em fonte ilegível" value={run.summary.unreadable} tone="warning" />
+                  <SummaryCard label="Campos em fonte ilegível" value={run.summary.unreadable} tone="warning" hint="Campos afetados por uma fonte enviada que não pôde ser interpretada com segurança." />
                 ) : null}
               </div>
               {run.validationType === "RECONCILIATION" ? (
                 <div className="grid gap-3 md:grid-cols-3">
                   {run.participatingSources.map((source) => (
                     <div key={source} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="text-xs font-bold uppercase text-slate-500">{documentSourceLabels[source]}</div>
+                      <div className="flex items-center gap-1 text-xs font-bold uppercase text-slate-500">{documentSourceLabels[source]} <InfoTooltip text="Fonte documental usada na reconciliação. Os números abaixo se referem somente aos campos esperados nesta fonte." /></div>
                       <div className="mt-2 text-sm text-slate-700">
                         {run.summary.missingBySource[source] ?? 0} ausentes · {run.summary.unreadableBySource[source] ?? 0} ilegíveis
                       </div>
@@ -471,7 +472,7 @@ async function readJsonSafely<T>(response: Response): Promise<T | null> {
   }
 }
 
-function SummaryCard({ label, value, tone }: { label: string; value: number; tone: "neutral" | "success" | "danger" | "warning" }) {
+function SummaryCard({ label, value, tone, hint }: { label: string; value: number; tone: "neutral" | "success" | "danger" | "warning"; hint: string }) {
   const toneClasses = {
     neutral: "text-slate-950 bg-slate-100",
     success: "text-emerald-700 bg-emerald-50",
@@ -482,7 +483,7 @@ function SummaryCard({ label, value, tone }: { label: string; value: number; ton
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className={`inline-flex h-9 min-w-12 items-center justify-center rounded-md px-3 text-lg font-bold ${toneClasses[tone]}`}>{value}</div>
-      <div className="mt-3 text-sm font-semibold text-slate-700">{label}</div>
+      <div className="mt-3 flex items-center gap-1 text-sm font-semibold text-slate-700">{label} <InfoTooltip text={hint} /></div>
     </div>
   );
 }
@@ -513,7 +514,7 @@ function ReviewProgress({ run }: { run: ReconciliationRun }) {
           </p>
         </div>
         <div className="text-left sm:text-right">
-          <div className="text-2xl font-bold text-slate-950">{progress}%</div>
+          <div className="flex items-center justify-end gap-1"><div className="text-2xl font-bold text-slate-950">{progress}%</div> <InfoTooltip text="Percentual do checklist que já está conferido automaticamente ou validado manualmente. Divergências e revisões ainda abertas ficam fora deste percentual." /></div>
           <div className="text-xs font-semibold text-slate-500">conferido</div>
         </div>
       </div>
