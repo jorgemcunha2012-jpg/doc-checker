@@ -93,47 +93,76 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
   ],
   ITBI: [
     text("buyer.name", "ITBI", 94, [
+      /\bNome\s*:\s*([^\n\r]+)/i,
       /Texto1\s*:\s*([A-ZÀ-Ú\s]+?)(?=\d{11}\b)/i,
       /NomeRazão Social_4\s*:\s*([^\n\r]+)/i,
       /Nome\/Razão Social_4\s*:\s*([^\n\r]+)/i,
     ]),
     text("buyer.cpf", "ITBI", 94, [
+      /CPF\s*\/??\s*CNPJ\s*:\s*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i,
+      /CPFCNPJ\s*:\s*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i,
       /Texto1\s*:\s*[A-ZÀ-Ú\s]+?(\d{11})\b/i,
       /Texto12\s*:\s*(\d{11})\b/i,
       /\bCPF\b[^\d]*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i,
     ]),
-    text("buyer.email", "ITBI", 92, [/Email_4\s*:\s*([^\s\n\r]+@[^\s\n\r]+)/i]),
+    text("buyer.email", "ITBI", 92, [
+      /Email_4\s*:\s*([^\s\n\r]+@[^\s\n\r]+)/i,
+      /\bEmail\s*:\s*([^\s\n\r]+@[^\s\n\r]+)/i,
+    ]),
     text("buyer.address", "ITBI", 90, [/Endereço\s*:\s*([^\n\r]+)/i]),
     text("seller.legalName", "ITBI", 94, [
+      /Text1\s*:\s*([^\n\r]+)/i,
       /Texto2\s*:\s*([^\n\r]+)/i,
       /NomeRazão Social\s*:\s*([^\n\r]+)/i,
     ]),
     text("seller.cnpj", "ITBI", 94, [
+      /Text2\s*:\s*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i,
       /Texto3\s*:\s*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i,
       /Texto11\s*:\s*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i,
       /\bCNPJ\b[^\d]*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i,
     ]),
+    text("seller.address", "ITBI", 90, [/Endereço_2\s*:\s*([^\n\r]+)/i]),
     text("seller.email", "ITBI", 90, [/(?:Email|E-mail)[^:\n\r]*:\s*([^\s\n\r]+@[^\s\n\r]+)/i]),
     text("seller.phone", "ITBI", 88, [/(?:Telefone|Celular)[^:\n\r]*:\s*([+()\d\s.-]{8,24})/i]),
     text("transaction.instrumentDate", "ITBI", 88, [/(?:data\s+do\s+instrumento|data\s+da\s+transa[cç][aã]o)[^:\n\r]*:\s*([^\n\r]+)/i]),
-    text("transaction.nature", "ITBI", 88, [/natureza\s+da\s+transa[cç][aã]o[^:\n\r]*:\s*([^\n\r]+)/i]),
+    text("transaction.nature", "ITBI", 88, [
+      /natureza\s+da\s+transa[cç][aã]o[^:\n\r]*:\s*([^\n\r]+)/i,
+      /Compra\s+Venda\s+etc\s*:\s*([^\n\r]+)/i,
+    ]),
     text("transaction.transferredPercentage", "ITBI", 88, [/(?:%\s*transmitido|percentual\s+transmitido)[^:\n\r]*:\s*([\d.,]+\s*%?)/i]),
-    text("property.iptu", "ITBI", 94, [/Texto6\s*:\s*([A-Z0-9./-]+)/i]),
-    text("property.type", "ITBI", 88, [/(?:tipo\s+do\s+im[oó]vel|tipo)[^:\n\r]*:\s*([^\n\r]+)/i]),
-    text("property.address", "ITBI", 90, [/Endereço_2\s*:\s*([^\n\r]+)/i]),
-    text("property.unit", "ITBI", 90, [/Complemento\s*:\s*[^\n\r]*?(?:APT|APTO|APARTAMENTO)\s*([A-Z0-9-]+)/i]),
-    text("property.tower", "ITBI", 90, [/Complemento\s*:\s*[^\n\r]*?TORRE\s*([A-Z0-9-]+)/i]),
+    text("property.iptu", "ITBI", 94, [
+      /Inscri[cç][aã]o\s+do\s+IPTU\s*:\s*([A-Z0-9./-]+)/i,
+      /Texto6\s*:\s*([A-Z0-9./-]+)/i,
+    ]),
+    text("property.registration", "ITBI", 94, [
+      /Matr[ií]cula\s*:\s*([A-Z0-9./-]+)/i,
+      /Text4\s*:\s*([A-Z0-9./-]+)/i,
+    ]),
+    text("property.type", "ITBI", 88, [
+      /Text6\s*:\s*([^\n\r]+)/i,
+      /(?:tipo\s+do\s+im[oó]vel|tipo)[^:\n\r]*:\s*([^\n\r]+)/i,
+    ]),
+    text("property.address", "ITBI", 90, [
+      /Text3\s*:\s*([^\n\r]+)/i,
+      /Endereço_2\s*:\s*([^\n\r]+)/i,
+    ]),
+    text("property.unit", "ITBI", 90, [/Complemento\s*:\s*[^\n\r]*?(?:APT|APTO|APARTAMENTO|AP)\s*([A-Z0-9-]+)/i]),
+    text("property.tower", "ITBI", 90, [
+      /Complemento\s*:\s*[^\n\r]*?TORRE\s*([A-Z0-9-]+)/i,
+      /Complemento\s*:\s*[^\n\r]*?\bT\s*([A-Z0-9-]+)\s*,/i,
+    ]),
     text("property.privateArea", "ITBI", 92, [/Área privativa m²\s*:\s*([^\n\r]+)/i]),
     text("property.commonArea", "ITBI", 92, [/Área comum m²\s*:\s*([^\n\r]+)/i]),
     text("property.totalArea", "ITBI", 92, [/Área total m²\s*:\s*([^\n\r]+)/i]),
     text("property.landArea", "ITBI", 96, [
-      /área\s+do\s+terreno(?:\s*\(?\s*m[²2]\s*\)?)?\s*[:\-]?\s*([^\n\r]+)/i,
+      /área\s+do\s+terreno(?:\s*\(?\s*m[²2]\s*\)?)?\s*:\s*(\d+[\d.,]*\s*m?[²2]?)/i,
       /área\s+terreno[^:\n\r]*[:\-]\s*([^\n\r]+)/i,
     ]),
     text("property.idealFraction", "ITBI", 92, [/Fração ideal\s*:\s*([^\n\r]+)/i]),
     money("financial.financing", "ITBI", 92, [
       /Valor financiado SFH\s*:\s*(\d[\d.,]*)/i,
       /VALOR FINANCIADO\s*R\$\s*(\d[\d.,]*)/i,
+      /Valor financiado\s*:\s*(?:R\$\s*)?(\d[\d.,]*)/i,
       /valor financiado[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
     ]),
     money("financial.nonFinancedValue", "ITBI", 90, [/Valor não financiado\s*:\s*(\d[\d.,]*)/i]),
@@ -178,7 +207,8 @@ export function extractDeterministicFields(
   source: DocumentSource,
 ): ProviderExtractionOutput {
   const allowed = new Set(checklist.map((field) => field.id));
-  const definitions = sourceDefinitions[source] ?? [];
+  const resolvedSource = looksLikeDti(text) ? "ITBI" : source;
+  const definitions = sourceDefinitions[resolvedSource] ?? [];
   const fields = checklist.map((field): ExtractedField => {
     if (!allowed.has(field.id)) return empty(field.id);
     const definition = definitions.find((item) => item.fieldId === field.id);
@@ -210,6 +240,12 @@ export function extractDeterministicFields(
   });
 
   return { fields };
+}
+
+function looksLikeDti(text: string) {
+  const hasDtiHeader = /declara[cç][aã]o\s+de\s+transa[cç][aã]o\s+imobili[aá]ria|\bDTI\b/i.test(text);
+  const hasDtiFields = /[áa]rea\s+do\s+terreno|valor\s+total\s+declarado|\[CAMPOS\s+DE\s+FORMULARIO\]/i.test(text);
+  return hasDtiHeader && hasDtiFields;
 }
 
 function reservationAddress(text: string) {

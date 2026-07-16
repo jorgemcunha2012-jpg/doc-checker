@@ -285,9 +285,21 @@ export class DocumentExtractionService {
     const deterministicFields = deterministic.fields
       .filter((field) => field.value != null && String(field.value).trim())
       .map((field) => field.fieldId);
-    const initial = mergeRecoveryOutput(await this.deepSeekProvider.structureText(text, checklist), deterministic, checklist, true);
+    let providerOutput: ProviderExtractionOutput = { fields: [] };
+    let providerFailed = false;
+    try {
+      providerOutput = await this.deepSeekProvider.structureText(text, checklist);
+    } catch (error) {
+      providerFailed = true;
+      console.warn("[ConferIA] Provider textual indisponível; preservando extração determinística", {
+        source,
+        error: sanitizeExtractionError(error),
+        deterministicFields,
+      });
+    }
+    const initial = mergeRecoveryOutput(providerOutput, deterministic, checklist, true);
     const missing = missingCriticalFields(source, initial, checklist);
-    if (!missing.length) return { output: initial, recoveredFields: [], deterministicFields };
+    if (!missing.length || providerFailed) return { output: initial, recoveredFields: [], deterministicFields };
 
     try {
       const recovery = await this.deepSeekProvider.structureText(text, missing);

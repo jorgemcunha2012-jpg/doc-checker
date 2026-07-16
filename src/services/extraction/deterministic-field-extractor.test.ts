@@ -186,6 +186,68 @@ test("extrai campos de ITBI preenchível a partir dos campos de formulário do P
   assert.equal(value(output, "financial.totalValue"), "350.000,00");
 });
 
+test("extrai DTI preenchível mesmo quando os rótulos vêm como Text e CPFCNPJ", () => {
+  const output = extractDeterministicFields(
+    [
+      "Nome: JOAO ERIC ANTONIO BEZERRA OLIVEIRA /LARISSA FERREIRA DOS SANTOS",
+      "CPFCNPJ: 028.349.913-32/ 074.805.813-35",
+      "Telefone: (85) 99793-2496",
+      "Endereço: R Pedro Macário, 151, Tabuba em Caucaia/CE",
+      "Email: jeric.oliveira@gmail.com",
+      "Text1: SPE CAUCAIA CT EMPREENDIMENTOS IMOBILIARIOS LTDA",
+      "Text2: 53.635.373/0001-03",
+      "Endereço_2: RUA GENERAL SAMPAIO, 835 - SALA 301, CENTRO, FORTALEZA/CE",
+      "Inscrição do IPTU: 147158-9",
+      "Text3: RUA TABUZIOS, TABUBA, CAUCAIA/CE",
+      "Text8: 70",
+      "Text6: Apartamento",
+      "Text4: 69465",
+      "Área do terreno m²: 10.006,00",
+      "Área privativa m²: 48,19m²",
+      "Área comum m²: 41,524337m²",
+      "Área total m²: 89,714337m²",
+      "Complemento: T3 , AP 201",
+      "Compra Venda etc: COMPRA E VENDA",
+      "Valor Financiado: 360.000,00",
+      "Valor Não Financiado: 55.000,00",
+      "Valor Total Declarado: 415.000,00",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "ITBI",
+  );
+
+  assert.equal(value(output, "buyer.name"), "JOAO ERIC ANTONIO BEZERRA OLIVEIRA /LARISSA FERREIRA DOS SANTOS");
+  assert.equal(value(output, "buyer.cpf"), "028.349.913-32");
+  assert.equal(value(output, "seller.legalName"), "SPE CAUCAIA CT EMPREENDIMENTOS IMOBILIARIOS LTDA");
+  assert.equal(value(output, "seller.cnpj"), "53.635.373/0001-03");
+  assert.equal(value(output, "property.iptu"), "147158-9");
+  assert.equal(value(output, "property.registration"), "69465");
+  assert.equal(value(output, "property.address"), "RUA TABUZIOS, TABUBA, CAUCAIA/CE");
+  assert.equal(value(output, "property.tower"), "3");
+  assert.equal(value(output, "property.unit"), "201");
+  assert.equal(value(output, "property.landArea"), "10.006,00");
+  assert.equal(value(output, "financial.financing"), "360.000,00");
+  assert.equal(value(output, "financial.nonFinancedValue"), "55.000,00");
+});
+
+test("reconhece o formato DTI pelo conteúdo mesmo se a fonte vier classificada diferente", () => {
+  const output = extractDeterministicFields(
+    [
+      "DECLARAÇÃO DE TRANSAÇÃO IMOBILIÁRIA - DTI",
+      "[CAMPOS DE FORMULARIO]",
+      "Nome: JOAO ERIC ANTONIO BEZERRA OLIVEIRA",
+      "Área do terreno m²: 10.006,00",
+      "Text4: 69465",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "buyer.name"), "JOAO ERIC ANTONIO BEZERRA OLIVEIRA");
+  assert.equal(value(output, "property.landArea"), "10.006,00");
+  assert.equal(value(output, "property.registration"), "69465");
+});
+
 test("extrai razão social e CNPJ da matrícula para confronto com a minuta", () => {
   const output = extractDeterministicFields(
     [
