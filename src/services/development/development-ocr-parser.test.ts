@@ -25,6 +25,7 @@ test("extrai tipos de unidade de matrícula OCR com torres, apartamentos e fraç
     tower: "",
     unit: "",
     privateArea: "38,08",
+    commonArea: "34,576616",
     totalArea: "72,656616",
     idealFraction: "0,0022143433",
     typology: "Tipo A",
@@ -35,6 +36,7 @@ test("extrai tipos de unidade de matrícula OCR com torres, apartamentos e fraç
     tower: "",
     unit: "",
     privateArea: "50,43",
+    commonArea: "35,697996",
     totalArea: "86,127996",
     idealFraction: "0,0022861583",
     typology: "Tipo B",
@@ -76,6 +78,15 @@ test("reconhece área privativa total e não exige torre ou apartamento", () => 
   assert.equal(result.units.length, 2);
   assert.ok(result.units.some((unit) => unit.typology === "Tipo A" && unit.privateArea === "72,50"));
   assert.ok(result.units.some((unit) => unit.typology === "Tipo B" && unit.privateArea === "84,25"));
+});
+
+test("extrai área comum quando a matrícula informa área de uso comum", () => {
+  const result = extractDevelopmentFromOcrText(`
+    Tipo A, área privativa principal de 38,08m², área de uso comum de 34,576616m²,
+    perfazendo uma área total real de 72,656616m² e fração ideal de 0,0022143433.
+  `);
+
+  assert.equal(result.units[0]?.commonArea, "34,576616");
 });
 
 test("identifica tipos quando a matrícula não traz suas áreas", () => {

@@ -87,7 +87,7 @@ function addQuality(extraction: DevelopmentExtraction, reviewRequired: string[],
 }
 
 function unitKey(unit: { tower: string; unit: string }) {
-  const candidate = unit as typeof unit & { typology?: string; privateArea?: string; totalArea?: string; idealFraction?: string };
+  const candidate = unit as typeof unit & { typology?: string; privateArea?: string; commonArea?: string; totalArea?: string; idealFraction?: string };
   // A type is the identity of a registry record. Areas are compared as data,
   // so an area mismatch must be reported as a divergence, not as two missing types.
   if (candidate.typology?.trim()) return normalize(candidate.typology);
@@ -95,12 +95,12 @@ function unitKey(unit: { tower: string; unit: string }) {
 }
 
 function sameUnitData(left: unitForType, right: unitForType) {
-  return [left.privateArea, left.totalArea, left.idealFraction, left.iptuRegistration, left.typology].every((value, index) =>
-    sameText(String(value ?? ""), String([right.privateArea, right.totalArea, right.idealFraction, right.iptuRegistration, right.typology][index] ?? "")),
+  return [left.privateArea, left.commonArea, left.totalArea, left.idealFraction, left.iptuRegistration, left.typology].every((value, index) =>
+    sameText(String(value ?? ""), String([right.privateArea, right.commonArea, right.totalArea, right.idealFraction, right.iptuRegistration, right.typology][index] ?? "")),
   );
 }
 
-type unitForType = { tower: string; unit: string; privateArea: string; totalArea?: string; idealFraction?: string; iptuRegistration?: string; typology?: string; confidence: number };
+type unitForType = { tower: string; unit: string; privateArea: string; commonArea?: string; totalArea?: string; idealFraction?: string; iptuRegistration?: string; typology?: string; confidence: number };
 
 function unitLabel(unit: { tower: string; unit: string; typology?: string; privateArea?: string }) {
   return unit.typology?.trim() ? `${unit.typology} · área ${unit.privateArea ?? "não informada"}` : `Torre ${unit.tower} · apartamento ${unit.unit}`;

@@ -32,6 +32,7 @@ function extractUnits(text: string): DevelopmentExtraction["units"] {
     const context = text.slice(previousEnd, match.index);
     const after = text.slice(match.index, match.index + 360);
     const privateArea = normalizeDecimal(match[1]) ?? "";
+    const commonArea = normalizeDecimal(after.match(/(?:area\s+(?:de\s+uso\s+)?comum|area\s+comum\s+real)\s*(?:de|:)?\s*([0-9][0-9.]*[,.][0-9]{2,6})\s*m?/)?.[1]);
     const totalArea = normalizeDecimal(after.match(/(?:area\s+total\s+real|area\s+real\s+total)\s+de\s+([0-9][0-9.]*[,.][0-9]{3,6})\s*m?/)?.[1]);
     const idealFraction = normalizeDecimal(after.match(/fracao ideal de\s+([0-9][,.][0-9]{6,12})/)?.[1]);
     const iptuRegistration = after.match(/(?:inscricao\s+(?:imobiliaria|municipal)|inscricao\s+do\s+imovel|iptu)\s*[:.]?\s*([a-z0-9./-]{3,30})/i)?.[1] ||
@@ -42,6 +43,7 @@ function extractUnits(text: string): DevelopmentExtraction["units"] {
       tower: "",
       unit: "",
       privateArea,
+      ...(commonArea ? { commonArea } : {}),
       totalArea,
       idealFraction,
       ...(iptuRegistration ? { iptuRegistration } : {}),

@@ -143,7 +143,7 @@ export class KimiProvider implements DocumentExtractionProvider {
     const firstNamed = pages.find((page) => page.name !== "Empreendimento sem nome");
     const units = new Map<string, DevelopmentExtraction["units"][number]>();
     pages.flatMap((page) => page.units).forEach((unit) => {
-      const key = `${unit.typology?.toUpperCase() ?? "TIPO"}::${unit.privateArea}::${unit.totalArea ?? ""}::${unit.idealFraction ?? ""}`;
+      const key = `${unit.typology?.toUpperCase() ?? "TIPO"}::${unit.privateArea}::${unit.commonArea ?? ""}::${unit.totalArea ?? ""}::${unit.idealFraction ?? ""}`;
       const current = units.get(key);
       if (!current || unit.confidence > current.confidence) units.set(key, { ...unit, tower: "", unit: "" });
     });
@@ -170,7 +170,7 @@ export class KimiProvider implements DocumentExtractionProvider {
           {
             type: "text",
             text:
-              `Esta é a página ${page}. Extraia o empreendimento, razão social e CNPJ da proprietária ou incorporadora quando aparecerem, além de todas as regras explícitas e legíveis de tipo de unidade, área privativa, área total, fração ideal e inscrição imobiliária/IPTU associada. Torre e apartamento são opcionais e não devem impedir o registro do tipo. Responda no formato compacto {\"name\":string|null,\"city\":string|null,\"registration\":string|null,\"sellerLegalName\":string|null,\"sellerCnpj\":string|null,\"groups\":[{\"towers\":[string],\"units\":[string],\"privateArea\":string,\"totalArea\":string|null,\"idealFraction\":string|null,\"iptuRegistration\":string|null,\"typology\":string|null,\"registration\":string|null,\"confidence\":number}]}. Não invente dados nem expanda combinações. Ignore regras cortadas ou incompletas nas margens.`,
+              `Esta é a página ${page}. Extraia o empreendimento, razão social e CNPJ da proprietária ou incorporadora quando aparecerem, além de todas as regras explícitas e legíveis de tipo de unidade, área privativa, área comum, área total, fração ideal e inscrição imobiliária/IPTU associada. Torre e apartamento são opcionais e não devem impedir o registro do tipo. Responda no formato compacto {\"name\":string|null,\"city\":string|null,\"registration\":string|null,\"sellerLegalName\":string|null,\"sellerCnpj\":string|null,\"groups\":[{\"towers\":[string],\"units\":[string],\"privateArea\":string,\"commonArea\":string|null,\"totalArea\":string|null,\"idealFraction\":string|null,\"iptuRegistration\":string|null,\"typology\":string|null,\"registration\":string|null,\"confidence\":number}]}. Não invente dados nem expanda combinações. Ignore regras cortadas ou incompletas nas margens.`,
           },
           { type: "image_url", image_url: { url: image } },
         ],
@@ -248,6 +248,7 @@ function coerceDevelopmentExtraction(value: unknown): DevelopmentExtraction {
       tower,
       unit,
       privateArea,
+      ...(clean(group.commonArea) ? { commonArea: clean(group.commonArea) } : {}),
       totalArea: clean(group.totalArea) || undefined,
       idealFraction: clean(group.idealFraction) || undefined,
       iptuRegistration: clean(group.iptuRegistration) || undefined,

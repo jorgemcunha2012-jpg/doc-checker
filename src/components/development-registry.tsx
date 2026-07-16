@@ -135,6 +135,7 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
         tower: unit.tower,
         unit: unit.unit,
         privateArea: unit.privateArea,
+        commonArea: unit.commonArea,
         totalArea: unit.totalArea,
         idealFraction: unit.idealFraction,
         iptuRegistration: unit.iptuRegistration,
@@ -167,7 +168,7 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
     }
   }
 
-  function updateUnit(index: number, key: "tower" | "unit" | "privateArea" | "totalArea" | "idealFraction" | "iptuRegistration" | "typology", value: string) {
+  function updateUnit(index: number, key: "tower" | "unit" | "privateArea" | "commonArea" | "totalArea" | "idealFraction" | "iptuRegistration" | "typology", value: string) {
     if (!extraction) return;
     setExtraction({
       ...extraction,
@@ -217,7 +218,7 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
             onClick={() => {
               setEditingDevelopmentId(null);
               setSourceDocumentName("Cadastro manual");
-              setExtraction({ name: "", sellerLegalName: "", sellerCnpj: "", units: [{ tower: "", unit: "", privateArea: "", totalArea: "", idealFraction: "", iptuRegistration: "", confidence: 100 }] });
+              setExtraction({ name: "", sellerLegalName: "", sellerCnpj: "", units: [{ tower: "", unit: "", privateArea: "", commonArea: "", totalArea: "", idealFraction: "", iptuRegistration: "", confidence: 100 }] });
             }}
           >
             <Plus className="h-4 w-4" /> Criar manualmente
@@ -286,14 +287,14 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
               </button>
             </div>
             <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left text-sm">
+              <table className="w-full min-w-[980px] text-left text-sm">
                 <thead className="border-b border-slate-200 text-xs uppercase text-slate-500">
-                  <tr><th className="py-3">Tipo</th><th>Torre</th><th>Unidade</th><th>Área privativa</th><th>Área total</th><th>Fração ideal</th><th>Inscrição IPTU</th><th>Confiança</th><th /></tr>
+                  <tr><th className="py-3">Tipo</th><th>Torre</th><th>Unidade</th><th>Área privativa</th><th>Área comum</th><th>Área total</th><th>Fração ideal</th><th>Inscrição IPTU</th><th>Confiança</th><th /></tr>
                 </thead>
                 <tbody>
                   {extraction.units.map((unit, index) => (
                     <tr key={`${unit.tower}-${unit.unit}-${index}`} className="border-b border-slate-100">
-                      {(["typology", "tower", "unit", "privateArea", "totalArea", "idealFraction", "iptuRegistration"] as const).map((key) => (
+                      {(["typology", "tower", "unit", "privateArea", "commonArea", "totalArea", "idealFraction", "iptuRegistration"] as const).map((key) => (
                         <td key={key} className="py-2 pr-3">
                           <input
                             className={`w-full rounded border px-2 py-1.5 ${isRequiredUnitField(key) && !String(unit[key] ?? "").trim() ? "border-amber-400 bg-amber-50" : unit.confidence < 80 ? "border-amber-200 bg-amber-50/50" : "border-slate-300"}`}
@@ -316,7 +317,7 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
                 </span>
               ))}
             </div>
-            <button onClick={() => setExtraction({ ...extraction, units: [...extraction.units, { tower: "", unit: "", privateArea: "", totalArea: "", idealFraction: "", iptuRegistration: "", confidence: 100 }] })} className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-blue-600">
+            <button onClick={() => setExtraction({ ...extraction, units: [...extraction.units, { tower: "", unit: "", privateArea: "", commonArea: "", totalArea: "", idealFraction: "", iptuRegistration: "", confidence: 100 }] })} className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-blue-600">
               <Plus className="h-4 w-4" /> Adicionar unidade
             </button>
           </section>
@@ -436,7 +437,7 @@ function canvasToJpegBlob(canvas: HTMLCanvasElement) {
 
 function summarizeUnitTypes(development: Development) {
   const signatures = new Set(development.units.map((unit) =>
-    `${unit.typology || "Tipo"} · ${unit.privateArea || "-"} priv. · ${unit.totalArea || "-"} total · fração ${unit.idealFraction || "-"} · IPTU ${unit.iptuRegistration || "-"}`,
+    `${unit.typology || "Tipo"} · ${unit.privateArea || "-"} priv. · ${unit.commonArea || "-"} comum · ${unit.totalArea || "-"} total · fração ${unit.idealFraction || "-"} · IPTU ${unit.iptuRegistration || "-"}`,
   ));
   return `${signatures.size} tipo(s) cadastrado(s)`;
 }

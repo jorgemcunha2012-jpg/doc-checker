@@ -18,6 +18,7 @@ type DevelopmentRow = {
     tower: string;
     unit: string;
     private_area: string;
+    common_area?: string | null;
     total_area: string | null;
     ideal_fraction: string | null;
     iptu_registration?: string | null;
@@ -37,10 +38,10 @@ export async function listDevelopments(organizationId: string): Promise<Developm
   let error: { message: string } | null;
   ({ data, error } = await supabase
     .from("developments")
-    .select("id, organization_id, name, city, registration, seller_legal_name, seller_cnpj, source_document_name, created_at, development_units(id, tower, unit, private_area, total_area, ideal_fraction, iptu_registration, typology, registration, confidence)")
+    .select("id, organization_id, name, city, registration, seller_legal_name, seller_cnpj, source_document_name, created_at, development_units(id, tower, unit, private_area, common_area, total_area, ideal_fraction, iptu_registration, typology, registration, confidence)")
     .eq("organization_id", organizationId)
     .order("name"));
-  if (error?.message.includes("seller_legal_name") || error?.message.includes("seller_cnpj") || error?.message.includes("iptu_registration")) {
+  if (error?.message.includes("seller_legal_name") || error?.message.includes("seller_cnpj") || error?.message.includes("iptu_registration") || error?.message.includes("common_area")) {
     ({ data, error } = await supabase
       .from("developments")
       .select("id, organization_id, name, city, registration, source_document_name, created_at, development_units(id, tower, unit, private_area, total_area, ideal_fraction, typology, registration, confidence)")
@@ -65,6 +66,7 @@ export async function listDevelopments(organizationId: string): Promise<Developm
       tower: unit.tower === "TIPO" ? "" : unit.tower,
       unit: unit.tower === "TIPO" ? "" : unit.unit,
       privateArea: unit.private_area,
+      commonArea: unit.common_area ?? undefined,
       totalArea: unit.total_area ?? undefined,
       idealFraction: unit.ideal_fraction ?? undefined,
       iptuRegistration: unit.iptu_registration ?? undefined,
@@ -137,6 +139,7 @@ export async function createDevelopment(
       tower: unit.tower || "TIPO",
       unit: unit.unit || unit.typology || "TIPO",
       private_area: unit.privateArea,
+      common_area: unit.commonArea ?? null,
       total_area: unit.totalArea ?? null,
       ideal_fraction: unit.idealFraction ?? null,
       iptu_registration: unit.iptuRegistration ?? null,
@@ -145,7 +148,7 @@ export async function createDevelopment(
       confidence: unit.confidence,
     })),
   );
-  if (unitsError?.message.includes("iptu_registration")) {
+  if (unitsError?.message.includes("iptu_registration") || unitsError?.message.includes("common_area")) {
     ({ error: unitsError } = await supabase.from("development_units").insert(
       development.units.map((unit) => ({
         id: unit.id,
@@ -246,7 +249,7 @@ export async function updateDevelopment(
   if (deleteUnitsError) throw new Error(deleteUnitsError.message);
 
   let { error: unitsError } = await supabase.from("development_units").insert(updated.units.map((unit) => unitRow(unit)));
-  if (unitsError?.message.includes("iptu_registration")) {
+  if (unitsError?.message.includes("iptu_registration") || unitsError?.message.includes("common_area")) {
     ({ error: unitsError } = await supabase.from("development_units").insert(updated.units.map((unit) => unitRow(unit, true))));
   }
   if (unitsError) throw new Error(unitsError.message);
@@ -261,6 +264,7 @@ export async function updateDevelopment(
       unit: unit.unit || unit.typology || "TIPO",
       private_area: unit.privateArea,
       total_area: unit.totalArea ?? null,
+      common_area: unit.commonArea ?? null,
       ideal_fraction: unit.idealFraction ?? null,
       iptu_registration: unit.iptuRegistration ?? null,
       typology: unit.typology ?? null,
@@ -268,8 +272,9 @@ export async function updateDevelopment(
       confidence: unit.confidence,
     };
     if (withoutIptu) {
-      const { iptu_registration, ...legacyRow } = row;
+      const { iptu_registration, common_area, ...legacyRow } = row;
       void iptu_registration;
+      void common_area;
       return legacyRow;
     }
     return row;
