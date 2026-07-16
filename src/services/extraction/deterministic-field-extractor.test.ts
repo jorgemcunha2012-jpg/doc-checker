@@ -23,6 +23,27 @@ test("extrai composição financeira padronizada da minuta sem depender da IA", 
   assert.equal(value(output, "financial.totalValue"), "R$ 237.000,00");
 });
 
+test("extrai área do terreno quando o contrato informa o valor na descrição do terreno", () => {
+  const output = extractDeterministicFields(
+    "D1 - O terreno possui 22.688,71m² de área total, constituído de 30 torres.",
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "property.terrainArea"), "22.688,71m²");
+  assert.equal(value(output, "property.landArea"), "22.688,71m²");
+});
+
+test("aceita variações do rótulo de área do terreno no ITBI", () => {
+  const output = extractDeterministicFields(
+    "Área do terreno (m²): 180,00",
+    getChecklist("RECONCILIATION"),
+    "ITBI",
+  );
+
+  assert.equal(value(output, "property.landArea"), "180,00");
+});
+
 test("extrai dados principais da tela de reserva", () => {
   const output = extractDeterministicFields(
     [

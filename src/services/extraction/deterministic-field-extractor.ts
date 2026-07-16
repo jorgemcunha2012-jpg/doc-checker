@@ -40,7 +40,16 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     text("property.registryOffice", "Descrição do imóvel", 88, [/(?:cart[oó]rio|of[ií]cio)\s+(?:de\s+)?registro\s+de\s+im[oó]veis?[^:\n\r]*:?\s*([^\n\r]+)/i]),
     text("property.type", "Descrição do imóvel", 88, [/(?:tipo\s+do\s+im[oó]vel|tipo\s+da\s+unidade)[^:\n\r]*:\s*([^\n\r]+)/i]),
     text("property.floor", "Descrição do imóvel", 88, [/(?:pavimento|andar)[^:\n\r:]*:\s*([A-Z0-9-]+)/i]),
-    text("property.terrainArea", "Descrição do imóvel", 86, [/área\s+do\s+terreno[^\d]*(\d+[\d.,]*\s*m[²2]?)/i]),
+    text("property.terrainArea", "Descrição do imóvel", 96, [
+      /área\s+(?:total\s+)?do\s+terreno[^\d]*(\d+[\d.,]*\s*m[²2]?)/i,
+      /\bterreno\b[^.\n\r]{0,100}?\b(?:possui|tem)\b\s*(\d+[\d.,]*\s*m[²2]?)/i,
+      /\bterreno\b[^.\n\r]{0,120}?área\s+total\s+(?:de\s*)?(\d+[\d.,]*\s*m[²2]?)/i,
+    ]),
+    text("property.landArea", "Descrição do imóvel", 96, [
+      /área\s+(?:total\s+)?do\s+terreno[^\d]*(\d+[\d.,]*\s*m[²2]?)/i,
+      /\bterreno\b[^.\n\r]{0,100}?\b(?:possui|tem)\b\s*(\d+[\d.,]*\s*m[²2]?)/i,
+      /\bterreno\b[^.\n\r]{0,120}?área\s+total\s+(?:de\s*)?(\d+[\d.,]*\s*m[²2]?)/i,
+    ]),
   ],
   DADOS_RESERVA: [
     text("buyer.name", "Dados da reserva", 92, [
@@ -117,7 +126,10 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     text("property.privateArea", "ITBI", 92, [/Área privativa m²\s*:\s*([^\n\r]+)/i]),
     text("property.commonArea", "ITBI", 92, [/Área comum m²\s*:\s*([^\n\r]+)/i]),
     text("property.totalArea", "ITBI", 92, [/Área total m²\s*:\s*([^\n\r]+)/i]),
-    text("property.landArea", "ITBI", 90, [/Área do terreno m²\s*:\s*([^\n\r]+)/i]),
+    text("property.landArea", "ITBI", 96, [
+      /área\s+do\s+terreno(?:\s*\(?\s*m[²2]\s*\)?)?\s*[:\-]?\s*([^\n\r]+)/i,
+      /área\s+terreno[^:\n\r]*[:\-]\s*([^\n\r]+)/i,
+    ]),
     text("property.idealFraction", "ITBI", 92, [/Fração ideal\s*:\s*([^\n\r]+)/i]),
     money("financial.financing", "ITBI", 92, [
       /Valor financiado SFH\s*:\s*(\d[\d.,]*)/i,
