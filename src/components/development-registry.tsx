@@ -60,13 +60,14 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
     setError("");
     try {
       const pages = await renderPdfInBrowser(pendingFile, selectedPages);
+      const text = await extractPdfTextInBrowser(pendingFile, selectedPages);
       const imagePaths = await uploadRenderedPages(pendingFile.name, pages, controller.signal);
       let response: Response;
       try {
         response = await fetch("/api/developments/extract", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sourceDocumentName: pendingFile.name, imagePaths, pageNumbers: selectedPages }),
+          body: JSON.stringify({ sourceDocumentName: pendingFile.name, imagePaths, pageNumbers: selectedPages, text }),
           signal: controller.signal,
         });
       } catch (reason) {
@@ -372,6 +373,24 @@ async function renderPdfInBrowser(file: File, selectedPages: number[]) {
   }
 
   return images;
+}
+
+async function extractPdfTextInBrowser(file: File, selectedPages: number[]) {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.mjs";
+  const document = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  try {
+    const pages: string[] = [];
+    for (const pageNumber of selectedPages) {
+      const page = await document.getPage(pageNumber);
+      const content = await page.getTextContent();
+      pages.push(`[PAGINA ${pageNumber}]\\n${content.items.map((item) => ("str" in item ? item.str : "")).filter(Boolean).join(" ")}`);
+      page.cleanup();
+    }
+    return pages.join("\\n\\n").slice(0, 500_000);
+  } finally {
+    await document.destroy();
+  }
 }
 
 function parsePageSelection(value: string, pageCount: number) {

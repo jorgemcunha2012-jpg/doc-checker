@@ -23,6 +23,8 @@ export function extractDevelopmentFromOcrText(text: string): DevelopmentExtracti
 }
 
 function extractUnits(text: string): DevelopmentExtraction["units"] {
+  const tableUnits = extractTabularUnits(text);
+  if (tableUnits.length) return tableUnits;
   const units = new Map<string, DevelopmentExtraction["units"][number]>();
   const areaPattern = /(?:com\s+uma\s+)?area\s+privativa(?:\s+(?:principal|coberta\s+padrao|coberta|total|util))?\s*(?:de|:)?\s*([0-9][0-9.]*[,.][0-9]{2,6})\s*m?/g;
   let previousEnd = 0;
@@ -61,6 +63,42 @@ function extractUnits(text: string): DevelopmentExtraction["units"] {
     left.tower.localeCompare(right.tower, "pt-BR", { numeric: true }) ||
     left.unit.localeCompare(right.unit, "pt-BR", { numeric: true }),
   );
+}
+
+// Handles exported spreadsheets/registries printed to PDF, where the column
+// labels appear once and each row contains tower, unit, type and areas.
+function extractTabularUnits(text: string): DevelopmentExtraction["units"] {
+  const units = new Map<string, DevelopmentExtraction["units"][number]>();
+  const rowPattern = /\b(\d{1,3})\s+(\d{3,5})\s+([a-z](?:-[a-z]+)?)\s+(\d{1,4}[.,]\d{2,6})\s+(\d{1,4}[.,]\d{3,8})\s+(\d[.,]\d{5,14})\b/gi;
+  for (const match of text.matchAll(rowPattern)) {
+    const tower = match[1];
+    const unit = match[2];
+    const typology = `Tipo ${match[3].toUpperCase()}`;
+    const privateArea = normalizeDecimal(match[4]) ?? "";
+    const totalArea = normalizeDecimal(match[5]);
+    const idealFraction = normalizeDecimal(match[6]);
+    const key = `${tower}::${unit}::${typology}::${privateArea}`;
+    units.set(key, {
+      tower,
+      unit,
+      typology,
+      privateArea,
+      totalArea,
+      idealFraction,
+      confidence: 96,
+      evidence: {
+        pages: pageAtIndex(text, match.index ?? 0),
+        rawText: compactEvidence(match[0]),
+      },
+    });
+  }
+  return [...units.values()];
+}
+
+function pageAtIndex(text: string, index: number) {
+  const prefix = text.slice(0, index);
+  const pages = [...prefix.matchAll(/\[?P[AÁ]GINA\s+(\d+)\]?/gi)].map((match) => Number(match[1])).filter((page) => page > 0);
+  return pages.length ? [pages.at(-1)!] : undefined;
 }
 
 function validateUnits(units: DevelopmentExtraction["units"], detectedTypologies: string[]): NonNullable<DevelopmentExtraction["quality"]> {

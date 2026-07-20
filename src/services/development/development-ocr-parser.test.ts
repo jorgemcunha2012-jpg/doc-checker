@@ -68,6 +68,30 @@ test("extrai matrícula escaneada com área privativa coberta e apartamentos nrs
   assert.ok(result.units.some((unit) => unit.typology === "Tipo B" && unit.idealFraction === "0,003660292"));
 });
 
+test("extrai tabela de unidades impressa em PDF usando as colunas do cabeçalho", () => {
+  const result = extractDevelopmentFromOcrText(`
+    [PÁGINA 1]
+    Torre Unidade Tipo Área Privativa (m²) Área Total (m²) Fração Ideal
+    01 101 D 56,54 81,801906 0,002022647
+    01 103 C 50,16 73,658178 0,00188143
+    01 203 A 35,58 58,153173 0,001807368
+    01 1401 B-ADAP 37,96 62,043127 0,001928265
+  `);
+
+  assert.equal(result.units.length, 4);
+  assert.deepEqual(stripEvidence(result.units[0]), {
+    tower: "01",
+    unit: "101",
+    typology: "Tipo D",
+    privateArea: "56,54",
+    totalArea: "81,801906",
+    idealFraction: "0,002022647",
+    confidence: 96,
+  });
+  assert.deepEqual(result.units[3]?.evidence?.pages, [1]);
+  assert.equal(result.quality?.reviewRequired.length, 0);
+});
+
 test("reconhece área privativa total e não exige torre ou apartamento", () => {
   const result = extractDevelopmentFromOcrText(`
     Matrícula 78367. Empreendimento JÓQUEI CONDOMÍNIO CLUBE.

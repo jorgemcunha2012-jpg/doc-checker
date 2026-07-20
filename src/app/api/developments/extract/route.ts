@@ -3,6 +3,7 @@ import { AuthError, requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
 import { extractDevelopmentFromImagesWithOcr } from "@/services/development/development-ocr-service";
+import { extractDevelopmentFromOcrText } from "@/services/development/development-ocr-parser";
 import { KimiProvider } from "@/services/extraction/kimi-provider";
 import { reconcileDevelopmentExtractions } from "@/services/development/development-reconciliation";
 
@@ -64,10 +65,14 @@ export async function POST(request: Request) {
         return null;
       }),
     ]);
-    const extraction = reconcileDevelopmentExtractions(ocrExtraction, visionExtraction);
+    const deterministicExtraction = payload.text ? extractDevelopmentFromOcrText(payload.text) : null;
+    const textExtraction = deterministicExtraction && deterministicExtraction.units.length > (ocrExtraction?.units.length ?? 0)
+      ? deterministicExtraction
+      : ocrExtraction;
+    const extraction = reconcileDevelopmentExtractions(textExtraction, visionExtraction);
     console.info("[ConferIA] Leituras independentes da matrícula concluídas", {
       durationMs: Date.now() - startedAt,
-      ocrUnits: ocrExtraction?.units.length ?? 0,
+      ocrUnits: textExtraction?.units.length ?? 0,
       visionUnits: visionExtraction?.units.length ?? 0,
       reviewRequired: extraction?.quality?.reviewRequired.length ?? 0,
     });
@@ -75,7 +80,7 @@ export async function POST(request: Request) {
       await auditExtraction(user, "DEVELOPMENT_EXTRACTION_FAILED", attemptId, startedAt, sourceDocumentName, pageNumbers, {
         stage: "RECONCILIATION",
         reason: [ocrError, visionError].filter(Boolean).join(" | ") || "As leituras não encontraram tipos com área privativa suficiente.",
-        ocrUnits: ocrExtraction?.units.length ?? 0,
+        ocrUnits: textExtraction?.units.length ?? 0,
         visionUnits: visionExtraction?.units.length ?? 0,
         detectedTypologies: extraction?.quality?.detectedTypologies ?? [],
       });
@@ -94,7 +99,7 @@ export async function POST(request: Request) {
     }
     await auditExtraction(user, "DEVELOPMENT_EXTRACTION_FINISHED", attemptId, startedAt, sourceDocumentName, pageNumbers, {
       stage: "RECONCILIATION",
-      ocrUnits: ocrExtraction?.units.length ?? 0,
+      ocrUnits: textExtraction?.units.length ?? 0,
       visionUnits: visionExtraction?.units.length ?? 0,
       extractedUnits: extraction.units.length,
       reviewRequired: extraction.quality?.reviewRequired.length ?? 0,
@@ -134,7 +139,7 @@ async function auditExtraction(
 async function readPdfPayload(request: Request, organizationId: string) {
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
-    const body = await request.json() as { storagePath?: string; sourceDocumentName?: string; images?: string[]; imagePaths?: string[]; pageNumbers?: number[] };
+    const body = await request.json() as { storagePath?: string; sourceDocumentName?: string; images?: string[]; imagePaths?: string[]; pageNumbers?: number[]; text?: string };
     if (Array.isArray(body.images)) {
       const images = body.images.filter((image) => typeof image === "string" && image.startsWith("data:image/")).slice(0, MAX_IMAGES);
       if (!body.sourceDocumentName || !images.length) return null;
@@ -142,6 +147,7 @@ async function readPdfPayload(request: Request, organizationId: string) {
         images,
         pageNumbers: normalizePageNumbers(body.pageNumbers, images.length),
         sourceDocumentName: body.sourceDocumentName,
+        text: typeof body.text === "string" ? body.text.slice(0, 500_000) : undefined,
         size: images.reduce((total, image) => total + image.length, 0),
       };
     }
@@ -161,6 +167,7 @@ async function readPdfPayload(request: Request, organizationId: string) {
         images: downloads,
         pageNumbers: normalizePageNumbers(body.pageNumbers, downloads.length),
         sourceDocumentName: body.sourceDocumentName,
+        text: typeof body.text === "string" ? body.text.slice(0, 500_000) : undefined,
         size: downloads.reduce((total, image) => total + image.length, 0),
       };
     }
