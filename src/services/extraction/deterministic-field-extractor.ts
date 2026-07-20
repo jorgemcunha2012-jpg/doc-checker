@@ -84,15 +84,18 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /financiamento\s+\d+\s+(R\$\s*\d[\d.,]*)/i,
       /valor\s+financiado[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
       /\bfinanciamento\b[^\n\r]{0,80}?(R\$\s*\d[\d.,]*)/i,
+      /\bfinanciamento\b\s+\d+\s+(\d[\d.,]*)/i,
     ]),
     money("financial.fgts", "Print de pagamento", 92, [
       /\bFGTS\b[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
       /\bFGTS\b\s+\d+\s+(R\$\s*\d[\d.,]*)/i,
+      /\bFGTS\b\s+\d+\s+(\d[\d.,]*)/i,
     ]),
     money("financial.subsidy", "Print de pagamento", 92, [
       /subs[ií]dio[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
       /subs[ií]dio\s+\d+\s+(R\$\s*\d[\d.,]*)/i,
       /desconto[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+      /(?:subs[ií]dio|desconto)\s+\d+\s+(\d[\d.,]*)/i,
     ]),
   ],
   SIOPI: [

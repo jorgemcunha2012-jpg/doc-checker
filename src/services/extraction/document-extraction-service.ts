@@ -6,7 +6,9 @@ import { DeepSeekProvider } from "./deepseek-provider";
 import { KimiProvider } from "./kimi-provider";
 import { extractPdfText, hasEnoughPdfText } from "./pdf-text-service";
 import { extractPdfOcrText } from "./pdf-ocr-service";
+import { extractImageOcrText } from "./image-ocr-service";
 import { extractDocxText, extractRtfText } from "./word-text-service";
+import { enrichReservationFinancialComposition } from "./reservation-financial-composition";
 import { convertTiffToPngPages } from "./tiff-image-service";
 import type { ExtractionRequest, ExtractionResult, ReconciliationExtractionResult, UploadedDocumentPayload } from "./types";
 import { buildExtractionQuality, missingCriticalFields, validateCriticalEvidence } from "./extraction-quality-service";
@@ -218,18 +220,24 @@ export class DocumentExtractionService {
           }
           if (document.mimeType.includes("image") || isTiff(document)) {
             const output = await this.extractVisualDocument(document, sourceChecklist, source);
+            const deterministicFields = source === "DADOS_RESERVA"
+              ? output.fields
+                .filter((field) => field.value && ["Print de pagamento", "Composição calculada do print"].includes(field.sourceLocation?.section ?? ""))
+                .map((field) => field.fieldId)
+              : [];
             console.info("[ConferIA] Extração concluída", {
               source,
               documentName: document.name,
               durationMs: Date.now() - startedAt,
               requestedFields: sourceChecklist.length,
+              deterministicFields,
             });
             return {
               output,
               recoveredFields: [],
-              deterministicFields: [],
+              deterministicFields,
               usedPdfVisionFallback: false,
-              extractionMethod: "VISION" as const,
+              extractionMethod: deterministicFields.length ? "MIXED" as const : "VISION" as const,
             };
           }
           return { output: null, recoveredFields: [], deterministicFields: [], usedPdfVisionFallback: false, extractionMethod: "UNSUPPORTED" as const, error: `Formato de arquivo não suportado: ${document.mimeType || document.name}.` };
@@ -368,23 +376,29 @@ export class DocumentExtractionService {
   ) {
     if (source !== "DADOS_RESERVA") return this.kimiProvider.extractFromImage(document, checklist);
 
-    const [focusedAttempt, ocrAttempt] = await Promise.allSettled([
+    const [focusedAttempt, ocrAttempt, localOcrAttempt] = await Promise.allSettled([
       this.kimiProvider.extractReservationFromImage(document, checklist),
       this.kimiProvider.transcribeReservationImage(document).then((text) => ({
+        output: extractDeterministicFields(text, checklist, "DADOS_RESERVA"),
+        text,
+      })),
+      extractImageOcrText(document.buffer).then((text) => ({
         output: extractDeterministicFields(text, checklist, "DADOS_RESERVA"),
         text,
       })),
     ]);
     const focusedOutput = focusedAttempt.status === "fulfilled" ? focusedAttempt.value : null;
     const ocrOutput = ocrAttempt.status === "fulfilled" ? ocrAttempt.value.output : null;
-    const firstPassOutputs = [focusedOutput, ocrOutput].filter((output): output is ProviderExtractionOutput => Boolean(output));
+    const localOcrOutput = localOcrAttempt.status === "fulfilled" ? localOcrAttempt.value.output : null;
+    const firstPassOutputs = [focusedOutput, ocrOutput, localOcrOutput].filter((output): output is ProviderExtractionOutput => Boolean(output));
     if (firstPassOutputs.length) {
-      const mergedFirstPass = mergeOutputs(firstPassOutputs, checklist);
+      const mergedFirstPass = enrichReservationFinancialComposition(mergeOutputs(firstPassOutputs, checklist), checklist);
       if (hasReservationCriticalValue(mergedFirstPass)) {
-        if (ocrOutput) {
-          console.info("[ConferIA] Dados da Reserva extraídos com camada OCR determinística", {
+        if (ocrOutput || localOcrOutput) {
+          console.info("[ConferIA] Dados da Reserva extraídos com camadas OCR determinísticas", {
             documentName: document.name,
             extractedTextCharacters: ocrAttempt.status === "fulfilled" ? ocrAttempt.value.text.length : 0,
+            localOcrTextCharacters: localOcrAttempt.status === "fulfilled" ? localOcrAttempt.value.text.length : 0,
           });
         }
         return mergedFirstPass;
@@ -403,10 +417,16 @@ export class DocumentExtractionService {
         error: sanitizeExtractionError(ocrAttempt.reason),
       });
     }
+    if (localOcrAttempt.status === "rejected") {
+      console.warn("[ConferIA] OCR local de Dados da Reserva falhou", {
+        documentName: document.name,
+        error: sanitizeExtractionError(localOcrAttempt.reason),
+      });
+    }
 
     try {
       const genericOutput = await this.kimiProvider.extractFromImage(document, checklist);
-      const merged = mergeOutputs([...firstPassOutputs, genericOutput], checklist);
+      const merged = enrichReservationFinancialComposition(mergeOutputs([...firstPassOutputs, genericOutput], checklist), checklist);
       if (hasReservationCriticalValue(merged)) {
         console.info("[ConferIA] Dados da Reserva recuperados com extração visual genérica", {
           documentName: document.name,
