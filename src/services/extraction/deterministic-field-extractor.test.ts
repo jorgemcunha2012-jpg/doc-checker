@@ -33,6 +33,26 @@ test("extrai a data do contrato no bloco de assinaturas da minuta", () => {
   assert.equal(value(output, "contract.date"), "15 de Julho de 2026");
 });
 
+test("prioriza o valor da tabela B.4 quando o DOCX preserva separadores de coluna", () => {
+  const output = extractDeterministicFields(
+    [
+      "B.4 - VALOR DE COMPOSIÇÃO DOS RECURSOS:",
+      "B.4.1 - Valor do financiamento concedido pela CAIXA: | R$ 189.600,00",
+      "B.4.2 - Valor dos recursos próprios: | R$ 72.346,53",
+      "B.4.3 - Valor dos recursos da conta vinculada de FGTS: | R$ 0,00",
+      "B.4.5 - Valor do desconto complemento concedido pelo FGTS/União: | R$ 0,00",
+      "sendo o valor da compra e venda do terreno: R$ 23.810,95",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "financial.financing"), "R$ 189.600,00");
+  assert.equal(value(output, "financial.downPayment"), "R$ 72.346,53");
+  assert.equal(value(output, "financial.fgts"), "R$ 0,00");
+  assert.equal(value(output, "financial.subsidy"), "R$ 0,00");
+});
+
 test("extrai área do terreno quando o contrato informa o valor na descrição do terreno", () => {
   const output = extractDeterministicFields(
     "D1 - O terreno possui 22.688,71m² de área total, constituído de 30 torres.",
