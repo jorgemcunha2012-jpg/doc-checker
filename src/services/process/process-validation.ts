@@ -24,7 +24,7 @@ export async function createValidationProcessAndWait(validationType: ValidationT
   const process = createBaseValidationProcess(validationType, documents, user);
 
   saveValidationProcess(process);
-  await Promise.all([persistProcess(process), persistDocuments(process.id, process.documents)]);
+  if (!(await persistProcessInitialization(process))) return getValidationProcess(process.id) ?? process;
   if (!(await storeOriginalsOrFail(process.id, documents))) return getValidationProcess(process.id) ?? process;
   await audit({ id: user.id, organizationId: user.organizationId }, "PROCESS_CREATED", "validation_process", process.id, {
     documents: process.documents.map((document) => document.name),
@@ -47,7 +47,7 @@ export async function createValidationProcessAndStart(
   const process = createBaseValidationProcess(validationType, documents, user);
 
   saveValidationProcess(process);
-  await Promise.all([persistProcess(process), persistDocuments(process.id, process.documents)]);
+  if (!(await persistProcessInitialization(process))) return getValidationProcess(process.id) ?? process;
   if (!(await storeOriginalsOrFail(process.id, documents))) return getValidationProcess(process.id) ?? process;
   await audit({ id: user.id, organizationId: user.organizationId }, "PROCESS_CREATED", "validation_process", process.id, {
     documents: process.documents.map((document) => document.name),
@@ -60,6 +60,34 @@ export async function createValidationProcessAndStart(
 function assertProcessHasDocuments(documents: UploadedDocumentPayload[]) {
   if (!documents.length) {
     throw new Error("Não é possível criar uma conferência sem documentos.");
+  }
+}
+
+async function persistProcessInitialization(process: ValidationProcess) {
+  try {
+    await Promise.all([persistProcess(process), persistDocuments(process.id, process.documents)]);
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Não foi possível iniciar a conferência.";
+    const failed = updateValidationProcess(process.id, {
+      status: "FAILED",
+      error: `Falha ao registrar os documentos da conferência: ${message}`,
+    });
+
+    if (failed) {
+      try {
+        await persistProcess(failed);
+        await audit({ id: failed.userId, organizationId: failed.organizationId }, "PROCESS_FAILED", "validation_process", failed.id, {
+          stage: "INITIALIZATION",
+          documents: failed.documents.map((document) => document.name),
+          error: failed.error,
+        });
+      } catch (persistenceError) {
+        console.error("[ConferIA] Não foi possível registrar a falha de inicialização", persistenceError);
+      }
+    }
+
+    return false;
   }
 }
 
