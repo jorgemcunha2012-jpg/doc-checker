@@ -130,6 +130,56 @@ export class KimiProvider implements DocumentExtractionProvider {
     };
   }
 
+  async extractReservationIdentityFromImage(document: UploadedDocumentPayload, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
+    return this.extractReservationSection(
+      document,
+      checklist,
+      ["buyer.name", "buyer.cpf", "buyer.rg", "buyer.maritalStatus", "buyer.address", "buyer.email", "buyer.phone"],
+      "Leia exclusivamente a ficha de Dados do Cliente. Extraia todos os rótulos visíveis: nome, CPF, RG, estado civil, endereço completo, e-mail e telefone. " +
+        "O endereço deve ser montado com endereço, número, complemento, bairro, cidade e estado quando aparecerem. Não omita um campo visível. Cada rawText deve conter o rótulo e o valor correspondente.",
+    );
+  }
+
+  async extractReservationUnitFromImage(document: UploadedDocumentPayload, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
+    return this.extractReservationSection(
+      document,
+      checklist,
+      ["property.development", "property.registration", "property.unit", "property.tower"],
+      "Leia exclusivamente o bloco Unidade da tela de Reserva. Extraia empreendimento, torre, unidade/apartamento e matrícula. " +
+        "Quando o texto vier no formato EMPREENDIMENTO / TORRE X / UNIDADE, separe os quatro campos. Cada rawText deve conter o rótulo e o valor correspondente.",
+    );
+  }
+
+  private async extractReservationSection(
+    document: UploadedDocumentPayload,
+    checklist: ChecklistField[],
+    fieldIds: string[],
+    instruction: string,
+  ): Promise<ProviderExtractionOutput> {
+    const dataUrl = `data:${document.mimeType};base64,${document.buffer.toString("base64")}`;
+    const sectionChecklist = checklist.filter((field) => fieldIds.includes(field.id));
+    const result = await this.client.completeJson([
+      {
+        role: "system",
+        content:
+          "Você revisa uma tela imobiliária recorrente. Extraia somente valores explicitamente visíveis. " +
+          "Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"value\":string,\"confidence\":number,\"sourceLocation\":{\"section\":string,\"rawText\":string}}]}. " +
+          "Não retorne valor sem evidência curta contendo o rótulo e o próprio valor.",
+      },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: `${instruction}\n\nCampos obrigatórios para esta leitura:\n${checklistPrompt(sectionChecklist)}` },
+          { type: "image_url", image_url: { url: dataUrl } },
+        ],
+      },
+    ], { timeoutMs: 75_000, maxTokens: 2_400, responseFormat: false });
+
+    const output = coerceExtractionOutput(result, sectionChecklist);
+    const byId = new Map(output.fields.map((field) => [field.fieldId, field]));
+    return { fields: checklist.map((field) => byId.get(field.id) ?? { fieldId: field.id, value: null, confidence: 0 }) };
+  }
+
   async transcribeReservationImage(document: UploadedDocumentPayload): Promise<string> {
     const dataUrl = `data:${document.mimeType};base64,${document.buffer.toString("base64")}`;
     return this.client.completeText([

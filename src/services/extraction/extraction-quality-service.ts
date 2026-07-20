@@ -11,14 +11,22 @@ const LOW_CRITICAL_CONFIDENCE_THRESHOLD = 75;
 
 const criticalFieldsBySource: Partial<Record<DocumentSource, string[]>> = {
   MINUTA: [
+    "contract.number",
+    "contract.date",
     "contract.agencyCode",
     "contract.financingModality",
     "contract.housingProgram",
     "buyer.name",
     "buyer.cpf",
+    "buyer.rg",
+    "buyer.maritalStatus",
+    "buyer.address",
+    "property.iptu",
     "property.development",
+    "property.registration",
     "property.unit",
     "property.tower",
+    "financial.downPayment",
     "financial.financing",
     "financial.totalValue",
     "financial.appraisalValue",
@@ -44,7 +52,14 @@ const criticalFieldsBySource: Partial<Record<DocumentSource, string[]>> = {
   ],
   DADOS_RESERVA: [
     "buyer.name",
+    "buyer.cpf",
+    "buyer.rg",
+    "buyer.maritalStatus",
+    "buyer.address",
+    "buyer.email",
+    "buyer.phone",
     "property.development",
+    "property.registration",
     "property.unit",
     "property.tower",
     "financial.financing",
@@ -62,11 +77,17 @@ const criticalFieldsBySource: Partial<Record<DocumentSource, string[]>> = {
 
 export function criticalChecklistFields(source: DocumentSource, checklist: ChecklistField[]) {
   const expected = new Set(criticalFieldsBySource[source] ?? []);
-  return checklist.filter((field) => expected.has(field.id) || isSensitiveField(field.id));
+  // Coverage is source-specific. A reservation screen, for example, must not be
+  // penalized for omitting the seller's phone or data that only exists in an ITBI.
+  return checklist.filter((field) => expected.has(field.id));
 }
 
 export function validateCriticalEvidence(source: DocumentSource, output: ProviderExtractionOutput, checklist: ChecklistField[]) {
-  const critical = new Set(criticalChecklistFields(source, checklist).map((field) => field.id));
+  const critical = new Set(
+    checklist
+      .filter((field) => criticalChecklistFields(source, checklist).some((criticalField) => criticalField.id === field.id) || requiresEvidence(field.id))
+      .map((field) => field.id),
+  );
   const evidenceIssues = output.fields
     .filter((field) => critical.has(field.fieldId) && hasValue(field.value))
     .filter((field) => {
@@ -189,8 +210,17 @@ function hasValue(value: string | number | null | undefined) {
   return value != null && String(value).trim().length > 0;
 }
 
-function isSensitiveField(fieldId: string) {
-  return fieldId.startsWith("buyer.") || fieldId.startsWith("seller.") || fieldId.startsWith("financial.");
+function requiresEvidence(fieldId: string) {
+  return fieldId.startsWith("financial.") || [
+    "buyer.name",
+    "buyer.cpf",
+    "buyer.rg",
+    "buyer.address",
+    "buyer.email",
+    "buyer.phone",
+    "seller.legalName",
+    "seller.cnpj",
+  ].includes(fieldId);
 }
 
 function evidenceContainsValue(value: string, evidence: string, fieldType: ChecklistField["fieldType"]) {

@@ -177,6 +177,21 @@ test("extrai dados pessoais de tela de reserva em grade", () => {
   assert.equal(value(output, "buyer.phone"), "+5585984057983");
 });
 
+test("preserva os rótulos e valores financeiros da Reserva para validação de evidência", () => {
+  const output = extractDeterministicFields(
+    [
+      "Valor do contrato: R$ 261.946,53",
+      "Financiamento 1 R$ 189.600,00 R$ 189.600,00",
+      "FGTS 1 R$ 0,00 R$ 0,00",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "DADOS_RESERVA",
+  );
+
+  assert.match(String(field(output, "financial.financing")?.sourceLocation?.rawText), /Financiamento/i);
+  assert.match(String(field(output, "financial.totalValue")?.sourceLocation?.rawText), /Valor do contrato/i);
+});
+
 test("monta endereço residencial do cliente a partir dos rótulos da reserva", () => {
   const output = extractDeterministicFields(
     [
@@ -372,4 +387,8 @@ test("extrai razão social e CNPJ da matrícula para confronto com a minuta", ()
 
 function value(output: ReturnType<typeof extractDeterministicFields>, fieldId: string) {
   return output.fields.find((field) => field.fieldId === fieldId)?.value;
+}
+
+function field(output: ReturnType<typeof extractDeterministicFields>, fieldId: string) {
+  return output.fields.find((item) => item.fieldId === fieldId);
 }

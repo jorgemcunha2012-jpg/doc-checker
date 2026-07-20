@@ -20,7 +20,7 @@ test("identifica campo crítico ausente e registra recuperação", () => {
   const missing = missingCriticalFields("MINUTA", output, checklist);
   assert.ok(missing.some((field) => field.id === "financial.financing"));
   assert.ok(missing.some((field) => field.id === "buyer.rg"));
-  assert.ok(missing.some((field) => field.id === "financial.subsidy"));
+  assert.ok(missing.some((field) => field.id === "financial.downPayment"));
 
   const values: ExtractedFieldValue[] = [
     ...output.fields.map((field) => ({ ...field, source: "MINUTA" as const })),
@@ -31,6 +31,25 @@ test("identifica campo crítico ausente e registra recuperação", () => {
   assert.equal(quality.status, "PARTIAL");
   assert.ok(quality.coverage < 100);
   assert.deepEqual(quality.recoveredFields, ["financial.financing"]);
+});
+
+test("mede a Reserva apenas pelos campos que devem existir nesse tipo de tela", () => {
+  const checklist = getChecklist("RECONCILIATION");
+  const quality = buildExtractionQuality(
+    "DADOS_RESERVA",
+    [
+      { ...extracted("buyer.name", "Maria"), source: "DADOS_RESERVA" },
+      { ...extracted("buyer.cpf", "12345678900"), source: "DADOS_RESERVA" },
+      { ...extracted("financial.financing", "150000"), source: "DADOS_RESERVA" },
+      { ...extracted("financial.totalValue", "200000"), source: "DADOS_RESERVA" },
+    ],
+    checklist,
+    [], [], [], false,
+  );
+
+  assert.equal(quality.expectedCriticalFields.includes("seller.phone"), false);
+  assert.equal(quality.expectedCriticalFields.includes("buyer.name"), true);
+  assert.equal(quality.expectedCriticalFields.includes("financial.financing"), true);
 });
 
 test("marca cobertura parcial sem derrubar a conferência", () => {

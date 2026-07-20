@@ -376,13 +376,16 @@ export class DocumentExtractionService {
   ) {
     if (source !== "DADOS_RESERVA") return this.kimiProvider.extractFromImage(document, checklist);
 
+    const localOcrPromise = process.env.CONFERIA_SKIP_LOCAL_OCR === "true"
+      ? Promise.reject(new Error("OCR local desabilitado para esta execução."))
+      : extractImageOcrText(document.buffer);
     const [focusedAttempt, ocrAttempt, localOcrAttempt] = await Promise.allSettled([
       this.kimiProvider.extractReservationFromImage(document, checklist),
       this.kimiProvider.transcribeReservationImage(document).then((text) => ({
         output: extractDeterministicFields(text, checklist, "DADOS_RESERVA"),
         text,
       })),
-      extractImageOcrText(document.buffer).then((text) => ({
+      localOcrPromise.then((text) => ({
         output: extractDeterministicFields(text, checklist, "DADOS_RESERVA"),
         text,
       })),
@@ -403,11 +406,14 @@ export class DocumentExtractionService {
         return null;
       })
       : null;
-    const firstPassOutputs = [focusedOutput, ocrOutput, localOcrOutput, financialAttempt]
-      .filter((output): output is ProviderExtractionOutput => Boolean(output));
-    if (firstPassOutputs.length) {
-      const mergedFirstPass = enrichReservationFinancialComposition(mergeOutputs(firstPassOutputs, checklist), checklist, ocrText);
-      if (hasReservationCriticalValue(mergedFirstPass)) {
+    const firstPassOutputs = sanitizeReservationOutputs(
+      [focusedOutput, ocrOutput, localOcrOutput, financialAttempt]
+        .filter((output): output is ProviderExtractionOutput => Boolean(output)),
+      checklist,
+    );
+    let merged = enrichReservationFinancialComposition(mergeReservationOutputs(firstPassOutputs, checklist), checklist, ocrText);
+    const recoveryTargets = reservationRecoveryTargets(merged, ocrText);
+    if (!recoveryTargets.length) {
         if (ocrOutput || localOcrOutput) {
           console.info("[ConferIA] Dados da Reserva extraídos com camadas OCR determinísticas", {
             documentName: document.name,
@@ -415,9 +421,32 @@ export class DocumentExtractionService {
             localOcrTextCharacters: localOcrAttempt.status === "fulfilled" ? localOcrAttempt.value.text.length : 0,
           });
         }
-        return mergedFirstPass;
-      }
+        return merged;
     }
+
+    const targetedAttempts = await Promise.all([
+      recoveryTargets.includes("identity")
+        ? this.kimiProvider.extractReservationIdentityFromImage(document, checklist).catch((error) => {
+          console.warn("[ConferIA] Revisão dirigida de dados pessoais falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
+          return null;
+        })
+        : Promise.resolve(null),
+      recoveryTargets.includes("unit")
+        ? this.kimiProvider.extractReservationUnitFromImage(document, checklist).catch((error) => {
+          console.warn("[ConferIA] Revisão dirigida da unidade falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
+          return null;
+        })
+        : Promise.resolve(null),
+      recoveryTargets.includes("payment") && !financialAttempt
+        ? this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
+          console.warn("[ConferIA] Revisão dirigida financeira falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
+          return null;
+        })
+        : Promise.resolve(null),
+    ]);
+    const targetedOutputs = sanitizeReservationOutputs(targetedAttempts.filter((output): output is ProviderExtractionOutput => Boolean(output)), checklist);
+    merged = enrichReservationFinancialComposition(mergeReservationOutputs([...firstPassOutputs, ...targetedOutputs], checklist), checklist, ocrText);
+    if (!reservationRecoveryTargets(merged, ocrText).length) return merged;
 
     if (focusedAttempt.status === "rejected") {
       console.warn("[ConferIA] Extração focada de Dados da Reserva falhou", {
@@ -440,8 +469,8 @@ export class DocumentExtractionService {
 
     try {
       const genericOutput = await this.kimiProvider.extractFromImage(document, checklist);
-      const merged = enrichReservationFinancialComposition(mergeOutputs([...firstPassOutputs, genericOutput], checklist), checklist, ocrText);
-      if (hasReservationCriticalValue(merged)) {
+      merged = enrichReservationFinancialComposition(mergeReservationOutputs([...firstPassOutputs, ...targetedOutputs, ...sanitizeReservationOutputs([genericOutput], checklist)], checklist), checklist, ocrText);
+      if (!reservationRecoveryTargets(merged, ocrText).length) {
         console.info("[ConferIA] Dados da Reserva recuperados com extração visual genérica", {
           documentName: document.name,
         });
@@ -452,23 +481,38 @@ export class DocumentExtractionService {
         documentName: document.name,
         error: sanitizeExtractionError(error),
       });
-      return firstPassOutputs.length ? mergeOutputs(firstPassOutputs, checklist) : emptyOutput(checklist);
+      return firstPassOutputs.length ? merged : emptyOutput(checklist);
     }
   }
 }
 
-function hasReservationCriticalValue(output: ProviderExtractionOutput) {
-  const critical = new Set([
-    "buyer.name",
-    "property.development",
-    "property.unit",
-    "property.tower",
-    "financial.financing",
-    "financial.totalValue",
-  ]);
-  return output.fields.some(
-    (field) => critical.has(field.fieldId) && field.value != null && String(field.value).trim().length > 0,
+function reservationRecoveryTargets(output: ProviderExtractionOutput, ocrText: string) {
+  const available = new Set(
+    output.fields
+      .filter((field) => field.value != null && String(field.value).trim())
+      .map((field) => field.fieldId),
   );
+  const groups = {
+    identity: ["buyer.name", "buyer.cpf", "buyer.rg", "buyer.maritalStatus", "buyer.address", "buyer.email", "buyer.phone"],
+    unit: ["property.development", "property.registration", "property.unit", "property.tower"],
+    payment: ["financial.totalValue", "financial.financing"],
+  } as const;
+  const text = ocrText.toLowerCase();
+  const selected = new Set<keyof typeof groups>();
+  if (/nome\s+do\s+cliente|cpf\s*\/?\s*cnpj|estado\s+civil|e-?mail|telefone|celular/.test(text)) selected.add("identity");
+  if (hasReservationPaymentTable(text)) selected.add("payment");
+  if (/\bunidade\b|\btorre\b|matr[ií]cula/.test(text)) selected.add("unit");
+  if (!selected.size) {
+    if ([...groups.identity].some((field) => available.has(field))) selected.add("identity");
+    if ([...groups.payment].some((field) => available.has(field))) selected.add("payment");
+    if ([...groups.unit].some((field) => available.has(field))) selected.add("unit");
+  }
+  if (!selected.size) return ["identity", "unit", "payment"] as Array<keyof typeof groups>;
+  return [...selected].filter((group) => groups[group].some((field) => !available.has(field)));
+}
+
+function sanitizeReservationOutputs(outputs: ProviderExtractionOutput[], checklist: ExtractionRequest["checklist"]) {
+  return outputs.map((output) => validateCriticalEvidence("DADOS_RESERVA", output, checklist).output);
 }
 
 function hasReservationPaymentTable(text: string) {
@@ -582,6 +626,37 @@ function mergeOutputs(outputs: ProviderExtractionOutput[], checklist: Extraction
       return best ?? { fieldId: field.id, value: null, confidence: 0 };
     }),
   };
+}
+
+function mergeReservationOutputs(outputs: ProviderExtractionOutput[], checklist: ExtractionRequest["checklist"]): ProviderExtractionOutput {
+  return {
+    fields: checklist.map((field) => {
+      const candidates = outputs
+        .flatMap((output) => output.fields)
+        .filter((candidate) => candidate.fieldId === field.id && candidate.value != null && String(candidate.value).trim());
+      const best = candidates.sort((left, right) => reservationCandidateScore(right, field.id) - reservationCandidateScore(left, field.id))[0];
+      return best ?? { fieldId: field.id, value: null, confidence: 0 };
+    }),
+  };
+}
+
+function reservationCandidateScore(candidate: ProviderExtractionOutput["fields"][number], fieldId: string) {
+  const rawText = candidate.sourceLocation?.rawText ?? "";
+  let score = candidate.confidence;
+  if (rawText) score += 15;
+  if (String(candidate.value).replace(/\D/g, "") && rawText.replace(/\D/g, "").includes(String(candidate.value).replace(/\D/g, ""))) score += 20;
+  if (!fieldId.startsWith("financial.")) return score;
+
+  const label = fieldId === "financial.totalValue"
+    ? /valor\s+(?:do\s+contrato|total)/i
+    : fieldId === "financial.financing"
+      ? /financiamento|valor\s+financiado/i
+      : fieldId === "financial.fgts"
+        ? /fgts/i
+        : fieldId === "financial.subsidy"
+          ? /subs[ií]dio|desconto/i
+          : /entrada|recursos\s+pr[oó]prios/i;
+  return score + (label.test(rawText) ? 40 : -40);
 }
 
 function mergeRecoveryOutput(

@@ -66,28 +66,36 @@ export class OpenAICompatibleClient {
       throw new Error(`${providerName} não configurado. Confira API key, base URL e modelo no .env.`);
     }
 
-    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
-      method: "POST",
-      signal: AbortSignal.timeout(options.timeoutMs ?? 120_000),
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: 1,
-        ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
-        ...(options.responseFormat === false ? {} : { response_format: { type: "json_object" } }),
-      }),
-    });
-
-    if (!response.ok) {
+    const timeoutMs = options.timeoutMs ?? 120_000;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 1,
+          ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+          ...(options.responseFormat === false ? {} : { response_format: { type: "json_object" } }),
+        }),
+      });
+      // Keep the timeout active while reading the response body as well. A provider
+      // may send headers and still stall before returning the JSON payload.
       const body = await response.text();
-      throw new Error(`${providerName} retornou ${response.status}: ${body}`);
+      if (!response.ok) throw new Error(`${providerName} retornou ${response.status}: ${body}`);
+      return JSON.parse(body) as ChatCompletionResponse;
+    } catch (error) {
+      if (controller.signal.aborted) throw new Error(`${providerName} excedeu o tempo limite de ${Math.round(timeoutMs / 1_000)} segundos.`);
+      throw error;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    return (await response.json()) as ChatCompletionResponse;
   }
 }
 
