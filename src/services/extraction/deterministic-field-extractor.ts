@@ -263,9 +263,31 @@ export function extractDeterministicFields(
   });
 
   const output = source === "DADOS_RESERVA"
-    ? { fields: recoverReservationOcrLabelTypos(fields, text) }
+    ? { fields: recoverReservationGridFields(recoverReservationOcrLabelTypos(fields, text), text) }
     : { fields };
   return resolvedSource === "ITBI" ? mergeDtiStructuredFields(output, text, checklist) : output;
+}
+
+function recoverReservationGridFields(fields: ExtractedField[], text: string) {
+  const recovered = new Map<string, { value: string; rawText: string }>();
+  const identity = text.match(/NOME\s+DO\s+CLIENTE[^\n\r]*[\n\r]+\s*([A-ZÀ-Ú][A-ZÀ-Ú\s]+?)\s+(\d{3}\.?\d{3}\.?\d{3}-?\d{2})\s+(\d{8,14})\s+(\+?\d{10,15})/i);
+  if (identity) {
+    recovered.set("buyer.name", { value: identity[1].trim(), rawText: `NOME DO CLIENTE: ${identity[1].trim()}` });
+    recovered.set("buyer.cpf", { value: identity[2], rawText: `CPF / CNPJ: ${identity[2]}` });
+    recovered.set("buyer.rg", { value: identity[3], rawText: `RG: ${identity[3]}` });
+    recovered.set("buyer.phone", { value: identity[4], rawText: `CELULAR: ${identity[4]}` });
+  }
+  const phone = text.match(/TELEFONE[^\n\r]*[\n\r]+\s*(\+?\d{10,15})/i)?.[1];
+  if (phone) recovered.set("buyer.phone", { value: phone, rawText: `TELEFONE: ${phone}` });
+  const email = text.match(/[\w.+-]+@[\w.-]+\.[A-Z]{2,}/i)?.[0];
+  if (email && !/[o0]{2}/i.test(email)) recovered.set("buyer.email", { value: email, rawText: `E-MAIL: ${email}` });
+
+  return fields.map((field) => {
+    const value = recovered.get(field.fieldId);
+    const looksLikeGridHeader = /\b(?:CPF|CNPJ|RG|CELULAR|TELEFONE|E-?MAIL)\b/i.test(String(field.value ?? ""));
+    if (!value || (field.value && !looksLikeGridHeader)) return field;
+    return { ...field, value: value.value, confidence: 90, sourceLocation: { section: "Dados da reserva", rawText: value.rawText } };
+  });
 }
 
 function recoverReservationOcrLabelTypos(fields: ExtractedField[], text: string) {

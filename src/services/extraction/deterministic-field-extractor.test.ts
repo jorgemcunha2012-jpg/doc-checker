@@ -161,6 +161,22 @@ test("extrai dados do cliente da reserva quando o valor vem abaixo do rótulo", 
   assert.equal(value(output, "buyer.maritalStatus"), "Solteiro(a)");
 });
 
+test("extrai dados pessoais de tela de reserva em grade", () => {
+  const output = extractDeterministicFields(
+    [
+      "NOME DO CLIENTE CPF / CNPJ RG CELULAR",
+      "MARIANA BERNARDINO ALVES 079.718.803-75 07723964953 +5585984057983",
+      "TELEFONE E-MAIL PROFISSÃO",
+      "+5585984057983 mariana.b.alves@gmail.com Analista de recursos humanos",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"), "DADOS_RESERVA",
+  );
+  assert.equal(value(output, "buyer.name"), "MARIANA BERNARDINO ALVES");
+  assert.equal(value(output, "buyer.cpf"), "079.718.803-75");
+  assert.equal(value(output, "buyer.rg"), "07723964953");
+  assert.equal(value(output, "buyer.phone"), "+5585984057983");
+});
+
 test("monta endereço residencial do cliente a partir dos rótulos da reserva", () => {
   const output = extractDeterministicFields(
     [
