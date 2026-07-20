@@ -34,7 +34,7 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
     setBusy(true);
     setError("");
     try {
-      const count = await getPdfPageCount(file);
+      const count = isXlsx(file) ? 1 : await getPdfPageCount(file);
       setPendingFile(file);
       setPageCount(count);
       setPageSelection(`1-${count}`);
@@ -47,6 +47,25 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
 
   async function extractSelectedPages() {
     if (!pendingFile) return;
+    if (isXlsx(pendingFile)) {
+      setBusy(true);
+      setError("");
+      try {
+        const form = new FormData();
+        form.append("file", pendingFile);
+        const response = await fetch("/api/developments/extract", { method: "POST", body: form });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error ?? "Não foi possível extrair a planilha.");
+        setExtraction(payload.extraction);
+        setSourceDocumentName(payload.sourceDocumentName ?? pendingFile.name);
+        setPendingFile(null);
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Não foi possível extrair a planilha.");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     let selectedPages: number[];
     try {
       selectedPages = parsePageSelection(pageSelection, pageCount);
@@ -189,7 +208,7 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
           <label className="mt-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
             {busy ? "Preparando..." : "Selecionar matrícula"}
-            <input className="sr-only" type="file" accept=".pdf,application/pdf" disabled={busy} onChange={(event) => void handleFile(event.target.files?.[0])} />
+            <input className="sr-only" type="file" accept=".pdf,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={busy} onChange={(event) => void handleFile(event.target.files?.[0])} />
           </label>
           {pendingFile ? (
             <div className="mt-4 border border-blue-200 bg-blue-50/60 p-4">
@@ -211,7 +230,7 @@ export function DevelopmentRegistry({ canManage, canDelete }: { canManage: boole
                   </button>
                 </div>
               </div>
-              <p className="mt-2 text-xs leading-5 text-slate-600">Use intervalos separados por vírgula. Todas as páginas ficam selecionadas por padrão; a seleção pode ter no máximo {MAX_SELECTED_PAGES} páginas.</p>
+              <p className="mt-2 text-xs leading-5 text-slate-600">{isXlsx(pendingFile) ? "A planilha será lida diretamente pelas colunas e linhas, sem OCR." : `Use intervalos separados por vírgula. Todas as páginas ficam selecionadas por padrão; a seleção pode ter no máximo ${MAX_SELECTED_PAGES} páginas.`}</p>
             </div>
           ) : null}
           <button
@@ -471,4 +490,8 @@ function Field({ label, value, onChange, required = false, invalid = false }: { 
 
 function isRequiredUnitField(key: string) {
   return key === "typology" || key === "privateArea";
+}
+
+function isXlsx(file: File) {
+  return file.name.toLowerCase().endsWith(".xlsx") || file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 }

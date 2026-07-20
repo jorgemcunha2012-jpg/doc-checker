@@ -6,6 +6,7 @@ import { extractDevelopmentFromImagesWithOcr } from "@/services/development/deve
 import { extractDevelopmentFromOcrText } from "@/services/development/development-ocr-parser";
 import { KimiProvider } from "@/services/extraction/kimi-provider";
 import { reconcileDevelopmentExtractions } from "@/services/development/development-reconciliation";
+import { extractDevelopmentFromXlsx } from "@/services/development/xlsx-development-parser";
 
 const MAX_SIZE = 20 * 1024 * 1024;
 const MAX_IMAGES = 40;
@@ -20,6 +21,20 @@ export async function POST(request: Request) {
   let pageNumbers: number[] = [];
   try {
     user = await requireUser();
+    if ((request.headers.get("content-type") ?? "").includes("multipart/form-data")) {
+      const form = await request.formData();
+      const file = form.get("file");
+      if (!(file instanceof File) || !file.name.toLowerCase().endsWith(".xlsx") || file.size > MAX_SIZE) {
+        return NextResponse.json({ error: "Envie uma planilha XLSX válida de até 20 MB." }, { status: 400 });
+      }
+      const extraction = await extractDevelopmentFromXlsx(Buffer.from(await file.arrayBuffer()), file.name);
+      await auditExtraction(user, "DEVELOPMENT_EXTRACTION_FINISHED", attemptId, startedAt, file.name, [], {
+        stage: "XLSX_PARSER",
+        extractedUnits: extraction.units.length,
+        reviewRequired: extraction.quality?.reviewRequired.length ?? 0,
+      });
+      return NextResponse.json({ extraction, sourceDocumentName: file.name });
+    }
     const payload = await readPdfPayload(request, user.organizationId);
     sourceDocumentName = payload?.sourceDocumentName ?? sourceDocumentName;
     pageNumbers = payload?.pageNumbers ?? [];
