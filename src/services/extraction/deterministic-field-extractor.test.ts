@@ -71,6 +71,27 @@ test("prioriza o valor da tabela B.4 quando o DOCX preserva separadores de colun
   assert.equal(value(output, "financial.subsidy"), "R$ 0,00");
 });
 
+test("associa valores agrupados aos itens B.4 quando o PDF separa rótulos e números", () => {
+  const output = extractDeterministicFields(
+    [
+      "B.4.1 - Valor do financiamento concedido pela CAIXA:",
+      "B.4.2 - Valor dos recursos próprios:",
+      "B.4.3 - Valor dos recursos da conta vinculada de FGTS:",
+      "B.4.4 - Valor da Cessão de Direitos Creditórios do FGTS Futuro, se houver:",
+      "B.4. 5 - Valor do desconto complemento concedido pelo FGTS/União:",
+      "R$ 158.384,70 R$ 43.334,35 R$ 4.035,95 R$ 0,00 R$ 18.245,00",
+    ].join(" "),
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "financial.financing"), "R$ 158.384,70");
+  assert.equal(value(output, "financial.downPayment"), "R$ 43.334,35");
+  assert.equal(value(output, "financial.fgts"), "R$ 4.035,95");
+  assert.equal(value(output, "financial.subsidy"), "R$ 18.245,00");
+  assert.match(String(field(output, "financial.financing")?.sourceLocation?.rawText), /B\.4\.1.*158\.384,70/);
+});
+
 test("extrai área do terreno quando o contrato informa o valor na descrição do terreno", () => {
   const output = extractDeterministicFields(
     "D1 - O terreno possui 22.688,71m² de área total, constituído de 30 torres.",

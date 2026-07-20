@@ -264,8 +264,46 @@ export function extractDeterministicFields(
 
   const output = source === "DADOS_RESERVA"
     ? { fields: recoverReservationGridFields(recoverReservationOcrLabelTypos(fields, text), text) }
-    : { fields };
+    : source === "MINUTA"
+      ? { fields: recoverMinutaCompositionTable(fields, text) }
+      : { fields };
   return resolvedSource === "ITBI" ? mergeDtiStructuredFields(output, text, checklist) : output;
+}
+
+function recoverMinutaCompositionTable(fields: ExtractedField[], text: string) {
+  const start = text.search(/B\s*\.\s*4\s*\.\s*1\b/i);
+  if (start < 0) return fields;
+  const remainder = text.slice(start);
+  const end = remainder.search(/\bB\s*\.\s*5\b/i);
+  const block = remainder.slice(0, end >= 0 ? end : remainder.length);
+  const labels = [...block.matchAll(/B\s*\.\s*4\s*\.\s*([1-5])\b[\s\S]{0,260}?(?=B\s*\.\s*4\s*\.\s*[1-5]\b|R\$\s*\d|$)/gi)];
+  const amounts = [...block.matchAll(/R\$\s*\d[\d.]*,\d{2}/g)].map((match) => match[0].replace(/\s+/g, " "));
+  if (labels.length < 4 || amounts.length < labels.length) return fields;
+
+  const fieldByItem: Record<string, string | undefined> = {
+    "1": "financial.financing",
+    "2": "financial.downPayment",
+    "3": "financial.fgts",
+    "5": "financial.subsidy",
+  };
+  const recovered = new Map<string, { value: string; rawText: string }>();
+  labels.forEach((label, index) => {
+    const fieldId = fieldByItem[label[1]];
+    const value = amounts[index];
+    if (!fieldId || !value) return;
+    recovered.set(fieldId, { value, rawText: `${label[0].replace(/\s+/g, " ")} ${value}` });
+  });
+
+  return fields.map((field) => {
+    const value = recovered.get(field.fieldId);
+    if (!value) return field;
+    return {
+      ...field,
+      value: value.value,
+      confidence: 100,
+      sourceLocation: { section: "Composição dos recursos", rawText: value.rawText },
+    };
+  });
 }
 
 function recoverReservationGridFields(fields: ExtractedField[], text: string) {
