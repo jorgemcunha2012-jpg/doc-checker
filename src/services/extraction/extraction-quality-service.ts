@@ -72,7 +72,9 @@ export function validateCriticalEvidence(source: DocumentSource, output: Provide
     .filter((field) => {
       const definition = checklist.find((item) => item.id === field.fieldId);
       const rawText = field.sourceLocation?.rawText?.trim();
-      return !definition || !rawText || !evidenceContainsValue(String(field.value), rawText, definition.fieldType);
+      return !definition || !rawText ||
+        !evidenceContainsValue(String(field.value), rawText, definition.fieldType) ||
+        !hasExpectedMinutaFinancialEvidence(source, field.fieldId, rawText);
     })
     .map((field) => field.participantId ? `${field.fieldId}::${field.participantId}` : field.fieldId);
   const invalid = new Set(evidenceIssues);
@@ -85,6 +87,30 @@ export function validateCriticalEvidence(source: DocumentSource, output: Provide
     },
     evidenceIssues: [...new Set(evidenceIssues)],
   };
+}
+
+function hasExpectedMinutaFinancialEvidence(source: DocumentSource, fieldId: string, rawText: string) {
+  if (source !== "MINUTA") return true;
+
+  const compact = rawText.replace(/\s+/g, " ");
+  const item = (number: string) => new RegExp(`B\\s*\\.?\\s*4\\s*\\.?\\s*${number}\\b`, "i").test(compact);
+
+  if (fieldId === "financial.financing") {
+    return item("1") && /valor\s+do\s+financiamento(?:\s+concedido\s+pela\s+caixa)?/i.test(compact);
+  }
+  if (fieldId === "financial.downPayment" || fieldId === "financial.housingEntry") {
+    return item("2") && /recursos\s+pr[oó]prios/i.test(compact);
+  }
+  if (fieldId === "financial.fgts") {
+    return item("3") && /fgts/i.test(compact);
+  }
+  if (fieldId === "financial.subsidy") {
+    return item("5") && /(?:desconto|subs[ií]dio)/i.test(compact);
+  }
+  if (fieldId === "financial.totalValue") {
+    return /valor\s+destinado\s+[àa]\s+aquisi[cç][aã]o|valor\s+do\s+contrato/i.test(compact);
+  }
+  return true;
 }
 
 export function missingCriticalFields(

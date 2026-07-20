@@ -91,6 +91,42 @@ test("bloqueia valor financeiro que não aparece na evidência", () => {
   assert.deepEqual(validated.evidenceIssues, ["financial.subsidy"]);
 });
 
+test("bloqueia financiamento da minuta quando a evidência se refere à compra do terreno", () => {
+  const checklist = getChecklist("RECONCILIATION");
+  const validated = validateCriticalEvidence("MINUTA", {
+    fields: [{
+      fieldId: "financial.financing",
+      value: "R$ 23.810,95",
+      confidence: 100,
+      sourceLocation: {
+        page: 2,
+        rawText: "B.4.1' constitui uma parte de um todo, sendo o valor da compra e venda do terreno: R$ 23.810,95",
+      },
+    }],
+  }, checklist);
+
+  assert.equal(validated.output.fields[0].value, null);
+  assert.deepEqual(validated.evidenceIssues, ["financial.financing"]);
+});
+
+test("aceita financiamento da minuta somente com a evidência do item B.4.1", () => {
+  const checklist = getChecklist("RECONCILIATION");
+  const validated = validateCriticalEvidence("MINUTA", {
+    fields: [{
+      fieldId: "financial.financing",
+      value: "R$ 189.600,00",
+      confidence: 100,
+      sourceLocation: {
+        page: 2,
+        rawText: "B.4.1 - Valor do financiamento concedido pela CAIXA: | R$ 189.600,00",
+      },
+    }],
+  }, checklist);
+
+  assert.equal(validated.output.fields[0].value, "R$ 189.600,00");
+  assert.deepEqual(validated.evidenceIssues, []);
+});
+
 test("aceita CPF quando o valor está mascarado no trecho de evidência", () => {
   const checklist = getChecklist("RECONCILIATION");
   const validated = validateCriticalEvidence("MINUTA", {
