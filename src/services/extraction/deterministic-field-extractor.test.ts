@@ -23,6 +23,24 @@ test("extrai composição financeira padronizada da minuta sem depender da IA", 
   assert.equal(value(output, "financial.totalValue"), "R$ 237.000,00");
 });
 
+test("extrai composição B1 de minuta de aquisição e construção", () => {
+  const output = extractDeterministicFields(
+    [
+      "O valor de aquisição da unidade habitacional objeto deste contrato equivale a R$ 424.098,99, a ser integralizado pelas parcelas abaixo:",
+      "B1.1 Recursos próprios: | R$ 95.738,99",
+      "B1.2 Recursos da conta vinculada do FGTS do(s) comprador(es): | R$ 0,00",
+      "B1.3 Financiamento concedido pela CAIXA: | R$ 328.360,00",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "financial.totalValue"), "R$ 424.098,99");
+  assert.equal(value(output, "financial.downPayment"), "R$ 95.738,99");
+  assert.equal(value(output, "financial.fgts"), "R$ 0,00");
+  assert.equal(value(output, "financial.financing"), "R$ 328.360,00");
+});
+
 test("extrai a data do contrato no bloco de assinaturas da minuta", () => {
   const output = extractDeterministicFields(
     "E por estarem de acordo, as partes assinam. FORTALEZA, CE 15 de Julho de 2026",

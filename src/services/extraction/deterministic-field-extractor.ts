@@ -22,13 +22,23 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     text("contract.agencyCode", "Identificação do contrato", 90, [/(?:ag[eê]ncia|c[oó]digo\s+da\s+ag[eê]ncia)[^:\n\r]*:\s*([A-Z0-9./-]+)/i]),
     text("contract.financingModality", "Identificação do contrato", 90, [/modalidade\s+de\s+financiamento[^:\n\r]*:\s*([^\n\r]+)/i]),
     text("contract.housingProgram", "Identificação do contrato", 90, [/programa\s+habitacional[^:\n\r]*:\s*([^\n\r]+)/i]),
-    money("financial.financing", "Composição dos recursos", 100, [/B\.4\.1[^\n\r:]*:\s*\|?\s*(R\$\s*\d[\d.,]*)/i]),
-    money("financial.downPayment", "Composição dos recursos", 100, [/B\.4\.2[^\n\r:]*:\s*\|?\s*(R\$\s*\d[\d.,]*)/i]),
-    money("financial.fgts", "Composição dos recursos", 100, [/B\.4\.3[^\n\r:]*:\s*\|?\s*(R\$\s*\d[\d.,]*)/i]),
+    money("financial.financing", "Composição dos recursos", 100, [
+      /B\.4\.1[^\n\r:]*:\s*\|?\s*(R\$\s*\d[\d.,]*)/i,
+      /B\s*1\s*\.\s*3[^\n\r]*?financiamento[^\n\r]*?(R\$\s*\d[\d.,]*)/i,
+    ]),
+    money("financial.downPayment", "Composição dos recursos", 100, [
+      /B\.4\.2[^\n\r:]*:\s*\|?\s*(R\$\s*\d[\d.,]*)/i,
+      /B\s*1\s*\.\s*1[^\n\r]*?recursos\s+pr[oó]prios[^\n\r]*?(R\$\s*\d[\d.,]*)/i,
+    ]),
+    money("financial.fgts", "Composição dos recursos", 100, [
+      /B\.4\.3[^\n\r:]*:\s*\|?\s*(R\$\s*\d[\d.,]*)/i,
+      /B\s*1\s*\.\s*2[^\n\r]*?FGTS[^\n\r]*?(R\$\s*\d[\d.,]*)/i,
+    ]),
     money("financial.subsidy", "Composição dos recursos", 100, [/B\.4\.5[^\n\r:]*:\s*\|?\s*(R\$\s*\d[\d.,]*)/i]),
     money("financial.totalValue", "Valor do contrato", 98, [
       /valor destinado[^.\n\r]*?\s+é\s*(R\$\s*\d[\d.,]*)/i,
       /valor (?:total|do imóvel|da venda)[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+      /valor\s+de\s+aquisi[cç][aã]o[^.\n\r]*?objeto\s+deste\s+contrato\s+equivale\s+a\s*(R\$\s*\d[\d.,]*)/i,
     ]),
     money("financial.appraisalValue", "Valores da operação", 92, [/valor\s+da\s+avalia[cç][aã]o[^:\n\r]*:\s*(R\$\s*\d[\d.,]*)/i]),
     money("financial.housingEntry", "Valores da operação", 90, [/entrada\s+moradia[^:\n\r]*:\s*(R\$\s*\d[\d.,]*)/i]),

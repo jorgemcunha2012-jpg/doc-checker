@@ -94,21 +94,23 @@ function hasExpectedMinutaFinancialEvidence(source: DocumentSource, fieldId: str
 
   const compact = rawText.replace(/\s+/g, " ");
   const item = (number: string) => new RegExp(`B\\s*\\.?\\s*4\\s*\\.?\\s*${number}\\b`, "i").test(compact);
+  const acquisitionItem = (number: string) => new RegExp(`B\\s*1\\s*\\.?\\s*${number}\\b`, "i").test(compact);
 
   if (fieldId === "financial.financing") {
-    return item("1") && /valor\s+do\s+financiamento(?:\s+concedido\s+pela\s+caixa)?/i.test(compact);
+    return (item("1") && /valor\s+do\s+financiamento(?:\s+concedido\s+pela\s+caixa)?/i.test(compact)) ||
+      (acquisitionItem("3") && /financiamento\s+concedido\s+pela\s+caixa/i.test(compact));
   }
   if (fieldId === "financial.downPayment" || fieldId === "financial.housingEntry") {
-    return item("2") && /recursos\s+pr[oó]prios/i.test(compact);
+    return (item("2") || acquisitionItem("1")) && /recursos\s+pr[oó]prios/i.test(compact);
   }
   if (fieldId === "financial.fgts") {
-    return item("3") && /fgts/i.test(compact);
+    return (item("3") || acquisitionItem("2")) && /fgts/i.test(compact);
   }
   if (fieldId === "financial.subsidy") {
     return item("5") && /(?:desconto|subs[ií]dio)/i.test(compact);
   }
   if (fieldId === "financial.totalValue") {
-    return /valor\s+destinado\s+[àa]\s+aquisi[cç][aã]o|valor\s+do\s+contrato/i.test(compact);
+    return /valor\s+destinado\s+[àa]\s+aquisi[cç][aã]o|valor\s+do\s+contrato|valor\s+de\s+aquisi[cç][aã]o[^.]*?equivale/i.test(compact);
   }
   return true;
 }
