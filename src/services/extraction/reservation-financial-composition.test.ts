@@ -41,6 +41,48 @@ test("não compara sinal isolado como entrada da composição dos recursos", () 
   assert.match(String(enriched.fields.find((field) => field.fieldId === "financial.downPayment")?.sourceLocation?.rawText), /Recursos próprios calculados/);
 });
 
+test("não calcula recursos próprios quando a tabela indica subsídio ainda não extraído", () => {
+  const checklist = getChecklist("RECONCILIATION");
+  const output = {
+    fields: [
+      { fieldId: "financial.totalValue", value: "R$ 216.000,00", confidence: 98 },
+      { fieldId: "financial.financing", value: "R$ 172.800,00", confidence: 98 },
+      {
+        fieldId: "financial.downPayment",
+        value: "R$ 499,95",
+        confidence: 98,
+        sourceLocation: { section: "Condição de Pagamento", rawText: "Sinal 1 R$ 499,95" },
+      },
+    ],
+  };
+
+  const enriched = enrichReservationFinancialComposition(output, checklist, "Sinal 1 R$ 499,95\nSubsídio 1 R$ 4.183,00");
+  assert.equal(value(enriched, "financial.downPayment"), null);
+});
+
+test("calcula recursos próprios com todos os componentes da reserva, sem usar o sinal", () => {
+  const checklist = getChecklist("RECONCILIATION");
+  const output = extractDeterministicFields(
+    [
+      "Valor do contrato: R$ 216.000,00",
+      "Sinal 1 R$ 499,95",
+      "Financiamento 1 172.800,00 172.800,00",
+      "Subsídio 1 4.183,00 4.183,00",
+    ].join("\n"),
+    checklist,
+    "DADOS_RESERVA",
+  );
+
+  const enriched = enrichReservationFinancialComposition(
+    output,
+    checklist,
+    "Sinal 1 R$ 499,95\nFinanciamento 1 172.800,00\nSubsídio 1 4.183,00",
+  );
+
+  assert.equal(value(enriched, "financial.downPayment"), "R$ 39.017,00");
+  assert.match(String(enriched.fields.find((field) => field.fieldId === "financial.downPayment")?.sourceLocation?.rawText), /Subsídio: 4\.183,00/);
+});
+
 function value(output: { fields: Array<{ fieldId: string; value: string | null }> }, fieldId: string) {
   return output.fields.find((field) => field.fieldId === fieldId)?.value;
 }

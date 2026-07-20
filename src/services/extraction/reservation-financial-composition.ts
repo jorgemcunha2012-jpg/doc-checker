@@ -12,6 +12,7 @@ const financialFields = new Set([
 export function enrichReservationFinancialComposition(
   output: ProviderExtractionOutput,
   checklist: ChecklistField[],
+  sourceText = "",
 ) {
   const byId = new Map(output.fields.map((field) => [field.fieldId, field]));
   const total = money(byId.get("financial.totalValue")?.value);
@@ -20,7 +21,10 @@ export function enrichReservationFinancialComposition(
   const subsidy = money(byId.get("financial.subsidy")?.value) ?? 0;
   const currentEntry = byId.get("financial.downPayment");
 
-  if (total == null || financing == null || hasExplicitOwnResources(currentEntry)) return output;
+  if (hasExplicitOwnResources(currentEntry)) return output;
+  if (total == null || financing == null || hasUnresolvedFinancialComponent(sourceText, byId)) {
+    return clearUnsafePartialEntry(output, currentEntry);
+  }
 
   const entry = roundMoney(total - financing - fgts - subsidy);
   if (entry < 0) return output;
@@ -53,6 +57,29 @@ export function enrichReservationFinancialComposition(
               rawText,
             },
           }
+        : field,
+    ),
+  };
+}
+
+function hasUnresolvedFinancialComponent(text: string, fields: Map<string, ProviderExtractionOutput["fields"][number]>) {
+  const normalized = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase();
+  const hasValue = (fieldId: string) => Boolean(fields.get(fieldId)?.value);
+  return (
+    (/\bFGTS\b/.test(normalized) && !hasValue("financial.fgts")) ||
+    (/\bSUBSIDIO\b|\bDESCONTO\b/.test(normalized) && !hasValue("financial.subsidy"))
+  );
+}
+
+function clearUnsafePartialEntry(
+  output: ProviderExtractionOutput,
+  currentEntry: ProviderExtractionOutput["fields"][number] | undefined,
+) {
+  if (!currentEntry?.value || hasExplicitOwnResources(currentEntry)) return output;
+  return {
+    fields: output.fields.map((field) =>
+      field.fieldId === "financial.downPayment"
+        ? { ...field, value: null, confidence: 0, sourceLocation: undefined }
         : field,
     ),
   };

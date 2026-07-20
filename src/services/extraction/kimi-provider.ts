@@ -88,6 +88,48 @@ export class KimiProvider implements DocumentExtractionProvider {
     };
   }
 
+  async extractReservationFinancialComponentsFromImage(document: UploadedDocumentPayload, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
+    const dataUrl = `data:${document.mimeType};base64,${document.buffer.toString("base64")}`;
+    const financialChecklist = checklist.filter((field) => [
+      "financial.totalValue",
+      "financial.financing",
+      "financial.fgts",
+      "financial.subsidy",
+    ].includes(field.id));
+    const result = await this.client.completeJson([
+      {
+        role: "system",
+        content:
+          "Você confere exclusivamente a tabela Condição de Pagamento de uma reserva imobiliária. Extraia somente valores explicitamente visíveis. Não confunda Sinal, Mensal, Bônus ou Entrada Moradia com o total de recursos próprios. O status da conferência é decidido pelo sistema, não por você. Responda somente JSON válido.",
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text:
+              "Leia a tabela financeira. Retorne apenas os campos encontrados no formato " +
+              "{\"fields\":[{\"fieldId\":string,\"value\":string,\"confidence\":number,\"sourceLocation\":{\"section\":string,\"rawText\":string}}]}.\n" +
+              "Mapeamento: Valor do contrato -> financial.totalValue; Financiamento -> financial.financing; FGTS -> financial.fgts; Subsídio/Desconto concedido -> financial.subsidy.\n" +
+              "Para cada campo, rawText deve conter o rótulo e o valor da própria linha. Não retorne financial.downPayment.\n\n" +
+              checklistPrompt(financialChecklist),
+          },
+          { type: "image_url", image_url: { url: dataUrl } },
+        ],
+      },
+    ], { timeoutMs: 90_000, maxTokens: 1_800, responseFormat: false });
+
+    const focusedOutput = coerceExtractionOutput(result, financialChecklist);
+    const fieldsById = new Map(focusedOutput.fields.map((field) => [field.fieldId, field]));
+    return {
+      fields: checklist.map((field) => fieldsById.get(field.id) ?? {
+        fieldId: field.id,
+        value: null,
+        confidence: 0,
+      }),
+    };
+  }
+
   async transcribeReservationImage(document: UploadedDocumentPayload): Promise<string> {
     const dataUrl = `data:${document.mimeType};base64,${document.buffer.toString("base64")}`;
     return this.client.completeText([

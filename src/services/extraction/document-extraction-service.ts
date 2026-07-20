@@ -390,9 +390,23 @@ export class DocumentExtractionService {
     const focusedOutput = focusedAttempt.status === "fulfilled" ? focusedAttempt.value : null;
     const ocrOutput = ocrAttempt.status === "fulfilled" ? ocrAttempt.value.output : null;
     const localOcrOutput = localOcrAttempt.status === "fulfilled" ? localOcrAttempt.value.output : null;
-    const firstPassOutputs = [focusedOutput, ocrOutput, localOcrOutput].filter((output): output is ProviderExtractionOutput => Boolean(output));
+    const ocrText = [
+      ocrAttempt.status === "fulfilled" ? ocrAttempt.value.text : "",
+      localOcrAttempt.status === "fulfilled" ? localOcrAttempt.value.text : "",
+    ].filter(Boolean).join("\n");
+    const financialAttempt = hasReservationPaymentTable(ocrText)
+      ? await this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
+        console.warn("[ConferIA] Leitura especializada da condição de pagamento falhou", {
+          documentName: document.name,
+          error: sanitizeExtractionError(error),
+        });
+        return null;
+      })
+      : null;
+    const firstPassOutputs = [focusedOutput, ocrOutput, localOcrOutput, financialAttempt]
+      .filter((output): output is ProviderExtractionOutput => Boolean(output));
     if (firstPassOutputs.length) {
-      const mergedFirstPass = enrichReservationFinancialComposition(mergeOutputs(firstPassOutputs, checklist), checklist);
+      const mergedFirstPass = enrichReservationFinancialComposition(mergeOutputs(firstPassOutputs, checklist), checklist, ocrText);
       if (hasReservationCriticalValue(mergedFirstPass)) {
         if (ocrOutput || localOcrOutput) {
           console.info("[ConferIA] Dados da Reserva extraídos com camadas OCR determinísticas", {
@@ -426,7 +440,7 @@ export class DocumentExtractionService {
 
     try {
       const genericOutput = await this.kimiProvider.extractFromImage(document, checklist);
-      const merged = enrichReservationFinancialComposition(mergeOutputs([...firstPassOutputs, genericOutput], checklist), checklist);
+      const merged = enrichReservationFinancialComposition(mergeOutputs([...firstPassOutputs, genericOutput], checklist), checklist, ocrText);
       if (hasReservationCriticalValue(merged)) {
         console.info("[ConferIA] Dados da Reserva recuperados com extração visual genérica", {
           documentName: document.name,
@@ -455,6 +469,10 @@ function hasReservationCriticalValue(output: ProviderExtractionOutput) {
   return output.fields.some(
     (field) => critical.has(field.fieldId) && field.value != null && String(field.value).trim().length > 0,
   );
+}
+
+function hasReservationPaymentTable(text: string) {
+  return /condi[cç][aã]o\s+de\s+pagamento|valor\s+do\s+contrato|\bfinanciamento\b|\bsinal\b|\bmensal\b/i.test(text);
 }
 
 function pdfPageSelectionFor(source: DocumentSource) {
