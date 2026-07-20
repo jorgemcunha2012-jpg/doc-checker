@@ -187,7 +187,7 @@ test("extrai valores financeiros da tabela de reserva mesmo quando o OCR mantém
   const output = extractDeterministicFields(
     [
       "Valor do contrato: R$ 261.946,53",
-      "Sinal 1 R$ 500,00 R$ 0,00 R$ 500,00",
+      "Entrada 1 R$ 500,00 R$ 0,00 R$ 500,00",
       "Financiamento 1 R$ 189.600,00 R$ 189.600,00 R$ 0,00 R$ 189.600,00",
     ].join("\n"),
     getChecklist("RECONCILIATION"),

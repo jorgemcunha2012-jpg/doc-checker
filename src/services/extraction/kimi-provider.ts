@@ -66,7 +66,8 @@ export class KimiProvider implements DocumentExtractionProvider {
               "- linha Financiamento -> financial.financing\n" +
               "- linha FGTS -> financial.fgts somente se houver FGTS explícito\n" +
               "- linha Subsídio/Subsidio/Desconto -> financial.subsidy somente se houver explícito\n" +
-              "- Sinal/Entrada/Recursos próprios -> financial.downPayment quando for claramente entrada.\n\n" +
+              "- Recursos próprios ou Entrada total -> financial.downPayment quando for explicitamente o total dos recursos próprios.\n" +
+              "- Sinal é apenas uma parcela da condição de pagamento: não o mapeie sozinho para financial.downPayment.\n\n" +
               "Não retorne campos com value null. Não escreva explicações fora do JSON.\n\n" +
               "Campos esperados:\n" +
               checklistPrompt(reservationChecklist),

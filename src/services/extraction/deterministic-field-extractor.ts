@@ -76,8 +76,8 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /valor\s+do\s+contrato\s*\n\s*(R\$\s*\d[\d.,]*)/i,
     ]),
     money("financial.downPayment", "Print de pagamento", 94, [
-      /(?:sinal|entrada|recursos\s+pr[oó]prios)[^\n\r:]*:?\s*(R\$\s*\d[\d.,]*)/i,
-      /(?:sinal|entrada|recursos\s+pr[oó]prios)\s+\d+\s+(R\$\s*\d[\d.,]*)/i,
+      /(?:entrada|recursos\s+pr[oó]prios)[^\n\r:]*:?\s*(R\$\s*\d[\d.,]*)/i,
+      /(?:entrada|recursos\s+pr[oó]prios)\s+\d+\s+(R\$\s*\d[\d.,]*)/i,
     ]),
     money("financial.financing", "Print de pagamento", 94, [
       /financiamento[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,

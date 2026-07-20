@@ -20,7 +20,7 @@ export function enrichReservationFinancialComposition(
   const subsidy = money(byId.get("financial.subsidy")?.value) ?? 0;
   const currentEntry = byId.get("financial.downPayment");
 
-  if (total == null || financing == null || currentEntry?.value) return output;
+  if (total == null || financing == null || hasExplicitOwnResources(currentEntry)) return output;
 
   const entry = roundMoney(total - financing - fgts - subsidy);
   if (entry < 0) return output;
@@ -56,6 +56,12 @@ export function enrichReservationFinancialComposition(
         : field,
     ),
   };
+}
+
+function hasExplicitOwnResources(field: ProviderExtractionOutput["fields"][number] | undefined) {
+  if (!field?.value) return false;
+  const evidence = field.sourceLocation?.rawText ?? "";
+  return /recursos\s+pr[oó]prios|entrada\s+total/i.test(evidence) && !/\bsinal\b/i.test(evidence);
 }
 
 export function reservationFinancialFieldIds(output: ProviderExtractionOutput) {
