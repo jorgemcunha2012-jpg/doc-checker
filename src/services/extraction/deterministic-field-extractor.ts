@@ -43,7 +43,7 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     money("financial.appraisalValue", "Valores da operação", 92, [/valor\s+da\s+avalia[cç][aã]o[^:\n\r]*:\s*(R\$\s*\d[\d.,]*)/i]),
     money("financial.housingEntry", "Valores da operação", 90, [/entrada\s+moradia[^:\n\r]*:\s*(R\$\s*\d[\d.,]*)/i]),
     text("property.unit", "Descrição do imóvel", 92, [
-      /\b(?:unidade|apartamento|apto)\s*(?:n[ºo.]*)?\s*([A-Z0-9-]{1,12})\b/i,
+      /\b(?:unidade|apartamento|apto)\s*(?:n[ºo.]*)?\s*(?!habitacional\b|aut[oô]noma\b|residencial\b)([A-Z0-9-]{1,12})\b/i,
     ]),
     text("property.tower", "Descrição do imóvel", 92, [
       /\b(?:torre|bloco)\s*(?:n[ºo.]*)?\s*([A-Z0-9-]{1,12})\b/i,
@@ -132,7 +132,9 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /Email_4\s*:\s*([^\s\n\r]+@[^\s\n\r]+)/i,
       /\bEmail\s*:\s*([^\s\n\r]+@[^\s\n\r]+)/i,
     ]),
-    text("buyer.address", "ITBI", 90, [/Endereço\s*:\s*([^\n\r]+)/i]),
+    text("buyer.address", "ITBI", 94, [
+      /Endereço\s*:\s*(.+?)(?=\s+(?:Email|Telefone|Text\d+|Texto\d+|Endereço_?2|Inscri[cç][aã]o|$))/i,
+    ]),
     text("seller.legalName", "ITBI", 94, [
       /Text1\s*:\s*([^\n\r]+)/i,
       /Texto2\s*:\s*([^\n\r]+)/i,
@@ -144,13 +146,15 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /Texto11\s*:\s*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i,
       /\bCNPJ\b[^\d]*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i,
     ]),
-    text("seller.address", "ITBI", 90, [/Endereço_2\s*:\s*([^\n\r]+)/i]),
+    text("seller.address", "ITBI", 94, [
+      /Endereço_?2\s*:\s*(.+?)(?=\s+(?:Inscri[cç][aã]o|Text\d+|Texto\d+|[ÁA]rea|Complemento|Valor\s)|$)/i,
+    ]),
     text("seller.email", "ITBI", 90, [/(?:Email|E-mail)[^:\n\r]*:\s*([^\s\n\r]+@[^\s\n\r]+)/i]),
     text("seller.phone", "ITBI", 88, [/(?:Telefone|Celular)[^:\n\r]*:\s*([+()\d\s.-]{8,24})/i]),
     text("transaction.instrumentDate", "ITBI", 88, [/(?:data\s+do\s+instrumento|data\s+da\s+transa[cç][aã]o)[^:\n\r]*:\s*([^\n\r]+)/i]),
     text("transaction.nature", "ITBI", 88, [
       /natureza\s+da\s+transa[cç][aã]o[^:\n\r]*:\s*([^\n\r]+)/i,
-      /Compra\s+Venda\s+etc\s*:\s*([^\n\r]+)/i,
+      /Compra\s+Venda\s+etc\s*:\s*(.+?)(?=\s+(?:Valor|Check\s*Box|Caucaia:|$))/i,
     ]),
     text("transaction.transferredPercentage", "ITBI", 88, [/(?:%\s*transmitido|percentual\s+transmitido)[^:\n\r]*:\s*([\d.,]+\s*%?)/i]),
     text("property.iptu", "ITBI", 94, [
@@ -162,14 +166,16 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /Text4\s*:\s*([A-Z0-9./-]+)/i,
     ]),
     text("property.type", "ITBI", 88, [
-      /Text6\s*:\s*([^\n\r]+)/i,
+      /Text6\s*:\s*(.+?)(?=\s+(?:Text\d+|Texto\d+|[ÁA]rea|Complemento|Valor|$))/i,
       /(?:tipo\s+do\s+im[oó]vel|tipo)[^:\n\r]*:\s*([^\n\r]+)/i,
     ]),
     text("property.address", "ITBI", 90, [
-      /Text3\s*:\s*([^\n\r]+)/i,
+      /Text3\s*:\s*(.+?)(?=\s+(?:Text\d+|Texto\d+|[ÁA]rea|Complemento|Valor|$))/i,
       /Endereço_2\s*:\s*([^\n\r]+)/i,
     ]),
-    text("property.unit", "ITBI", 90, [/Complemento\s*:\s*[^\n\r]*?(?:APT|APTO|APARTAMENTO|AP)\s*([A-Z0-9-]+)/i]),
+    text("property.unit", "ITBI", 94, [
+      /Complemento\s*:\s*[^\n\r]*?\b(?:APARTAMENTO|APTO?|A\s*P)\.?\s*(?:N[ºO.]*)?\s*(\d{1,6}[A-Z]?)\b/i,
+    ]),
     text("property.tower", "ITBI", 90, [
       /Complemento\s*:\s*[^\n\r]*?TORRE\s*([A-Z0-9-]+)/i,
       /Complemento\s*:\s*[^\n\r]*?\bT\s*([A-Z0-9-]+)\s*,/i,

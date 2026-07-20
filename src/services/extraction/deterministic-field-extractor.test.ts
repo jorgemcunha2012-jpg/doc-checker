@@ -103,6 +103,16 @@ test("extrai área do terreno quando o contrato informa o valor na descrição d
   assert.equal(value(output, "property.landArea"), "22.688,71m²");
 });
 
+test("não trata unidade habitacional como número de apartamento", () => {
+  const output = extractDeterministicFields(
+    "A operação destina-se à aquisição de uma unidade habitacional integrante do empreendimento.",
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "property.unit"), null);
+});
+
 test("aceita variações do rótulo de área do terreno no ITBI", () => {
   const output = extractDeterministicFields(
     "Área do terreno (m²): 180,00",
@@ -344,6 +354,28 @@ test("extrai DTI preenchível mesmo quando os rótulos vêm como Text e CPFCNPJ"
   assert.equal(value(output, "property.landArea"), "10.006,00");
   assert.equal(value(output, "financial.financing"), "360.000,00");
   assert.equal(value(output, "financial.nonFinancedValue"), "55.000,00");
+});
+
+test("delimita campos do DTI achatado e não aceita AP dentro de uma palavra", () => {
+  const output = extractDeterministicFields(
+    [
+      "DECLARAÇÃO DE TRANSAÇÃO IMOBILIÁRIA DTI [CAMPOS DE FORMULARIO]",
+      "Text1: SPE CAUCAIA CT EMPREENDIMENTOS IMOBILIARIOS LTDA",
+      "Text2: 53.635.373/0001-03",
+      "Endereço: R Pedro Macário, 151, Tabuba em Caucaia/CE Email: jeric.oliveira@gmail.com",
+      "Endereço_2: RUA GENERAL SAMPAIO, 835 - SALA 301, CENTRO, FORTALEZA/CE",
+      "Inscrição do IPTU: 147158-9 Text3: RUA TABUZIOS, TABUBA, CAUCAIA/CE",
+      "Complemento: T3, AP 201 Compra Venda etc: COMPRA E VENDA Valor Financiado: 360.000,00",
+    ].join(" "),
+    getChecklist("RECONCILIATION"),
+    "ITBI",
+  );
+
+  assert.equal(value(output, "seller.address"), "RUA GENERAL SAMPAIO, 835 - SALA 301, CENTRO, FORTALEZA/CE");
+  assert.equal(value(output, "buyer.address"), "R Pedro Macário, 151, Tabuba em Caucaia/CE");
+  assert.equal(value(output, "property.unit"), "201");
+  assert.equal(value(output, "property.tower"), "3");
+  assert.equal(value(output, "transaction.nature"), "COMPRA E VENDA");
 });
 
 test("reconhece o formato DTI pelo conteúdo mesmo se a fonte vier classificada diferente", () => {

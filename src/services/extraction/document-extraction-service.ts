@@ -406,8 +406,17 @@ export class DocumentExtractionService {
         return null;
       })
       : null;
+    const preRegistrationAttempt = hasReservationPreRegistrationSummary(ocrText)
+      ? await this.kimiProvider.extractReservationPreRegistrationFinancials(document, checklist).catch((error) => {
+        console.warn("[ConferIA] Leitura especializada do pré-cadastro falhou", {
+          documentName: document.name,
+          error: sanitizeExtractionError(error),
+        });
+        return null;
+      })
+      : null;
     const firstPassOutputs = sanitizeReservationOutputs(
-      [focusedOutput, ocrOutput, localOcrOutput, financialAttempt]
+      [focusedOutput, ocrOutput, localOcrOutput, financialAttempt, preRegistrationAttempt]
         .filter((output): output is ProviderExtractionOutput => Boolean(output)),
       checklist,
     );
@@ -517,6 +526,10 @@ function sanitizeReservationOutputs(outputs: ProviderExtractionOutput[], checkli
 
 function hasReservationPaymentTable(text: string) {
   return /condi[cç][aã]o\s+de\s+pagamento|valor\s+do\s+contrato|\bfinanciamento\b|\bsinal\b|\bmensal\b/i.test(text);
+}
+
+function hasReservationPreRegistrationSummary(text: string) {
+  return /valor\s+avalia[cç][aã]o|valor\s+aprovado|valor\s+subs[ií]dio|valor\s*fgts/i.test(text);
 }
 
 function pdfPageSelectionFor(source: DocumentSource) {

@@ -130,6 +130,40 @@ export class KimiProvider implements DocumentExtractionProvider {
     };
   }
 
+  async extractReservationPreRegistrationFinancials(document: UploadedDocumentPayload, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
+    const dataUrl = `data:${document.mimeType};base64,${document.buffer.toString("base64")}`;
+    const fieldIds = ["financial.appraisalValue", "financial.financing", "financial.subsidy", "financial.fgts"];
+    const fields = checklist.filter((field) => fieldIds.includes(field.id));
+    const result = await this.client.completeJson([
+      {
+        role: "system",
+        content:
+          "Você extrai exclusivamente o resumo de pré-cadastro imobiliário. Leia cada rótulo e o número ao lado com rigor. " +
+          "Retorne somente JSON válido e omita campos ausentes. Não calcule nem infira valores.",
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text:
+              "Retorne {\"fields\":[{\"fieldId\":string,\"value\":string,\"confidence\":number,\"sourceLocation\":{\"section\":string,\"rawText\":string}}]}. " +
+              "Mapeamento obrigatório: Valor Avaliação -> financial.appraisalValue; Valor Aprovado -> financial.financing; " +
+              "Valor Subsídio -> financial.subsidy; Valor FGTS -> financial.fgts. " +
+              "A evidência deve conter exatamente o rótulo e o valor da tela.\n\n" + checklistPrompt(fields),
+          },
+          { type: "image_url", image_url: { url: dataUrl } },
+        ],
+      },
+    ], { timeoutMs: 60_000, maxTokens: 1_200, responseFormat: false });
+
+    const focusedOutput = coerceExtractionOutput(result, fields);
+    const fieldsById = new Map(focusedOutput.fields.map((field) => [field.fieldId, field]));
+    return {
+      fields: checklist.map((field) => fieldsById.get(field.id) ?? { fieldId: field.id, value: null, confidence: 0 }),
+    };
+  }
+
   async extractReservationIdentityFromImage(document: UploadedDocumentPayload, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
     return this.extractReservationSection(
       document,
