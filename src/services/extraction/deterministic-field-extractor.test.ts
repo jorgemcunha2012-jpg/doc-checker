@@ -23,6 +23,16 @@ test("extrai composição financeira padronizada da minuta sem depender da IA", 
   assert.equal(value(output, "financial.totalValue"), "R$ 237.000,00");
 });
 
+test("extrai a data do contrato no bloco de assinaturas da minuta", () => {
+  const output = extractDeterministicFields(
+    "E por estarem de acordo, as partes assinam. FORTALEZA, CE 15 de Julho de 2026",
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "contract.date"), "15 de Julho de 2026");
+});
+
 test("extrai área do terreno quando o contrato informa o valor na descrição do terreno", () => {
   const output = extractDeterministicFields(
     "D1 - O terreno possui 22.688,71m² de área total, constituído de 30 torres.",
@@ -151,6 +161,22 @@ test("extrai financiamento e subsídio de tabela de condição de pagamento", ()
   assert.equal(value(output, "financial.totalValue"), "R$ 216.000,00");
   assert.equal(value(output, "financial.financing"), "R$ 172.800,00");
   assert.equal(value(output, "financial.subsidy"), "R$ 4.183,00");
+});
+
+test("extrai valores financeiros da tabela de reserva mesmo quando o OCR mantém a coluna em uma linha", () => {
+  const output = extractDeterministicFields(
+    [
+      "Valor do contrato: R$ 261.946,53",
+      "Sinal 1 R$ 500,00 R$ 0,00 R$ 500,00",
+      "Financiamento 1 R$ 189.600,00 R$ 189.600,00 R$ 0,00 R$ 189.600,00",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "DADOS_RESERVA",
+  );
+
+  assert.equal(value(output, "financial.totalValue"), "R$ 261.946,53");
+  assert.equal(value(output, "financial.downPayment"), "R$ 500,00");
+  assert.equal(value(output, "financial.financing"), "R$ 189.600,00");
 });
 
 test("extrai campos de ITBI preenchível a partir dos campos de formulário do PDF", () => {

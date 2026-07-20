@@ -15,6 +15,10 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /\b(?:contrato|processo)\b[\s\r\n]*(?:n(?:[º°o.]|[úu]mero|umero)?[\s\r\n]*)?[:#-]?[\s\r\n]*([0-9][A-Z0-9./-]{3,40})/i,
       /\bcontrato\s*(?:n[úu]mero|n[ºo.]?)?\s*[:#-]\s*([A-Z0-9./-]{3,40})/i,
     ]),
+    text("contract.date", "Identificação do contrato", 98, [
+      /\b(?:FORTALEZA|FORTALEZA\/CE)\s*,?\s*CE\s+(\d{1,2}\s+de\s+[A-ZÀ-Úa-zà-ú]+\s+de\s+\d{4})/i,
+      /(?:data\s+(?:do\s+contrato|da\s+contrata[cç][aã]o|de\s+assinatura)|contrato\s+celebrado\s+em)\s*[:\-]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4}|\d{1,2}\s+de\s+[A-ZÀ-Úa-zà-ú]+\s+de\s+\d{4})/i,
+    ]),
     text("contract.agencyCode", "Identificação do contrato", 90, [/(?:ag[eê]ncia|c[oó]digo\s+da\s+ag[eê]ncia)[^:\n\r]*:\s*([A-Z0-9./-]+)/i]),
     text("contract.financingModality", "Identificação do contrato", 90, [/modalidade\s+de\s+financiamento[^:\n\r]*:\s*([^\n\r]+)/i]),
     text("contract.housingProgram", "Identificação do contrato", 90, [/programa\s+habitacional[^:\n\r]*:\s*([^\n\r]+)/i]),
@@ -69,11 +73,17 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     money("financial.totalValue", "Print de pagamento", 94, [
       /valor\s+do\s+contrato[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
       /valor\s+total[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+      /valor\s+do\s+contrato\s*\n\s*(R\$\s*\d[\d.,]*)/i,
+    ]),
+    money("financial.downPayment", "Print de pagamento", 94, [
+      /(?:sinal|entrada|recursos\s+pr[oó]prios)[^\n\r:]*:?\s*(R\$\s*\d[\d.,]*)/i,
+      /(?:sinal|entrada|recursos\s+pr[oó]prios)\s+\d+\s+(R\$\s*\d[\d.,]*)/i,
     ]),
     money("financial.financing", "Print de pagamento", 94, [
       /financiamento[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
       /financiamento\s+\d+\s+(R\$\s*\d[\d.,]*)/i,
       /valor\s+financiado[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
+      /\bfinanciamento\b[^\n\r]{0,80}?(R\$\s*\d[\d.,]*)/i,
     ]),
     money("financial.fgts", "Print de pagamento", 92, [
       /\bFGTS\b[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
