@@ -22,7 +22,7 @@ export function enrichReservationFinancialComposition(
   const currentEntry = byId.get("financial.downPayment");
 
   if (hasExplicitOwnResources(currentEntry)) return output;
-  if (total == null || financing == null || hasUnresolvedFinancialComponent(sourceText, byId)) {
+  if (total == null || financing == null || hasLowConfidenceFinancialComponent(byId) || hasUnresolvedFinancialComponent(sourceText, byId)) {
     return clearUnsafePartialEntry(output, currentEntry);
   }
 
@@ -69,6 +69,14 @@ function hasUnresolvedFinancialComponent(text: string, fields: Map<string, Provi
     (/\bFGTS\b/.test(normalized) && !hasValue("financial.fgts")) ||
     (/\bSUBSIDIO\b|\bDESCONTO\b/.test(normalized) && !hasValue("financial.subsidy"))
   );
+}
+
+function hasLowConfidenceFinancialComponent(fields: Map<string, ProviderExtractionOutput["fields"][number]>) {
+  return ["financial.totalValue", "financial.financing", "financial.fgts", "financial.subsidy"]
+    .some((fieldId) => {
+      const field = fields.get(fieldId);
+      return Boolean(field?.value) && (field?.confidence ?? 0) < 75;
+    });
 }
 
 function clearUnsafePartialEntry(

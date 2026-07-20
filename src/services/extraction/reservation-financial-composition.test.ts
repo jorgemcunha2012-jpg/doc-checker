@@ -83,6 +83,25 @@ test("calcula recursos próprios com todos os componentes da reserva, sem usar o
   assert.match(String(enriched.fields.find((field) => field.fieldId === "financial.downPayment")?.sourceLocation?.rawText), /Subsídio: 4\.183,00/);
 });
 
+test("recupera tabela de pagamento quando o OCR deforma o rótulo financiamento", () => {
+  const checklist = getChecklist("RECONCILIATION");
+  const output = extractDeterministicFields(
+    [
+      "Condição de Pagamento",
+      "Valor do contrato: R$ 424.098,99",
+      "Fnandamento 4 328.360,00 328.360,00 0,00 328.360,00",
+    ].join("\n"),
+    checklist,
+    "DADOS_RESERVA",
+  );
+  const enriched = enrichReservationFinancialComposition(output, checklist);
+
+  assert.equal(value(enriched, "financial.totalValue"), "R$ 424.098,99");
+  assert.equal(value(enriched, "financial.financing"), "328.360,00");
+  assert.equal(output.fields.find((field) => field.fieldId === "financial.financing")?.confidence, 70);
+  assert.equal(value(enriched, "financial.downPayment"), null);
+});
+
 function value(output: { fields: Array<{ fieldId: string; value: string | null }> }, fieldId: string) {
   return output.fields.find((field) => field.fieldId === fieldId)?.value;
 }

@@ -252,8 +252,28 @@ export function extractDeterministicFields(
     };
   });
 
-  const output = { fields };
+  const output = source === "DADOS_RESERVA"
+    ? { fields: recoverReservationOcrLabelTypos(fields, text) }
+    : { fields };
   return resolvedSource === "ITBI" ? mergeDtiStructuredFields(output, text, checklist) : output;
+}
+
+function recoverReservationOcrLabelTypos(fields: ExtractedField[], text: string) {
+  const financing = fields.find((field) => field.fieldId === "financial.financing");
+  if (!financing || financing.value) return fields;
+  const match = text.match(/\bf(?:nandamento|nanciamento)\b\s+\d+\s+(\d[\d.,]*)/i);
+  if (!match?.[1]) return fields;
+
+  return fields.map((field) => field.fieldId === "financial.financing"
+    ? {
+        ...field,
+        value: cleanValue(match[1]),
+        // A label recovered from a damaged OCR line is a hint for visual recovery,
+        // never enough evidence to approve a financial comparison by itself.
+        confidence: 70,
+        sourceLocation: { section: "Print de pagamento (OCR a confirmar)", rawText: match[0].slice(0, 500) },
+      }
+    : field);
 }
 
 function looksLikeDti(text: string) {
