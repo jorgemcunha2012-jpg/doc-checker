@@ -65,7 +65,10 @@ function assertProcessHasDocuments(documents: UploadedDocumentPayload[]) {
 
 async function persistProcessInitialization(process: ValidationProcess) {
   try {
-    await Promise.all([persistProcess(process), persistDocuments(process.id, process.documents)]);
+    // The documents table references the process row. Persisting them in parallel
+    // can race on a fresh process and intermittently violate the foreign key.
+    await persistProcess(process);
+    await persistDocuments(process.id, process.documents);
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível iniciar a conferência.";
