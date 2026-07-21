@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Building2, Check, CheckCircle2, Clock3, Download, FileCheck2, FilePlus2, FileSearch, Layers3, Loader2, ScanText, ShieldCheck, Sparkles, UploadCloud, UsersRound } from "lucide-react";
+import { AlertTriangle, Building2, Check, CheckCircle2, Clock3, Download, FileCheck2, FilePlus2, FileSearch, Layers3, Loader2, ScanText, Search, ShieldCheck, Sparkles, UploadCloud, UsersRound } from "lucide-react";
 import type { HumanReview, ReconciliationRun, User, ValidationProcess, ValidationRun } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
@@ -9,7 +9,7 @@ import { ClientUploadedDocument, FileDropZone } from "./file-drop-zone";
 import { ReconciliationResultsTable } from "./reconciliation-results-table";
 import { LogoutButton } from "./logout-button";
 import Link from "next/link";
-import type { Development } from "@/domain/development";
+import type { Development, DevelopmentUnit } from "@/domain/development";
 import { ExtractionQualityPanel } from "./extraction-quality-panel";
 import { InfoTooltip } from "./info-tooltip";
 
@@ -27,6 +27,8 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
   const [developments, setDevelopments] = useState<Development[]>([]);
   const [developmentId, setDevelopmentId] = useState("");
   const [developmentUnitId, setDevelopmentUnitId] = useState("");
+  const [towerFilter, setTowerFilter] = useState("");
+  const [unitSearch, setUnitSearch] = useState("");
   const [reportFilter, setReportFilter] = useState<"ALL" | "DIVERGENCES" | "PENDING" | "CHECKED">("ALL");
   const recoveryRequestedFor = useRef<string | null>(null);
 
@@ -146,6 +148,23 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
   }, [processId]);
 
   const selectedDevelopment = developments.find((development) => development.id === developmentId);
+  const developmentTowers = useMemo(
+    () => [...new Set(selectedDevelopment?.units.map((unit) => unit.tower).filter(Boolean) ?? [])]
+      .sort((left, right) => left.localeCompare(right, "pt-BR", { numeric: true })),
+    [selectedDevelopment],
+  );
+  const filteredDevelopmentUnits = useMemo(() => {
+    if (!selectedDevelopment) return [];
+    const query = normalizeUnitSearch(unitSearch);
+    const needsTowerSelection = developmentTowers.length > 1 && !towerFilter && !query;
+    if (needsTowerSelection) return [];
+    return selectedDevelopment.units.filter((unit) => {
+      if (towerFilter && unit.tower !== towerFilter) return false;
+      if (!query) return true;
+      return normalizeUnitSearch([unit.tower, unit.unit, unit.typology, unit.privateArea, unit.iptuRegistration].filter(Boolean).join(" ")).includes(query);
+    });
+  }, [developmentTowers.length, selectedDevelopment, towerFilter, unitSearch]);
+  const selectedDevelopmentUnit = selectedDevelopment?.units.find((unit) => unit.id === developmentUnitId);
   const hasDocuments =
     new Set(documents.map((document) => document.source).filter(Boolean)).size + (developmentUnitId ? 1 : 0) >= 2;
   const sourceCount = new Set(documents.map((document) => document.source).filter(Boolean)).size;
@@ -351,20 +370,35 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
               <h2 className="mt-1 text-lg font-semibold text-[var(--foreground)]">Identificação do imóvel</h2>
               <p className="text-sm leading-6 text-[var(--muted)]">Se houver uma unidade cadastrada, use-a como fonte de referência para áreas, fração ideal e matrícula.</p>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <label className="text-xs font-medium text-[var(--muted)]">Empreendimento
-                <select className="app-input mt-1 block w-full px-3 text-sm" value={developmentId} onChange={(event) => { setDevelopmentId(event.target.value); setDevelopmentUnitId(""); }}>
+                <select className="app-input mt-1 block w-full px-3 text-sm" value={developmentId} onChange={(event) => { setDevelopmentId(event.target.value); setDevelopmentUnitId(""); setTowerFilter(""); setUnitSearch(""); }}>
                   <option value="">Sem cadastro mestre</option>
                   {developments.map((development) => <option key={development.id} value={development.id}>{development.name}</option>)}
                 </select>
               </label>
-              <label className="text-xs font-medium text-[var(--muted)]">Tipo de unidade
-                <select disabled={!selectedDevelopment} className="app-input mt-1 block w-full px-3 text-sm disabled:bg-slate-100" value={developmentUnitId} onChange={(event) => setDevelopmentUnitId(event.target.value)}>
+              <label className="text-xs font-medium text-[var(--muted)]">Bloco ou torre
+                <select disabled={!selectedDevelopment || !developmentTowers.length} className="app-input mt-1 block w-full px-3 text-sm disabled:bg-slate-100" value={towerFilter} onChange={(event) => { setTowerFilter(event.target.value); setDevelopmentUnitId(""); }}>
+                  <option value="">{developmentTowers.length > 1 ? "Filtre por bloco ou torre" : developmentTowers.length ? "Todos os blocos" : "Não informado no cadastro"}</option>
+                  {developmentTowers.map((tower) => <option key={tower} value={tower}>Bloco/Torre {tower}</option>)}
+                </select>
+              </label>
+              <label className="text-xs font-medium text-[var(--muted)]">Buscar unidade ou tipo
+                <span className="relative mt-1 block">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)]" />
+                  <input disabled={!selectedDevelopment} className="app-input block w-full py-2 pl-9 pr-3 text-sm disabled:bg-slate-100" value={unitSearch} onChange={(event) => setUnitSearch(event.target.value)} placeholder="Ex.: 101 ou Tipo D" />
+                </span>
+              </label>
+              <label className="text-xs font-medium text-[var(--muted)]">Unidade de referência
+                <select disabled={!selectedDevelopment || !filteredDevelopmentUnits.length} className="app-input mt-1 block w-full px-3 text-sm disabled:bg-slate-100" value={developmentUnitId} onChange={(event) => setDevelopmentUnitId(event.target.value)}>
                   <option value="">Selecione a unidade</option>
-                  {selectedDevelopment?.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.typology || `Torre ${unit.tower} · Apto ${unit.unit}`} · {unit.privateArea} priv. · {unit.commonArea || "-"} comum · {unit.totalArea || "-"} total · fração {unit.idealFraction || "-"} · IPTU {unit.iptuRegistration || "-"}</option>)}
+                  {filteredDevelopmentUnits.map((unit) => <option key={unit.id} value={unit.id}>{unitReferenceLabel(unit)}</option>)}
                 </select>
               </label>
             </div>
+            {selectedDevelopment && developmentTowers.length > 1 && !towerFilter && !unitSearch ? <p className="mt-3 text-xs text-[var(--muted)]">Escolha um bloco/torre ou pesquise por unidade ou tipo para reduzir a lista.</p> : null}
+            {selectedDevelopment && (towerFilter || unitSearch) ? <p className="mt-3 text-xs text-[var(--muted)]">{filteredDevelopmentUnits.length} unidade(s) encontrada(s).</p> : null}
+            {selectedDevelopmentUnit ? <div className="mt-4 grid gap-2 border-l-2 border-[var(--primary)] bg-[var(--primary-soft)]/45 px-3 py-3 text-xs text-[var(--foreground)] sm:grid-cols-2 xl:grid-cols-4"><span><strong>Bloco/Torre:</strong> {selectedDevelopmentUnit.tower || "Não informado"}</span><span><strong>Unidade:</strong> {selectedDevelopmentUnit.unit || "Não informada"}</span><span><strong>Tipo:</strong> {selectedDevelopmentUnit.typology || "Não informado"}</span><span><strong>Áreas:</strong> {selectedDevelopmentUnit.privateArea} priv. {selectedDevelopmentUnit.commonArea ? `· ${selectedDevelopmentUnit.commonArea} comum` : ""} {selectedDevelopmentUnit.totalArea ? `· ${selectedDevelopmentUnit.totalArea} total` : ""}</span></div> : null}
             {currentUser.role === "ADMIN" ? (
               <a href="/developments" className="mt-4 inline-flex min-h-9 items-center text-sm font-medium text-[var(--primary)] hover:text-[var(--primary-hover)]">
                 Cadastrar nova base de empreendimento
@@ -693,6 +727,21 @@ function ExtractionMethodNotice({ run }: { run: Extract<ValidationRun, { validat
   }
 
   return <div className="mt-1 text-sm">Um PDF tinha pouco ou nenhum texto extraível e exigiu análise visual.</div>;
+}
+
+function unitReferenceLabel(unit: DevelopmentUnit) {
+  const location = [unit.tower && `Bloco/Torre ${unit.tower}`, unit.unit && `Unidade ${unit.unit}`].filter(Boolean).join(" · ");
+  const typology = unit.typology ? ` · ${unit.typology}` : "";
+  return `${location || "Unidade sem localização"}${typology} · ${unit.privateArea} m² privativos`;
+}
+
+function normalizeUnitSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function formatElapsed(seconds: number) {
