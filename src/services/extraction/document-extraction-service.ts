@@ -8,6 +8,7 @@ import { extractPdfText, hasEnoughPdfText } from "./pdf-text-service";
 import { extractPdfOcrText } from "./pdf-ocr-service";
 import { extractImageOcrText } from "./image-ocr-service";
 import { extractDocxText, extractRtfText } from "./word-text-service";
+import { extractXlsxText, isXlsxName } from "./xlsx-text-service";
 import { enrichReservationFinancialComposition } from "./reservation-financial-composition";
 import { convertTiffToPngPages } from "./tiff-image-service";
 import type { ExtractionRequest, ExtractionResult, ReconciliationExtractionResult, UploadedDocumentPayload } from "./types";
@@ -117,8 +118,8 @@ export class DocumentExtractionService {
           usedPdfVisionFallback = true;
           outputs.push(emptyOutput(checklist));
         }
-      } else if (isDocx(document) || isRtf(document)) {
-        const text = isRtf(document) ? extractRtfText(document.buffer) : await extractDocxText(document.buffer);
+      } else if (isDocx(document) || isRtf(document) || isXlsx(document)) {
+        const text = await extractTextDocument(document);
         outputs.push(await this.deepSeekProvider.structureText(text, checklist));
       } else if (document.mimeType.includes("image")) {
         outputs.push(await this.extractVisualDocument(document, checklist));
@@ -199,9 +200,9 @@ export class DocumentExtractionService {
               extractionMethod: "TEXT" as const,
             };
           }
-          if (isDocx(document) || isRtf(document)) {
-            const text = isRtf(document) ? extractRtfText(document.buffer) : await extractDocxText(document.buffer);
-            if (!text.trim()) return { output: null, usedPdfVisionFallback: false, error: "O documento Word/RTF não possui texto extraível." };
+          if (isDocx(document) || isRtf(document) || isXlsx(document)) {
+            const text = await extractTextDocument(document);
+            if (!text.trim()) return { output: null, usedPdfVisionFallback: false, error: "O documento Word, RTF ou XLSX não possui texto extraível." };
             const extraction = await this.extractTextWithRecovery(text, sourceChecklist, source);
             console.info("[ConferIA] Extração concluída", {
               source,
@@ -603,6 +604,16 @@ function isDocx(document: UploadedDocumentPayload) {
 
 function isRtf(document: UploadedDocumentPayload) {
   return document.mimeType === "application/rtf" || document.mimeType === "text/rtf" || document.name.toLowerCase().endsWith(".rtf");
+}
+
+function isXlsx(document: UploadedDocumentPayload) {
+  return document.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || isXlsxName(document.name);
+}
+
+async function extractTextDocument(document: UploadedDocumentPayload) {
+  if (isRtf(document)) return extractRtfText(document.buffer);
+  if (isXlsx(document)) return extractXlsxText(document.buffer);
+  return extractDocxText(document.buffer);
 }
 
 function isTiff(document: UploadedDocumentPayload) {

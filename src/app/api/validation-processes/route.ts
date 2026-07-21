@@ -20,6 +20,7 @@ const ACCEPTED_MIME_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/rtf",
   "text/rtf",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]);
 
 export async function POST(request: Request) {
@@ -119,6 +120,7 @@ async function isAcceptedFile(file: File) {
     (name.endsWith(".png") && signatures.png) ||
     ((name.endsWith(".jpg") || name.endsWith(".jpeg")) && signatures.jpeg) ||
     (name.endsWith(".docx") && signatures.zip) ||
+    (name.endsWith(".xlsx") && signatures.zip) ||
     (name.endsWith(".rtf") && signatures.rtf) ||
     ((name.endsWith(".tif") || name.endsWith(".tiff")) && signatures.tiff);
 
@@ -170,6 +172,7 @@ function canonicalMimeType(file: File) {
   const name = file.name.toLowerCase();
   if (name.endsWith(".pdf")) return "application/pdf";
   if (name.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (name.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
   if (name.endsWith(".rtf")) return "application/rtf";
   if (name.endsWith(".tif") || name.endsWith(".tiff")) return "image/tiff";
   if (name.endsWith(".png")) return "image/png";
@@ -215,6 +218,10 @@ function resolveDocumentType(file: File, validationType: ValidationType): Upload
   }
 
   if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || name.endsWith(".docx")) {
+    return "WORD";
+  }
+
+  if (file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || name.endsWith(".xlsx")) {
     return "WORD";
   }
 

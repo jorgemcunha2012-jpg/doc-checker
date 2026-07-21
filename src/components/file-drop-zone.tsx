@@ -78,7 +78,7 @@ export function FileDropZone({
         <SourceUpload icon={Landmark} title="ITBI e imóvel" description="ITBI, matrícula, IPTU e certidões" count={documents.filter((item) => ["ITBI", "MATRICULA", "IPTU", "CERTIDAO"].includes(item.source ?? "")).length} onFiles={(files) => handleFiles(files, "ITBI")} />
         <SourceUpload icon={Files} title="Outros documentos" description="Anexos e documentos complementares" count={documents.filter((item) => item.source === "DOCUMENTO_COMPLEMENTAR").length} onFiles={(files) => handleFiles(files, "DOCUMENTO_COMPLEMENTAR")} />
       </div>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--muted)]"><span>PDF, DOCX, RTF, TIFF/TIF, PNG ou JPG · também aceita Ctrl+V</span>{uploadMessage ? <span role="status" className="font-medium text-[var(--primary)]">{uploadMessage}</span> : null}</div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--muted)]"><span>PDF, DOCX, RTF, XLSX, TIFF/TIF, PNG ou JPG · também aceita Ctrl+V</span>{uploadMessage ? <span role="status" className="font-medium text-[var(--primary)]">{uploadMessage}</span> : null}</div>
 
       <div className="mt-4 space-y-2">
         {documents.map((document) => (
@@ -126,7 +126,7 @@ export function FileDropZone({
 function SourceUpload({ icon: Icon, title, description, count, onFiles }: { icon: typeof MonitorUp; title: string; description: string; count: number; onFiles: (files: FileList | null) => void }) {
   return (
     <label className="group flex min-h-28 cursor-pointer items-center gap-4 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-subtle)] p-4 transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]">
-      <input className="sr-only" type="file" multiple accept=".pdf,.docx,.rtf,.tif,.tiff,.jpg,.jpeg,.png,image/jpeg,image/png,image/tiff,application/pdf,application/rtf,text/rtf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => { onFiles(event.target.files); event.target.value = ""; }} />
+      <input className="sr-only" type="file" multiple accept=".pdf,.docx,.rtf,.xlsx,.tif,.tiff,.jpg,.jpeg,.png,image/jpeg,image/png,image/tiff,application/pdf,application/rtf,text/rtf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => { onFiles(event.target.files); event.target.value = ""; }} />
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--primary)] shadow-sm"><Icon className="h-5 w-5" /></span>
       <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[var(--foreground)]">{title}</span><span className="mt-1 block text-xs text-[var(--muted)]">{description}</span><span className="mt-2 block text-xs font-medium text-[var(--primary)]">{count ? `${count} arquivo(s) · adicionar mais` : "Adicionar arquivo"}</span></span>
       <Paperclip className="h-4 w-4 text-slate-400 group-hover:text-[var(--primary)]" />
@@ -204,6 +204,10 @@ function resolveDocumentType(file: File, validationType: ValidationType): Upload
   }
 
   if (file.type.includes("wordprocessingml") || /\.docx$/i.test(file.name)) {
+    return "WORD";
+  }
+
+  if (file.type.includes("spreadsheetml") || /\.xlsx$/i.test(file.name)) {
     return "WORD";
   }
 
