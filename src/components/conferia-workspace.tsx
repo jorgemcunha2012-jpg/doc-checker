@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Building2, Check, CheckCircle2, Clock3, Download, FileCheck2, FilePlus2, FileSearch, Layers3, Loader2, ScanText, ShieldCheck, Sparkles, UploadCloud, UsersRound } from "lucide-react";
 import type { HumanReview, ReconciliationRun, User, ValidationProcess, ValidationRun } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
@@ -28,6 +28,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
   const [developmentId, setDevelopmentId] = useState("");
   const [developmentUnitId, setDevelopmentUnitId] = useState("");
   const [reportFilter, setReportFilter] = useState<"ALL" | "DIVERGENCES" | "PENDING" | "CHECKED">("ALL");
+  const recoveryRequestedFor = useRef<string | null>(null);
 
   useEffect(() => {
     void fetch("/api/developments")
@@ -82,12 +83,12 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
   }, []);
 
   useEffect(() => {
-    if (!processingStartedAt || !isSubmitting) return;
+    if (!processingStartedAt || (!isSubmitting && !processId)) return;
     const timer = window.setInterval(() => {
       setElapsedSeconds(Math.floor((Date.now() - processingStartedAt) / 1000));
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [isSubmitting, processingStartedAt]);
+  }, [isSubmitting, processId, processingStartedAt]);
 
   useEffect(() => {
     if (!processId) {
@@ -120,13 +121,23 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
 
       setProcess(nextProcess);
 
+      const isStale =
+        (nextProcess.status === "PENDING" || nextProcess.status === "EXTRACTING") &&
+        Date.now() - new Date(nextProcess.updatedAt).getTime() > 45_000;
+      if (isStale && recoveryRequestedFor.current !== processId) {
+        recoveryRequestedFor.current = processId;
+        void fetch(`/api/validation-processes/${processId}/resume`, { method: "POST" });
+      }
+
       if (nextProcess.status === "DONE") {
         setRun(nextProcess.result ?? null);
         setProcessId(null);
+        setProcessingStartedAt(null);
         window.clearInterval(interval);
       }
 
       if (nextProcess.status === "FAILED") {
+        setProcessingStartedAt(null);
         window.clearInterval(interval);
       }
     }, 2500);
@@ -156,6 +167,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
     setElapsedSeconds(0);
     setRun(null);
     setProcess(null);
+    recoveryRequestedFor.current = null;
 
     const formData = new FormData();
     formData.set("validationType", validationType);
@@ -169,7 +181,6 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
     });
     const payload = await readJsonSafely<{ processId?: string; process?: ValidationProcess; error?: string }>(response);
     setIsSubmitting(false);
-    setProcessingStartedAt(null);
 
     if (!response.ok || !payload?.processId) {
       setProcess({
@@ -183,6 +194,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
+      setProcessingStartedAt(null);
       return;
     }
 
@@ -193,11 +205,13 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
     if (payload.process?.status === "DONE") {
       setRun(payload.process.result ?? null);
       setProcessId(null);
+      setProcessingStartedAt(null);
       return;
     }
 
     if (payload.process?.status === "FAILED") {
       setProcessId(null);
+      setProcessingStartedAt(null);
       return;
     }
 

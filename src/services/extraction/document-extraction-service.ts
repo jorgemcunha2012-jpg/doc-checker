@@ -398,7 +398,8 @@ export class DocumentExtractionService {
       ocrAttempt.status === "fulfilled" ? ocrAttempt.value.text : "",
       localOcrAttempt.status === "fulfilled" ? localOcrAttempt.value.text : "",
     ].filter(Boolean).join("\n");
-    const financialAttempt = hasReservationPaymentTable(ocrText)
+    const focusedPaymentIsComplete = hasReliableReservationFinancialEvidence(focusedOutput, ["financial.totalValue", "financial.financing"]);
+    const financialAttempt = hasReservationPaymentTable(ocrText) && !focusedPaymentIsComplete
       ? await this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
         console.warn("[ConferIA] Leitura especializada da condição de pagamento falhou", {
           documentName: document.name,
@@ -407,7 +408,8 @@ export class DocumentExtractionService {
         return null;
       })
       : null;
-    const preRegistrationAttempt = hasReservationPreRegistrationSummary(ocrText)
+    const focusedPreRegistrationIsComplete = hasReliableReservationFinancialEvidence(focusedOutput, ["financial.totalValue"]);
+    const preRegistrationAttempt = hasReservationPreRegistrationSummary(ocrText) && !focusedPreRegistrationIsComplete
       ? await this.kimiProvider.extractReservationPreRegistrationFinancials(document, checklist).catch((error) => {
         console.warn("[ConferIA] Leitura especializada do pré-cadastro falhou", {
           documentName: document.name,
@@ -531,6 +533,14 @@ function hasReservationPaymentTable(text: string) {
 
 function hasReservationPreRegistrationSummary(text: string) {
   return /valor\s+avalia[cç][aã]o|valor\s+aprovado|valor\s+subs[ií]dio|valor\s*fgts/i.test(text);
+}
+
+function hasReliableReservationFinancialEvidence(output: ProviderExtractionOutput | null, fieldIds: string[]) {
+  if (!output) return false;
+  return fieldIds.every((fieldId) => {
+    const field = output.fields.find((candidate) => candidate.fieldId === fieldId);
+    return Boolean(field?.value && field.confidence >= 85 && field.sourceLocation?.rawText);
+  });
 }
 
 function pdfPageSelectionFor(source: DocumentSource) {

@@ -110,6 +110,32 @@ test("revisa valor total e financiamento da tela financeira de Reserva antes de 
   }
 });
 
+test("não repete a leitura financeira quando a extração focada já tem evidências confiáveis", async () => {
+  const previous = process.env.CONFERIA_SKIP_LOCAL_OCR;
+  process.env.CONFERIA_SKIP_LOCAL_OCR = "true";
+  let financialCalls = 0;
+  const service = new DocumentExtractionService({
+    extractReservationFromImage: async () => output([
+      extracted("financial.totalValue", "R$ 220.000,00", "Valor do contrato: R$ 220.000,00"),
+      extracted("financial.financing", "R$ 170.000,00", "Financiamento: R$ 170.000,00"),
+    ]),
+    transcribeReservationImage: async () => "CONDIÇÃO DE PAGAMENTO VALOR DO CONTRATO FINANCIAMENTO",
+    extractReservationIdentityFromImage: async () => output([]),
+    extractReservationUnitFromImage: async () => output([]),
+    extractReservationFinancialComponentsFromImage: async () => { financialCalls += 1; return output([]); },
+    extractFromImage: async () => output([]),
+  } as never, {} as never);
+
+  try {
+    const result = await extractReservationVisual(service);
+    assert.equal(financialCalls, 0);
+    assert.equal(value(result, "financial.financing"), "R$ 170.000,00");
+  } finally {
+    if (previous === undefined) delete process.env.CONFERIA_SKIP_LOCAL_OCR;
+    else process.env.CONFERIA_SKIP_LOCAL_OCR = previous;
+  }
+});
+
 function extractReservationVisual(service: DocumentExtractionService) {
   return (service as unknown as {
     extractSingleVisualDocument: (document: never, checklist: ReturnType<typeof getChecklist>, source: "DADOS_RESERVA") => Promise<{ fields: Array<{ fieldId: string; value: string | null }> }>;

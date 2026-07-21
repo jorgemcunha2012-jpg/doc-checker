@@ -159,8 +159,18 @@ async function processValidation(
   documents: UploadedDocumentPayload[],
   referenceValues: ExtractedFieldValue[] = [],
 ) {
+  const executionStartedAt = Date.now();
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
   try {
     await updateAndPersist(processId, { status: "EXTRACTING" });
+    // A worker ativo atualiza o processo periodicamente. Isso distingue uma fila
+    // abandonada de uma extração extensa e permite uma retomada segura pelo cliente.
+    heartbeat = setInterval(() => {
+      const current = getValidationProcess(processId);
+      void updateAndPersist(processId, { status: current?.status ?? "EXTRACTING" }).catch((error) => {
+        console.error("[ConferIA] Não foi possível atualizar o heartbeat do processo", error);
+      });
+    }, 20_000);
     const checklist = getChecklist(validationType);
     const process = getValidationProcess(processId);
     if (!process) throw new Error("Processo não encontrado durante o processamento.");
@@ -176,18 +186,26 @@ async function processValidation(
     }
     if (completed) {
       const elapsedMs = durationMs(completed.createdAt, completed.updatedAt);
+      const executionDurationMs = Date.now() - executionStartedAt;
+      const queueDelayMs = Math.max(0, executionStartedAt - new Date(completed.createdAt).getTime());
       await audit({ id: completed.userId, organizationId: completed.organizationId }, "PROCESS_FINISHED", "validation_process", completed.id, {
         documents: completed.documents.map((document) => document.name),
         summary: completed.result?.summary,
         extractionQualityBySource: completed.result?.validationType === "RECONCILIATION"
           ? completed.result.extractionQualityBySource
           : undefined,
-        durationMs: elapsedMs,
+        durationMs: executionDurationMs,
+        executionDurationMs,
+        queueDelayMs,
+        totalElapsedMs: elapsedMs,
       });
-      if (elapsedMs != null && elapsedMs >= 10 * 60 * 1000) {
+      if (executionDurationMs >= 10 * 60 * 1000) {
         await audit({ id: completed.userId, organizationId: completed.organizationId }, "PROCESS_SLOW", "validation_process", completed.id, {
           documents: completed.documents.map((document) => document.name),
-          durationMs: elapsedMs,
+          durationMs: executionDurationMs,
+          executionDurationMs,
+          queueDelayMs,
+          totalElapsedMs: elapsedMs,
           thresholdMs: 10 * 60 * 1000,
         });
       }
@@ -201,9 +219,14 @@ async function processValidation(
       await audit({ id: failed.userId, organizationId: failed.organizationId }, "PROCESS_FAILED", "validation_process", failed.id, {
         documents: failed.documents.map((document) => document.name),
         error: failed.error,
-        durationMs: durationMs(failed.createdAt, failed.updatedAt),
+        durationMs: Date.now() - executionStartedAt,
+        executionDurationMs: Date.now() - executionStartedAt,
+        queueDelayMs: Math.max(0, executionStartedAt - new Date(failed.createdAt).getTime()),
+        totalElapsedMs: durationMs(failed.createdAt, failed.updatedAt),
       });
     }
+  } finally {
+    if (heartbeat) clearInterval(heartbeat);
   }
 }
 
