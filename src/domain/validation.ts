@@ -34,7 +34,7 @@ export const documentSourceLabels: Record<DocumentSource, string> = {
   MINUTA: "Minuta",
   ITBI: "ITBI",
   DADOS_RESERVA: "Dados da Reserva",
-  CADASTRO_EMPREENDIMENTO: "Cadastro do Empreendimento",
+  CADASTRO_EMPREENDIMENTO: "Matrícula cadastrada",
   MATRICULA: "Matrícula",
   FRACOES: "Frações do empreendimento",
   IPTU: "Documento IPTU",
