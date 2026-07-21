@@ -113,6 +113,19 @@ test("não trata unidade habitacional como número de apartamento", () => {
   assert.equal(value(output, "property.unit"), null);
 });
 
+test("extrai apartamento e torre da redação de futura unidade autônoma da CAIXA", () => {
+  const output = extractDeterministicFields(
+    "Futura unidade autônoma Apartamento nº 404 da Torre 2",
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "property.unit"), "404");
+  assert.equal(value(output, "property.tower"), "2");
+  assert.match(String(field(output, "property.unit")?.sourceLocation?.rawText), /Apartamento nº 404/i);
+  assert.match(String(field(output, "property.tower")?.sourceLocation?.rawText), /Apartamento nº 404 da Torre 2/i);
+});
+
 test("aceita variações do rótulo de área do terreno no ITBI", () => {
   const output = extractDeterministicFields(
     "Área do terreno (m²): 180,00",

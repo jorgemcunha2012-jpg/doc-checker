@@ -43,9 +43,12 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     money("financial.appraisalValue", "Valores da operação", 92, [/valor\s+da\s+avalia[cç][aã]o[^:\n\r]*:\s*(R\$\s*\d[\d.,]*)/i]),
     money("financial.housingEntry", "Valores da operação", 90, [/entrada\s+moradia[^:\n\r]*:\s*(R\$\s*\d[\d.,]*)/i]),
     text("property.unit", "Descrição do imóvel", 92, [
-      /\b(?:unidade|apartamento|apto)\s*(?:n[ºo.]*)?\s*(?!habitacional\b|aut[oô]noma\b|residencial\b)([A-Z0-9-]{1,12})\b/i,
+      /\b(?:futura\s+)?unidade\s+aut[oô]noma\s+(?:apartamento|apto)\s*(?:n[ºo.]*)?\s*([0-9]{1,6}[A-Z]?)\b/i,
+      /\b(?:apartamento|apto)\s*(?:n[ºo.]*)?\s*([0-9]{1,6}[A-Z]?)\b/i,
+      /\bunidade\s*(?:n[ºo.]*)?\s*([0-9]{1,6}[A-Z]?)\b/i,
     ]),
     text("property.tower", "Descrição do imóvel", 92, [
+      /\b(?:apartamento|apto)\s*(?:n[ºo.]*)?\s*[0-9]{1,6}[A-Z]?\s+(?:da|do|na|no)\s+(?:torre|bloco)\s*(?:n[ºo.]*)?\s*([A-Z0-9-]{1,12})\b/i,
       /\b(?:torre|bloco)\s*(?:n[ºo.]*)?\s*([A-Z0-9-]{1,12})\b/i,
     ]),
     text("property.registration", "Descrição do imóvel", 90, [
