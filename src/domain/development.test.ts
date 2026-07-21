@@ -10,7 +10,9 @@ test("injeta área total e fração ideal do cadastro mestre na conferência", (
       developmentId: "dev_1",
       tower: "23",
       unit: "103",
+      typology: "Tipo A",
       privateArea: "45,62 m²",
+      commonArea: "12,48 m²",
       totalArea: "58,10 m²",
       idealFraction: "0,001234",
       confidence: 100,
@@ -18,8 +20,10 @@ test("injeta área total e fração ideal do cadastro mestre na conferência", (
   );
 
   assert.equal(values.find((value) => value.fieldId === "property.privateArea")?.value, "45,62 m²");
+  assert.equal(values.find((value) => value.fieldId === "property.commonArea")?.value, "12,48 m²");
   assert.equal(values.find((value) => value.fieldId === "property.totalArea")?.value, "58,10 m²");
   assert.equal(values.find((value) => value.fieldId === "property.idealFraction")?.value, "0,001234");
+  assert.equal(values.find((value) => value.fieldId === "property.type")?.value, "Tipo A");
 });
 
 test("resume e bloqueia cadastro extraído quando há unidade incompleta", () => {

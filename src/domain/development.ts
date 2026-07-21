@@ -77,6 +77,7 @@ export function developmentUnitValues(
   if (development.sellerCnpj?.trim()) values.splice(3, 0, { fieldId: "seller.cnpj", source, value: development.sellerCnpj, confidence });
   if (unit.unit.trim()) values.splice(2, 0, { fieldId: "property.unit", source, value: unit.unit, confidence });
   if (unit.tower.trim()) values.splice(unit.unit.trim() ? 3 : 2, 0, { fieldId: "property.tower", source, value: unit.tower, confidence });
+  if (unit.typology?.trim()) values.push({ fieldId: "property.type", source, value: unit.typology, confidence });
   return values;
 }
 
