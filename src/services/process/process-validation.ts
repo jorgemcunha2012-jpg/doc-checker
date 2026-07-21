@@ -8,6 +8,7 @@ import { ReconciliationEngine } from "@/services/validation/reconciliation-engin
 import { getValidationProcess, saveValidationProcess, updateValidationProcess } from "./validation-process-store";
 import { audit, persistDocuments, persistOriginalDocuments, persistProcess, persistResults } from "./process-repository";
 import { loadLearnedEquivalences } from "./learning-repository";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
 export function createValidationProcess(validationType: ValidationType, documents: UploadedDocumentPayload[]) {
   assertProcessHasDocuments(documents);
@@ -32,6 +33,49 @@ export async function createValidationProcessAndWait(validationType: ValidationT
   await processValidation(process.id, validationType, documents);
 
   return getValidationProcess(process.id) ?? process;
+}
+
+export async function resumePersistedValidationProcess(processId: string) {
+  const supabase = createSupabaseAdminClient();
+  const { data: persisted, error } = await supabase
+    .from("validation_processes")
+    .select("id, organization_id, user_id, validation_type, started_at, process_documents(id, name, document_type, source, mime_type, size_bytes, storage_path, organization_id)")
+    .eq("id", processId)
+    .single();
+  if (error || !persisted) throw new Error(error?.message ?? "Processo não encontrado.");
+  if (!persisted.process_documents?.length) throw new Error("O processo não possui documentos para retomar.");
+
+  const documents: UploadedDocumentPayload[] = [];
+  for (const document of persisted.process_documents) {
+    if (!document.storage_path) throw new Error(`Arquivo indisponível: ${document.name}`);
+    const { data, error: downloadError } = await supabase.storage.from("process-documents").download(document.storage_path);
+    if (downloadError || !data) throw new Error(`Não foi possível recuperar ${document.name}.`);
+    documents.push({
+      id: document.id,
+      organizationId: document.organization_id ?? persisted.organization_id,
+      name: document.name,
+      type: document.document_type,
+      source: document.source,
+      mimeType: document.mime_type,
+      sizeBytes: document.size_bytes,
+      storagePath: document.storage_path,
+      buffer: Buffer.from(await data.arrayBuffer()),
+    });
+  }
+
+  const now = new Date().toISOString();
+  saveValidationProcess({
+    id: persisted.id,
+    organizationId: persisted.organization_id,
+    userId: persisted.user_id,
+    validationType: persisted.validation_type,
+    status: "PENDING",
+    createdAt: persisted.started_at,
+    updatedAt: now,
+    documents: documents.map(stripBuffer),
+  });
+  await processValidation(persisted.id, persisted.validation_type, documents);
+  return getValidationProcess(persisted.id);
 }
 
 export async function createValidationProcessAndStart(
