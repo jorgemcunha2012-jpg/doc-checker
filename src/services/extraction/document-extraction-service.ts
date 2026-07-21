@@ -399,44 +399,35 @@ export class DocumentExtractionService {
       localOcrAttempt.status === "fulfilled" ? localOcrAttempt.value.text : "",
     ].filter(Boolean).join("\n");
     const focusedPaymentIsComplete = hasReliableReservationFinancialEvidence(focusedOutput, ["financial.totalValue", "financial.financing"]);
-    const financialAttempt = hasReservationPaymentTable(ocrText) && !focusedPaymentIsComplete
-      ? await this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
-        console.warn("[ConferIA] Leitura especializada da condição de pagamento falhou", {
-          documentName: document.name,
-          error: sanitizeExtractionError(error),
-        });
-        return null;
-      })
-      : null;
     const focusedPreRegistrationIsComplete = hasReliableReservationFinancialEvidence(focusedOutput, ["financial.totalValue"]);
-    const preRegistrationAttempt = hasReservationPreRegistrationSummary(ocrText) && !focusedPreRegistrationIsComplete
-      ? await this.kimiProvider.extractReservationPreRegistrationFinancials(document, checklist).catch((error) => {
-        console.warn("[ConferIA] Leitura especializada do pré-cadastro falhou", {
-          documentName: document.name,
-          error: sanitizeExtractionError(error),
-        });
-        return null;
-      })
-      : null;
-    const firstPassOutputs = sanitizeReservationOutputs(
-      [focusedOutput, ocrOutput, localOcrOutput, financialAttempt, preRegistrationAttempt]
+    const initialOutputs = sanitizeReservationOutputs(
+      [focusedOutput, ocrOutput, localOcrOutput]
         .filter((output): output is ProviderExtractionOutput => Boolean(output)),
       checklist,
     );
-    let merged = enrichReservationFinancialComposition(mergeReservationOutputs(firstPassOutputs, checklist), checklist, ocrText);
+    let merged = enrichReservationFinancialComposition(mergeReservationOutputs(initialOutputs, checklist), checklist, ocrText);
     const recoveryTargets = reservationRecoveryTargets(merged, ocrText);
-    if (!recoveryTargets.length) {
-        if (ocrOutput || localOcrOutput) {
-          console.info("[ConferIA] Dados da Reserva extraídos com camadas OCR determinísticas", {
+    // As leituras financeira, de identidade e de unidade não dependem entre si.
+    // Executá-las na mesma etapa mantém as camadas de conferência sem encadear seus tempos máximos.
+    const [financialAttempt, preRegistrationAttempt, ...targetedAttempts] = await Promise.all([
+      hasReservationPaymentTable(ocrText) && !focusedPaymentIsComplete
+        ? this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
+          console.warn("[ConferIA] Leitura especializada da condição de pagamento falhou", {
             documentName: document.name,
-            extractedTextCharacters: ocrAttempt.status === "fulfilled" ? ocrAttempt.value.text.length : 0,
-            localOcrTextCharacters: localOcrAttempt.status === "fulfilled" ? localOcrAttempt.value.text.length : 0,
+            error: sanitizeExtractionError(error),
           });
-        }
-        return merged;
-    }
-
-    const targetedAttempts = await Promise.all([
+          return null;
+        })
+        : Promise.resolve(null),
+      hasReservationPreRegistrationSummary(ocrText) && !focusedPreRegistrationIsComplete
+        ? this.kimiProvider.extractReservationPreRegistrationFinancials(document, checklist).catch((error) => {
+          console.warn("[ConferIA] Leitura especializada do pré-cadastro falhou", {
+            documentName: document.name,
+            error: sanitizeExtractionError(error),
+          });
+          return null;
+        })
+        : Promise.resolve(null),
       recoveryTargets.includes("identity")
         ? this.kimiProvider.extractReservationIdentityFromImage(document, checklist).catch((error) => {
           console.warn("[ConferIA] Revisão dirigida de dados pessoais falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
@@ -449,15 +440,30 @@ export class DocumentExtractionService {
           return null;
         })
         : Promise.resolve(null),
-      recoveryTargets.includes("payment") && !financialAttempt
+      recoveryTargets.includes("payment") && !hasReservationPaymentTable(ocrText)
         ? this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
           console.warn("[ConferIA] Revisão dirigida financeira falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
           return null;
         })
         : Promise.resolve(null),
     ]);
-    const targetedOutputs = sanitizeReservationOutputs(targetedAttempts.filter((output): output is ProviderExtractionOutput => Boolean(output)), checklist);
-    merged = enrichReservationFinancialComposition(mergeReservationOutputs([...firstPassOutputs, ...targetedOutputs], checklist), checklist, ocrText);
+    const firstPassOutputs = sanitizeReservationOutputs(
+      [focusedOutput, ocrOutput, localOcrOutput, financialAttempt, preRegistrationAttempt, ...targetedAttempts]
+        .filter((output): output is ProviderExtractionOutput => Boolean(output)),
+      checklist,
+    );
+    merged = enrichReservationFinancialComposition(mergeReservationOutputs(firstPassOutputs, checklist), checklist, ocrText);
+    if (!recoveryTargets.length) {
+        if (ocrOutput || localOcrOutput) {
+          console.info("[ConferIA] Dados da Reserva extraídos com camadas OCR determinísticas", {
+            documentName: document.name,
+            extractedTextCharacters: ocrAttempt.status === "fulfilled" ? ocrAttempt.value.text.length : 0,
+            localOcrTextCharacters: localOcrAttempt.status === "fulfilled" ? localOcrAttempt.value.text.length : 0,
+          });
+        }
+        return merged;
+    }
+
     if (!reservationRecoveryTargets(merged, ocrText).length) return merged;
 
     if (focusedAttempt.status === "rejected") {
@@ -481,7 +487,7 @@ export class DocumentExtractionService {
 
     try {
       const genericOutput = await this.kimiProvider.extractFromImage(document, checklist);
-      merged = enrichReservationFinancialComposition(mergeReservationOutputs([...firstPassOutputs, ...targetedOutputs, ...sanitizeReservationOutputs([genericOutput], checklist)], checklist), checklist, ocrText);
+      merged = enrichReservationFinancialComposition(mergeReservationOutputs([...firstPassOutputs, ...sanitizeReservationOutputs([genericOutput], checklist)], checklist), checklist, ocrText);
       if (!reservationRecoveryTargets(merged, ocrText).length) {
         console.info("[ConferIA] Dados da Reserva recuperados com extração visual genérica", {
           documentName: document.name,

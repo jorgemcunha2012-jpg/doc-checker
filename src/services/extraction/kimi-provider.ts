@@ -32,7 +32,7 @@ export class KimiProvider implements DocumentExtractionProvider {
           { type: "image_url", image_url: { url: dataUrl } },
         ],
       },
-    ], { timeoutMs: 120_000 });
+    ], { timeoutMs: 60_000, maxTokens: 2_400 });
 
     return coerceExtractionOutput(result, checklist);
   }
@@ -75,7 +75,7 @@ export class KimiProvider implements DocumentExtractionProvider {
           { type: "image_url", image_url: { url: dataUrl } },
         ],
       },
-    ], { timeoutMs: 120_000, maxTokens: 4_000, responseFormat: false });
+    ], { timeoutMs: 60_000, maxTokens: 2_400, responseFormat: false });
 
     const focusedOutput = coerceExtractionOutput(result, reservationChecklist);
     const fieldsById = new Map(focusedOutput.fields.map((field) => [field.fieldId, field]));
@@ -117,7 +117,7 @@ export class KimiProvider implements DocumentExtractionProvider {
           { type: "image_url", image_url: { url: dataUrl } },
         ],
       },
-    ], { timeoutMs: 90_000, maxTokens: 1_800, responseFormat: false });
+    ], { timeoutMs: 55_000, maxTokens: 1_800, responseFormat: false });
 
     const focusedOutput = coerceExtractionOutput(result, financialChecklist);
     const fieldsById = new Map(focusedOutput.fields.map((field) => [field.fieldId, field]));
@@ -155,7 +155,7 @@ export class KimiProvider implements DocumentExtractionProvider {
           { type: "image_url", image_url: { url: dataUrl } },
         ],
       },
-    ], { timeoutMs: 60_000, maxTokens: 1_200, responseFormat: false });
+    ], { timeoutMs: 45_000, maxTokens: 1_200, responseFormat: false });
 
     const focusedOutput = coerceExtractionOutput(result, fields);
     const fieldsById = new Map(focusedOutput.fields.map((field) => [field.fieldId, field]));
@@ -207,7 +207,7 @@ export class KimiProvider implements DocumentExtractionProvider {
           { type: "image_url", image_url: { url: dataUrl } },
         ],
       },
-    ], { timeoutMs: 75_000, maxTokens: 2_400, responseFormat: false });
+    ], { timeoutMs: 55_000, maxTokens: 2_400, responseFormat: false });
 
     const output = coerceExtractionOutput(result, sectionChecklist);
     const byId = new Map(output.fields.map((field) => [field.fieldId, field]));
@@ -234,7 +234,7 @@ export class KimiProvider implements DocumentExtractionProvider {
           { type: "image_url", image_url: { url: dataUrl } },
         ],
       },
-    ], { timeoutMs: 120_000, maxTokens: 4_000 });
+    ], { timeoutMs: 60_000, maxTokens: 2_400 });
   }
 
   async extractFromPdfFallback(document: UploadedDocumentPayload, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
