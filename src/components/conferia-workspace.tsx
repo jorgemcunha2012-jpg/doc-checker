@@ -412,11 +412,9 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
             {selectedDevelopment && developmentTowers.length > 1 && !towerFilter && !unitSearch ? <p className="mt-3 text-xs text-[var(--muted)]">Escolha um bloco/torre ou pesquise por unidade ou tipo para reduzir a lista.</p> : null}
             {selectedDevelopment && (towerFilter || unitSearch) ? <p className="mt-3 text-xs text-[var(--muted)]">{filteredDevelopmentUnits.length} unidade(s) encontrada(s).</p> : null}
             {selectedDevelopmentUnit ? <div className="mt-4 grid gap-2 border-l-2 border-[var(--primary)] bg-[var(--primary-soft)]/45 px-3 py-3 text-xs text-[var(--foreground)] sm:grid-cols-2 xl:grid-cols-4"><span><strong>Bloco/Torre:</strong> {selectedDevelopmentUnit.tower || "Não informado"}</span><span><strong>Unidade:</strong> {selectedDevelopmentUnit.unit || "Não informada"}</span><span><strong>Tipo:</strong> {selectedDevelopmentUnit.typology || "Não informado"}</span><span><strong>Áreas:</strong> {selectedDevelopmentUnit.privateArea} priv. {selectedDevelopmentUnit.commonArea ? `· ${selectedDevelopmentUnit.commonArea} comum` : ""} {selectedDevelopmentUnit.totalArea ? `· ${selectedDevelopmentUnit.totalArea} total` : ""}</span></div> : null}
-            {currentUser.role === "ADMIN" ? (
-              <a href="/developments" className="mt-4 inline-flex min-h-9 items-center text-sm font-medium text-[var(--primary)] hover:text-[var(--primary-hover)]">
-                Cadastrar nova base de empreendimento
-              </a>
-            ) : null}
+            <a href="/developments" className="mt-4 inline-flex min-h-9 items-center text-sm font-medium text-[var(--primary)] hover:text-[var(--primary-hover)]">
+              Criar ou editar base de empreendimento
+            </a>
           </section>
 
           <FileDropZone
