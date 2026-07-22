@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Building2, Check, CheckCircle2, Clock3, Download, FileCheck2, FilePlus2, FileSearch, Layers3, Loader2, ScanText, Search, ShieldCheck, Sparkles, UploadCloud, UsersRound } from "lucide-react";
 import type { HumanReview, ReconciliationRun, User, ValidationProcess, ValidationRun } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
@@ -32,11 +32,24 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
   const [reportFilter, setReportFilter] = useState<"ALL" | "DIVERGENCES" | "PENDING" | "CHECKED">("ALL");
   const recoveryRequestedFor = useRef<string | null>(null);
 
-  useEffect(() => {
-    void fetch("/api/developments")
-      .then((response) => response.ok ? response.json() : { developments: [] })
-      .then((payload) => setDevelopments(payload.developments ?? []));
+  const loadDevelopments = useCallback(async () => {
+    const response = await fetch("/api/developments");
+    const payload = response.ok ? await response.json() : { developments: [] };
+    setDevelopments(payload.developments ?? []);
   }, []);
+
+  useEffect(() => {
+    void loadDevelopments();
+    const refreshAfterReturningToPage = () => {
+      if (document.visibilityState === "visible") void loadDevelopments();
+    };
+    window.addEventListener("focus", refreshAfterReturningToPage);
+    document.addEventListener("visibilitychange", refreshAfterReturningToPage);
+    return () => {
+      window.removeEventListener("focus", refreshAfterReturningToPage);
+      document.removeEventListener("visibilitychange", refreshAfterReturningToPage);
+    };
+  }, [loadDevelopments]);
 
   useEffect(() => {
     if (!run || run.validationType !== "RECONCILIATION") return;
