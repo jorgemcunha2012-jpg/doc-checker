@@ -126,6 +126,18 @@ test("extrai apartamento e torre da redação de futura unidade autônoma da CAI
   assert.match(String(field(output, "property.tower")?.sourceLocation?.rawText), /Apartamento nº 404 da Torre 2/i);
 });
 
+test("extrai torre, pavimento e tipologia da descrição CAIXA sem aceitar Apartamento como tipo", () => {
+  const output = extractDeterministicFields(
+    "Futura unidade autônoma Apartamento nº 704 da Torre 3, 7º Pavimento, Tipo A, do Empreendimento denominado VIVER ESSENCIAL. Tudo devidamente descrito e caracterizado na matrícula.",
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "property.tower"), "3");
+  assert.equal(value(output, "property.floor"), "7º Pavimento");
+  assert.equal(value(output, "property.type"), "Tipo A");
+});
+
 test("aceita variações do rótulo de área do terreno no ITBI", () => {
   const output = extractDeterministicFields(
     "Área do terreno (m²): 180,00",

@@ -55,8 +55,14 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /\bmatr[ií]cula\s*(?:n[ºo.]*)?\s*([A-Z0-9./-]{2,30})\b/i,
     ]),
     text("property.registryOffice", "Descrição do imóvel", 88, [/(?:cart[oó]rio|of[ií]cio)\s+(?:de\s+)?registro\s+de\s+im[oó]veis?[^:\n\r]*:?\s*([^\n\r]+)/i]),
-    text("property.type", "Descrição do imóvel", 88, [/(?:tipo\s+do\s+im[oó]vel|tipo\s+da\s+unidade)[^:\n\r]*:\s*([^\n\r]+)/i]),
-    text("property.floor", "Descrição do imóvel", 88, [/(?:pavimento|andar)[^:\n\r:]*:\s*([A-Z0-9-]+)/i]),
+    text("property.type", "Descrição do imóvel", 88, [
+      /(?:tipo\s+do\s+im[oó]vel|tipo\s+da\s+unidade)[^:\n\r]*:\s*([^\n\r]+)/i,
+      /\b(?:\d{1,2}\s*[ºo]\s*)?pavimento\s*,?\s*(tipo\s+[A-Z0-9-]+)\b/i,
+    ]),
+    text("property.floor", "Descrição do imóvel", 88, [
+      /(\d{1,2}\s*[ºo]\s*pavimento)\b/i,
+      /(?:pavimento|andar)[^:\n\r:]*:\s*([A-Z0-9-]+)/i,
+    ]),
     text("property.terrainArea", "Descrição do imóvel", 96, [
       /área\s+(?:total\s+)?do\s+terreno[^\d]*(\d+[\d.,]*\s*m[²2]?)/i,
       /\bterreno\b[^.\n\r]{0,100}?\b(?:possui|tem)\b\s*(\d+[\d.,]*\s*m[²2]?)/i,
@@ -275,7 +281,7 @@ export function extractDeterministicFields(
   const output = source === "DADOS_RESERVA"
     ? { fields: recoverReservationGridFields(recoverReservationOcrLabelTypos(fields, text), text) }
     : source === "MINUTA"
-      ? { fields: recoverMinutaCompositionTable(fields, text) }
+      ? { fields: recoverMinutaPropertyDescription(recoverMinutaCompositionTable(fields, text), text) }
       : { fields };
   return resolvedSource === "ITBI" ? mergeDtiStructuredFields(output, text, checklist) : output;
 }
@@ -312,6 +318,34 @@ function recoverMinutaCompositionTable(fields: ExtractedField[], text: string) {
       value: value.value,
       confidence: 100,
       sourceLocation: { section: "Composição dos recursos", rawText: value.rawText },
+    };
+  });
+}
+
+function recoverMinutaPropertyDescription(fields: ExtractedField[], text: string) {
+  const start = text.search(/(?:futura\s+)?unidade\s+aut[oô]noma/i);
+  const description = start >= 0 ? text.slice(start, start + 700) : undefined;
+  if (!description) return fields;
+
+  const tower = description.match(/\b(?:torre|bloco)\s*(?:n[ºo.]*)?\s*([A-Z0-9-]{1,12})\b/i)?.[1];
+  const type = description.match(/\btipo\s+([A-Z][A-Z0-9-]*)\b/i)?.[1];
+  const floor = description.match(/\b(\d{1,2}\s*[ºo]\s*pavimento)\b/i)?.[1];
+  const values = new Map<string, string>();
+  if (tower) values.set("property.tower", tower);
+  if (type) values.set("property.type", "Tipo " + type.toUpperCase());
+  if (floor) values.set("property.floor", floor.replace(/\s+/g, " "));
+
+  return fields.map((field) => {
+    const value = values.get(field.fieldId);
+    if (!value) return field;
+    return {
+      ...field,
+      value,
+      confidence: 100,
+      sourceLocation: {
+        section: "Descrição do imóvel",
+        rawText: description.replace(/\s+/g, " ").slice(0, 500),
+      },
     };
   });
 }
