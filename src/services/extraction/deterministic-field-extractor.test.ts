@@ -138,6 +138,53 @@ test("extrai torre, pavimento e tipologia da descrição CAIXA sem aceitar Apart
   assert.equal(value(output, "property.type"), "Tipo A");
 });
 
+test("interpreta identificação do imóvel em campos de minuta distribuídos em linhas", () => {
+  const output = extractDeterministicFields(
+    [
+      "IDENTIFICAÇÃO DO IMÓVEL",
+      "Bloco: 03",
+      "Unidade: 704",
+      "Pavimento: 7",
+      "Tipo da unidade: B",
+      "Matrícula nº 6426",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "property.tower"), "03");
+  assert.equal(value(output, "property.unit"), "704");
+  assert.equal(value(output, "property.floor"), "7º Pavimento");
+  assert.equal(value(output, "property.type"), "Tipo B");
+  assert.match(String(field(output, "property.unit")?.sourceLocation?.rawText), /Bloco: 03/i);
+});
+
+test("interpreta campos achatados da identificação do imóvel mesmo com ordem diferente", () => {
+  const output = extractDeterministicFields(
+    "Descrição do imóvel: Tipo C - 12º Andar - Apartamento nº 1203 - Torre 08, integrante do empreendimento.",
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "property.tower"), "08");
+  assert.equal(value(output, "property.unit"), "1203");
+  assert.equal(value(output, "property.floor"), "12º Andar");
+  assert.equal(value(output, "property.type"), "Tipo C");
+});
+
+test("reconhece tipologia sem confundir apartamento com tipo do imóvel", () => {
+  const output = extractDeterministicFields(
+    "Unidade autônoma: Apto 305 | Torre: T-02 | Andar: 3 | Tipologia: D",
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "property.tower"), "T-02");
+  assert.equal(value(output, "property.unit"), "305");
+  assert.equal(value(output, "property.floor"), "3º Andar");
+  assert.equal(value(output, "property.type"), "Tipo D");
+});
+
 test("aceita variações do rótulo de área do terreno no ITBI", () => {
   const output = extractDeterministicFields(
     "Área do terreno (m²): 180,00",

@@ -323,17 +323,26 @@ function recoverMinutaCompositionTable(fields: ExtractedField[], text: string) {
 }
 
 function recoverMinutaPropertyDescription(fields: ExtractedField[], text: string) {
-  const start = text.search(/(?:futura\s+)?unidade\s+aut[oô]noma/i);
-  const description = start >= 0 ? text.slice(start, start + 700) : undefined;
+  const description = minutaPropertyContext(text);
   if (!description) return fields;
 
-  const tower = description.match(/\b(?:torre|bloco)\s*(?:n[ºo.]*)?\s*([A-Z0-9-]{1,12})\b/i)?.[1];
-  const type = description.match(/\btipo\s+([A-Z][A-Z0-9-]*)\b/i)?.[1];
-  const floor = description.match(/\b(\d{1,2}\s*[ºo]\s*pavimento)\b/i)?.[1];
+  const unit = extractMinutaPropertyValue(description, [
+    /\b(?:apartamento|apto|ap\.?|unidade)\s*(?:n[ºo.°]*)?\s*[:#-]?\s*([0-9]{1,6}[A-Z]?)\b/i,
+    /\b(?:unidade|apartamento|apto)\s*(?:aut[oô]noma)?\s*[:#-]?\s*([0-9]{1,6}[A-Z]?)\b/i,
+  ]);
+  const tower = extractMinutaPropertyValue(description, [
+    /\b(?:torre|bloco)\s*(?:n[ºo.°]*)?\s*[:#-]?\s*([A-Z0-9-]{1,12})\b/i,
+    /\b(?:edif[ií]cio)\s*(?:n[ºo.°]*)?\s*[:#-]?\s*([A-Z0-9-]{1,12})\b/i,
+  ]);
+  const type = extractMinutaPropertyValue(description, [
+    /\b(?:tipo\s+da\s+unidade|tipo\s+do\s+im[oó]vel|tipologia|tipo)\s*[:#-]?\s*([A-Z][A-Z0-9-]{0,15})\b/i,
+  ]);
+  const floor = extractMinutaFloor(description);
   const values = new Map<string, string>();
-  if (tower) values.set("property.tower", tower);
+  if (unit) values.set("property.unit", unit.toUpperCase());
+  if (tower) values.set("property.tower", tower.toUpperCase());
   if (type) values.set("property.type", "Tipo " + type.toUpperCase());
-  if (floor) values.set("property.floor", floor.replace(/\s+/g, " "));
+  if (floor) values.set("property.floor", floor);
 
   return fields.map((field) => {
     const value = values.get(field.fieldId);
@@ -341,13 +350,51 @@ function recoverMinutaPropertyDescription(fields: ExtractedField[], text: string
     return {
       ...field,
       value,
-      confidence: 100,
+      confidence: 99,
       sourceLocation: {
         section: "Descrição do imóvel",
         rawText: description.replace(/\s+/g, " ").slice(0, 500),
       },
     };
   });
+}
+
+function minutaPropertyContext(text: string) {
+  const compact = text.replace(/\u00a0/g, " ").replace(/\r/g, "");
+  const anchors = [
+    /(?:futura\s+)?unidade\s+aut[oô]noma/i,
+    /(?:apartamento|apto|unidade)\s*(?:n[ºo.°]*)?\s*[:#-]?\s*\d{1,6}[A-Z]?/i,
+    /(?:torre|bloco)\s*(?:n[ºo.°]*)?\s*[:#-]?\s*[A-Z0-9-]{1,12}/i,
+    /(?:identifica[cç][aã]o|descri[cç][aã]o)\s+do\s+im[oó]vel/i,
+  ];
+  const candidates = anchors.flatMap((anchor) => [...compact.matchAll(new RegExp(anchor.source, anchor.flags.includes("g") ? anchor.flags : `${anchor.flags}g`))]
+    .map((match) => compact.slice(Math.max(0, (match.index ?? 0) - 160), (match.index ?? 0) + 720)));
+
+  return candidates
+    .map((candidate) => ({ candidate, score: minutaPropertyContextScore(candidate) }))
+    .filter(({ score }) => score >= 2)
+    .sort((left, right) => right.score - left.score)[0]?.candidate;
+}
+
+function minutaPropertyContextScore(value: string) {
+  const hasUnit = /\b(?:apartamento|apto|ap\.?|unidade)\s*(?:n[ºo.°]*)?\s*[:#-]?\s*\d{1,6}[A-Z]?\b/i.test(value);
+  const hasTower = /\b(?:torre|bloco|edif[ií]cio)\s*(?:n[ºo.°]*)?\s*[:#-]?\s*[A-Z0-9-]{1,12}\b/i.test(value);
+  const hasFloor = /\b(?:\d{1,2}\s*[ºo]\s*)?(?:pavimento|andar)\b/i.test(value);
+  const hasType = /\b(?:tipo|tipologia)\s*(?:do\s+im[oó]vel|da\s+unidade)?\s*[:#-]?\s*[A-Z]/i.test(value);
+  return Number(hasUnit) + Number(hasTower) + Number(hasFloor) + Number(hasType);
+}
+
+function extractMinutaPropertyValue(value: string, patterns: RegExp[]) {
+  return firstMatch(value, patterns)?.value?.trim();
+}
+
+function extractMinutaFloor(value: string) {
+  const ordinal = value.match(/\b(\d{1,2})\s*[ºo]\s*(pavimento|andar)\b/i);
+  if (ordinal) return `${ordinal[1]}º ${ordinal[2].toLowerCase() === "andar" ? "Andar" : "Pavimento"}`;
+
+  const labeled = value.match(/\b(pavimento|andar)\s*[:#-]?\s*(\d{1,2})\b/i);
+  if (!labeled) return undefined;
+  return `${labeled[2]}º ${labeled[1].toLowerCase() === "andar" ? "Andar" : "Pavimento"}`;
 }
 
 function recoverReservationGridFields(fields: ExtractedField[], text: string) {
