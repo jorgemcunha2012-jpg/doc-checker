@@ -98,6 +98,7 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /valor\s+financiado[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
       /\bfinanciamento\b[^\n\r]{0,80}?(R\$\s*\d[\d.,]*)/i,
       /\bfinanciamento\b\s+\d+\s+(\d[\d.,]*)/i,
+      /\bfinanciamento\b[^\n\r]{0,40}?(\d{1,3}(?:\.\d{3})*,\d{2})/i,
     ]),
     money("financial.fgts", "Print de pagamento", 92, [
       /\bFGTS\b[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
@@ -317,6 +318,73 @@ function recoverMinutaCompositionTable(fields: ExtractedField[], text: string) {
 
 function recoverReservationGridFields(fields: ExtractedField[], text: string) {
   const recovered = new Map<string, { value: string; rawText: string }>();
+  // Algumas telas de reserva apresentam os rótulos em uma linha e os valores na
+  // linha abaixo, em colunas independentes. Esse formato não forma uma grade
+  // sequencial no OCR, então cada rótulo precisa ser resolvido isoladamente.
+  const reservationValue = (label: RegExp) => {
+    const match = text.match(new RegExp(`${label.source}\\s*:?\\s*(?:\\r?\\n\\s*)?([^\\r\\n]+)`, label.flags));
+    return match?.[1]?.trim() || undefined;
+  };
+  const name = reservationValue(/(?:^|\n)\s*NOME(?:\s+DO\s+CLIENTE)?/im);
+  const cpf = reservationValue(/(?:^|\n)\s*CPF\s*\/?\s*CNPJ/im)?.match(/\d{3}\.?\d{3}\.?\d{3}-?\d{2}/)?.[0];
+  const rg = reservationValue(/(?:^|\n)\s*RG/im)?.match(/[A-Z0-9.-]{5,30}/i)?.[0];
+  const maritalStatus = reservationValue(/(?:^|\n)\s*ESTADO\s+CIVIL/im);
+  const emailValue = reservationValue(/(?:^|\n)\s*E-?MAIL/im)?.match(/[\w.+-]+@[\w.-]+\.[A-Z]{2,}/i)?.[0];
+  const phoneValue = reservationValue(/(?:^|\n)\s*TELEFONE(?:\s*2)?|(?:^|\n)\s*CELULAR/im)?.match(/\+?\d[\d\s().-]{8,24}/)?.[0];
+  const street = reservationValue(/(?:^|\n)\s*(?:ENDERE[CÇ]O|END\.?)/im);
+  const addressNumber = reservationValue(/(?:^|\n)\s*(?:N[ÚU]MERO|N[ºO]\.?)/im)?.match(/\d{1,8}[A-Z]?/i)?.[0];
+  const neighborhood = reservationValue(/(?:^|\n)\s*BAIRRO/im);
+  const city = reservationValue(/(?:^|\n)\s*CIDADE/im);
+  const state = reservationValue(/(?:^|\n)\s*ESTADO(?!\s+CIVIL)\b/im);
+  const postalCode = reservationValue(/(?:^|\n)\s*CEP/im)?.match(/\d{5}-?\d{3}/)?.[0];
+
+  if (name && !/^(?:NASCIMENTO|CPF|RG|ESTADO)\b/i.test(name)) {
+    recovered.set("buyer.name", { value: name, rawText: `NOME: ${name}` });
+  }
+  if (cpf) recovered.set("buyer.cpf", { value: cpf, rawText: `CPF/CNPJ: ${cpf}` });
+  if (rg) recovered.set("buyer.rg", { value: rg, rawText: `RG: ${rg}` });
+  if (maritalStatus) recovered.set("buyer.maritalStatus", { value: maritalStatus, rawText: `ESTADO CIVIL: ${maritalStatus}` });
+  if (emailValue) recovered.set("buyer.email", { value: emailValue, rawText: `E-MAIL: ${emailValue}` });
+  if (phoneValue) recovered.set("buyer.phone", { value: phoneValue, rawText: `TELEFONE: ${phoneValue}` });
+  const address = [street, addressNumber, neighborhood, city, state, postalCode].filter((part) => part && !/^-$/.test(part)).join(", ");
+  if (address) recovered.set("buyer.address", { value: address, rawText: `ENDEREÇO: ${address}` });
+
+  // OCR de telas responsivas costuma devolver primeiro todos os cabeçalhos e,
+  // na linha seguinte, todos os valores. Recompomos essas colunas conhecidas
+  // em vez de interpretar o cabeçalho como se fosse o valor do campo.
+  const columnIdentity = text.match(
+    /NOME:\s+NASCIMENTO:\s+CPF\s*\/?\s*CNPJ:\s+RG:\s*\r?\n\s*(.+?)\s+(\d{1,2}[/-]\d{1,2}[/-]\d{4})\s+(\d{3}\.?\d{3}\.?\d{3}-?\d{2})\s+([A-Z0-9.-]{5,30})/i,
+  );
+  const columnCivil = text.match(
+    /ESTADO\s+CIVIL:\s+PROFISS[ÃA]O:\s+LOGRADOURO:\s+END:\s*\r?\n\s*(SOLTEIR[OA](?:\(A\))?|CASAD[OA](?:\(A\))?|DIVORCIAD[OA](?:\(A\))?|VI[ÚU]V[OA](?:\(A\))?)[^\r\n]*?\s+(?:RUA|AV(?:ENIDA)?\.?|ALAMEDA|TRAVESSA)\s+((?:RUA|AV(?:ENIDA)?\.?|ALAMEDA|TRAVESSA)\s+[^\r\n]+)/i,
+  );
+  const columnContact = text.match(
+    /TELEFONE:\s+TELEFONE\s*2:\s+E-?MAIL:\s+[^\r\n]*\r?\n\s*([+()\d\s.-]{8,24})\s+[+()\d\s.-]{8,24}\s+([A-Z0-9._%+-]+(?:@|&)[A-Z0-9.-]+\.[A-Z]{2,})/i,
+  );
+  const columnLocation = text.match(
+    /CIDADE\s+ESTADO\s+BAIRRO:\s+CEP:\s*\r?\n\s*([A-ZÀ-Úa-zà-ú\s]+?)\s+([A-ZÀ-Úa-zà-ú\s]+?)\s+([A-ZÀ-Úa-zà-ú\s]+?)\s+(\d{5}-?\d{3})/i,
+  );
+  if (columnIdentity) {
+    recovered.set("buyer.name", { value: columnIdentity[1].trim(), rawText: "NOME: " + columnIdentity[1].trim() });
+    recovered.set("buyer.cpf", { value: columnIdentity[3], rawText: "CPF/CNPJ: " + columnIdentity[3] });
+    recovered.set("buyer.rg", { value: columnIdentity[4], rawText: "RG: " + columnIdentity[4] });
+  }
+  if (columnCivil) {
+    recovered.set("buyer.maritalStatus", { value: columnCivil[1], rawText: "ESTADO CIVIL: " + columnCivil[1] });
+  }
+  if (columnContact) {
+    const email = columnContact[2].replace("&", "@");
+    recovered.set("buyer.phone", { value: columnContact[1].replace(/\s+/g, ""), rawText: "TELEFONE: " + columnContact[1] });
+    recovered.set("buyer.email", { value: email, rawText: "E-MAIL: " + email });
+  }
+  if (columnLocation) {
+    const streetFromColumns = columnCivil?.[2]?.trim() || street;
+    const addressFromColumns = [streetFromColumns, columnLocation[3].trim(), columnLocation[1].trim(), columnLocation[2].trim(), columnLocation[4]]
+      .filter(Boolean)
+      .join(", ");
+    recovered.set("buyer.address", { value: addressFromColumns, rawText: "ENDEREÇO: " + addressFromColumns });
+  }
+
   const identity = text.match(/NOME\s+DO\s+CLIENTE[^\n\r]*[\n\r]+\s*([A-ZÀ-Ú][A-ZÀ-Ú\s]+?)\s+(\d{3}\.?\d{3}\.?\d{3}-?\d{2})\s+(\d{8,14})\s+(\+?\d{10,15})/i);
   if (identity) {
     recovered.set("buyer.name", { value: identity[1].trim(), rawText: `NOME DO CLIENTE: ${identity[1].trim()}` });
@@ -331,8 +399,7 @@ function recoverReservationGridFields(fields: ExtractedField[], text: string) {
 
   return fields.map((field) => {
     const value = recovered.get(field.fieldId);
-    const looksLikeGridHeader = /\b(?:CPF|CNPJ|RG|CELULAR|TELEFONE|E-?MAIL)\b/i.test(String(field.value ?? ""));
-    if (!value || (field.value && !looksLikeGridHeader)) return field;
+    if (!value) return field;
     return { ...field, value: value.value, confidence: 90, sourceLocation: { section: "Dados da reserva", rawText: value.rawText } };
   });
 }

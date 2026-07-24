@@ -221,6 +221,72 @@ test("extrai dados pessoais de tela de reserva em grade", () => {
   assert.equal(value(output, "buyer.phone"), "+5585984057983");
 });
 
+test("recompõe a Reserva quando o OCR separa cabeçalhos e valores em colunas", () => {
+  const output = extractDeterministicFields(
+    [
+      "NOME: NASCIMENTO: CPF/CNPJ: RG:",
+      "Wallyson Lima Barbosa 16/10/1999 080.061.353-80 07351338833",
+      "ESTADO CIVIL: PROFISSÃO: LOGRADOURO: END:",
+      "Solteiro(a) Representante comercial autônomo Rua Rua Torreon",
+      "TELEFONE: TELEFONE 2: E-MAIL: PAÍS DE ORIGEM:",
+      "+5585997369979 +5585997369979 Wallyson17&icloud.com Brasil",
+      "CIDADE ESTADO BAIRRO: CEP:",
+      "Caucaia Ceará Potira 61650350",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "DADOS_RESERVA",
+  );
+
+  assert.equal(value(output, "buyer.name"), "Wallyson Lima Barbosa");
+  assert.equal(value(output, "buyer.cpf"), "080.061.353-80");
+  assert.equal(value(output, "buyer.rg"), "07351338833");
+  assert.equal(value(output, "buyer.maritalStatus"), "Solteiro(a)");
+  assert.equal(value(output, "buyer.phone"), "+5585997369979");
+  assert.equal(value(output, "buyer.email"), "Wallyson17@icloud.com");
+  assert.equal(value(output, "buyer.address"), "Rua Torreon, Potira, Caucaia, Ceará, 61650350");
+});
+
+test("extrai dados da Reserva quando cada rótulo aparece acima do valor", () => {
+  const output = extractDeterministicFields(
+    [
+      "NOME:",
+      "Wallyson Lima Barbosa",
+      "NASCIMENTO:",
+      "16/10/1999",
+      "CPF/CNPJ:",
+      "080.061.353-80",
+      "RG:",
+      "07351338833",
+      "ESTADO CIVIL:",
+      "Solteiro(a)",
+      "TELEFONE:",
+      "+5585997369979",
+      "E-MAIL:",
+      "Wallyson17@icloud.com",
+      "END:",
+      "Rua Torreon",
+      "BAIRRO:",
+      "Potira",
+      "CIDADE",
+      "Caucaia",
+      "ESTADO",
+      "Ceará",
+      "CEP:",
+      "61650350",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "DADOS_RESERVA",
+  );
+
+  assert.equal(value(output, "buyer.name"), "Wallyson Lima Barbosa");
+  assert.equal(value(output, "buyer.cpf"), "080.061.353-80");
+  assert.equal(value(output, "buyer.rg"), "07351338833");
+  assert.equal(value(output, "buyer.maritalStatus"), "Solteiro(a)");
+  assert.equal(value(output, "buyer.phone"), "+5585997369979");
+  assert.equal(value(output, "buyer.email"), "Wallyson17@icloud.com");
+  assert.equal(value(output, "buyer.address"), "Rua Torreon, Potira, Caucaia, Ceará, 61650350");
+});
+
 test("preserva os rótulos e valores financeiros da Reserva para validação de evidência", () => {
   const output = extractDeterministicFields(
     [
