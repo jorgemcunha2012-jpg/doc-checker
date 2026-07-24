@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Building2, Check, CheckCircle2, Clock3, Download, FileCheck2, FilePlus2, FileSearch, Layers3, Loader2, ScanText, Search, ShieldCheck, Sparkles, UploadCloud, UsersRound } from "lucide-react";
+import { AlertTriangle, Building2, Check, CheckCircle2, Clock3, Copy, Download, FileCheck2, FilePlus2, FileSearch, Layers3, Loader2, ScanText, Search, ShieldCheck, Sparkles, UploadCloud, UsersRound } from "lucide-react";
 import type { HumanReview, ReconciliationRun, User, ValidationProcess, ValidationRun } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
@@ -12,6 +12,7 @@ import Link from "next/link";
 import type { Development, DevelopmentUnit } from "@/domain/development";
 import { ExtractionQualityPanel } from "./extraction-quality-panel";
 import { InfoTooltip } from "./info-tooltip";
+import { processCode } from "@/lib/process-code";
 
 const validationType = "RECONCILIATION" as const;
 const usesPersistentReviews = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -439,10 +440,12 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
           ) : null}
 
           {isProcessing ? <ProcessingPanel steps={processSteps} elapsedSeconds={elapsedSeconds} documents={documents} /> : null}
+          {process && !run && process.id !== "local_error" ? <OperationReference processId={process.id} processing={isProcessing} /> : null}
           {process?.status === "FAILED" ? <ProcessError message={process.error} /> : null}
 
           {run ? (
             <>
+              <OperationReference processId={run.id} />
               {run.validationType === "RECONCILIATION" ? <ReviewProgress run={run} /> : null}
               {run.validationType === "RECONCILIATION" ? <ParticipantSummary run={run} /> : null}
               {run.usedPdfVisionFallback ? (
@@ -533,6 +536,30 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
         </section>
       </div>
     </main>
+  );
+}
+
+function OperationReference({ processId, processing = false }: { processId: string; processing?: boolean }) {
+  const code = processCode(processId);
+  const copy = async () => {
+    await navigator.clipboard.writeText(code);
+  };
+
+  return (
+    <div className="flex flex-col gap-3 border border-[var(--border)] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">{processing ? "Conferência em andamento" : "Conferência registrada"}</div>
+        <div className="mt-1 flex items-center gap-2">
+          <span className="font-mono text-sm font-bold text-[var(--foreground)]">{code}</span>
+          <button type="button" onClick={() => void copy()} title="Copiar número da operação" className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:border-[var(--primary)] hover:text-[var(--primary)]">
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      <Link href={{ pathname: "/history/" + processId }} className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:border-[var(--primary)] hover:text-[var(--primary)]">
+        {processing ? "Acompanhar no histórico" : "Abrir no histórico"}
+      </Link>
+    </div>
   );
 }
 
