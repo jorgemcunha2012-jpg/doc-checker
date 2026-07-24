@@ -70,15 +70,15 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
   ],
   DADOS_RESERVA: [
     text("buyer.name", "Dados da reserva", 92, [
-      /(?:nome\s+do\s+cliente|cliente)\s*:?\s*([^\n\r]+)/i,
+      /(?:nome(?:\s+do\s+cliente)?|cliente|proponente|comprador|adquirente)\s*:?\s*([^\n\r]+)/i,
     ]),
     text("buyer.cpf", "Dados da reserva", 94, [
-      /(?:cpf\s*\/\s*cnpj|cpf)\s*:?\s*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i,
+      /(?:cpf\s*\/?\s*cnpj|cpfc?npj|cpf)\s*:?\s*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i,
     ]),
     text("buyer.rg", "Dados da reserva", 90, [/\brg\s*:?\s*([A-Z0-9.-]{5,30})/i]),
     text("buyer.maritalStatus", "Dados da reserva", 90, [/estado\s+civil\s*:?\s*([^\n\r]+)/i]),
-    text("buyer.email", "Dados da reserva", 96, [/e-?mail\s*:?\s*([^\s\n\r]+@[^\s\n\r]+)/i]),
-    text("buyer.phone", "Dados da reserva", 94, [/(?:telefone|celular)\s*:?\s*([+()\d\s.-]{8,24})/i]),
+    text("buyer.email", "Dados da reserva", 96, [/(?:e-?mail|correio\s+eletr[oô]nico)\s*:?\s*([^\s\n\r]+@[^\s\n\r]+)/i]),
+    text("buyer.phone", "Dados da reserva", 94, [/(?:telefone|celular|fone|whatsapp)\s*:?\s*([+()\d\s.-]{8,24})/i]),
     text("property.development", "Dados da reserva", 92, [/unidade\s*:?\s*([^/\n\r]+?)(?:\s*\/\s*torre|\s*\/\s*\d|\n|\r)/i]),
     text("property.tower", "Dados da reserva", 94, [/\/\s*torre\s*([A-Z0-9-]{1,12})/i]),
     text("property.unit", "Dados da reserva", 94, [/\/\s*torre\s*[A-Z0-9-]{1,12}\s*\/\s*([A-Z0-9-]{1,12})/i]),
@@ -325,18 +325,24 @@ function recoverReservationGridFields(fields: ExtractedField[], text: string) {
     const match = text.match(new RegExp(`${label.source}\\s*:?\\s*(?:\\r?\\n\\s*)?([^\\r\\n]+)`, label.flags));
     return match?.[1]?.trim() || undefined;
   };
-  const name = reservationValue(/(?:^|\n)\s*NOME(?:\s+DO\s+CLIENTE)?/im);
-  const cpf = reservationValue(/(?:^|\n)\s*CPF\s*\/?\s*CNPJ/im)?.match(/\d{3}\.?\d{3}\.?\d{3}-?\d{2}/)?.[0];
+  const name = reservationValue(/(?:^|\n)\s*(?:NOME(?:\s+DO\s+CLIENTE)?|CLIENTE|PROPONENTE|COMPRADOR|ADQUIRENTE)/im);
+  const cpf = reservationValue(/(?:^|\n)\s*(?:CPF\s*\/?\s*CNPJ|CPFC?NPJ|CPF)/im)?.match(/\d{3}\.?\d{3}\.?\d{3}-?\d{2}/)?.[0];
   const rg = reservationValue(/(?:^|\n)\s*RG/im)?.match(/[A-Z0-9.-]{5,30}/i)?.[0];
   const maritalStatus = reservationValue(/(?:^|\n)\s*ESTADO\s+CIVIL/im);
-  const emailValue = reservationValue(/(?:^|\n)\s*E-?MAIL/im)?.match(/[\w.+-]+@[\w.-]+\.[A-Z]{2,}/i)?.[0];
-  const phoneValue = reservationValue(/(?:^|\n)\s*TELEFONE(?:\s*2)?|(?:^|\n)\s*CELULAR/im)?.match(/\+?\d[\d\s().-]{8,24}/)?.[0];
-  const street = reservationValue(/(?:^|\n)\s*(?:ENDERE[CÇ]O|END\.?)/im);
+  const emailValue = reservationValue(/(?:^|\n)\s*(?:E-?MAIL|CORREIO\s+ELETR[OÔ]NICO)/im)?.match(/[\w.+-]+(?:@|&)[\w.-]+\.[A-Z]{2,}/i)?.[0]?.replace("&", "@");
+  const phoneValue = reservationValue(/(?:^|\n)\s*(?:TELEFONE(?:\s*2)?|CELULAR|FONE|WHATSAPP)/im)?.match(/\+?\d[\d\s().-]{8,24}/)?.[0];
+  const street = reservationValue(/(?:^|\n)\s*(?:ENDERE[CÇ]O|LOGRADOURO|END\.?)/im);
   const addressNumber = reservationValue(/(?:^|\n)\s*(?:N[ÚU]MERO|N[ºO]\.?)/im)?.match(/\d{1,8}[A-Z]?/i)?.[0];
   const neighborhood = reservationValue(/(?:^|\n)\s*BAIRRO/im);
   const city = reservationValue(/(?:^|\n)\s*CIDADE/im);
   const state = reservationValue(/(?:^|\n)\s*ESTADO(?!\s+CIVIL)\b/im);
   const postalCode = reservationValue(/(?:^|\n)\s*CEP/im)?.match(/\d{5}-?\d{3}/)?.[0];
+  const reservationMoney = (label: RegExp) => reservationValue(label)?.match(/(?:R\$\s*)?\d{1,3}(?:\.\d{3})*,\d{2}/)?.[0];
+  const totalValue = reservationMoney(/(?:^|\n)\s*(?:VALOR\s+DO\s+CONTRATO|VALOR\s+TOTAL)/im);
+  const financingValue = reservationMoney(/(?:^|\n)\s*(?:VALOR\s+)?FINANCIAMENTO/im);
+  const fgtsValue = reservationMoney(/(?:^|\n)\s*FGTS/im);
+  const subsidyValue = reservationMoney(/(?:^|\n)\s*(?:SUBS[IÍ]DIO|DESCONTO)/im);
+  const downPaymentValue = reservationMoney(/(?:^|\n)\s*(?:ENTRADA\s+TOTAL|RECURSOS\s+PR[ÓO]PRIOS)/im);
 
   if (name && !/^(?:NASCIMENTO|CPF|RG|ESTADO)\b/i.test(name)) {
     recovered.set("buyer.name", { value: name, rawText: `NOME: ${name}` });
@@ -346,6 +352,11 @@ function recoverReservationGridFields(fields: ExtractedField[], text: string) {
   if (maritalStatus) recovered.set("buyer.maritalStatus", { value: maritalStatus, rawText: `ESTADO CIVIL: ${maritalStatus}` });
   if (emailValue) recovered.set("buyer.email", { value: emailValue, rawText: `E-MAIL: ${emailValue}` });
   if (phoneValue) recovered.set("buyer.phone", { value: phoneValue, rawText: `TELEFONE: ${phoneValue}` });
+  if (totalValue) recovered.set("financial.totalValue", { value: totalValue, rawText: "VALOR DO CONTRATO: " + totalValue });
+  if (financingValue) recovered.set("financial.financing", { value: financingValue, rawText: "FINANCIAMENTO: " + financingValue });
+  if (fgtsValue) recovered.set("financial.fgts", { value: fgtsValue, rawText: "FGTS: " + fgtsValue });
+  if (subsidyValue) recovered.set("financial.subsidy", { value: subsidyValue, rawText: "SUBSÍDIO: " + subsidyValue });
+  if (downPaymentValue) recovered.set("financial.downPayment", { value: downPaymentValue, rawText: "RECURSOS PRÓPRIOS: " + downPaymentValue });
   const address = [street, addressNumber, neighborhood, city, state, postalCode].filter((part) => part && !/^-$/.test(part)).join(", ");
   if (address) recovered.set("buyer.address", { value: address, rawText: `ENDEREÇO: ${address}` });
 

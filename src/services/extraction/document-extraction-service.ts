@@ -517,7 +517,7 @@ function reservationRecoveryTargets(output: ProviderExtractionOutput, ocrText: s
   } as const;
   const text = ocrText.toLowerCase();
   const selected = new Set<keyof typeof groups>();
-  if (/nome\s+do\s+cliente|cpf\s*\/?\s*cnpj|estado\s+civil|e-?mail|telefone|celular/.test(text)) selected.add("identity");
+  if (/nome(?:\s+do\s+cliente)?|cliente|proponente|comprador|adquirente|cpf\s*\/?\s*cnpj|cpfc?npj|estado\s+civil|e-?mail|correio\s+eletr[oô]nico|telefone|celular|fone|whatsapp/.test(text)) selected.add("identity");
   if (hasReservationPaymentTable(text)) selected.add("payment");
   if (/\bunidade\b|\btorre\b|matr[ií]cula/.test(text)) selected.add("unit");
   if (!selected.size) {

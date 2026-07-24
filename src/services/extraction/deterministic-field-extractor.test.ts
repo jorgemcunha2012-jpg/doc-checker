@@ -246,6 +246,37 @@ test("recompõe a Reserva quando o OCR separa cabeçalhos e valores em colunas",
   assert.equal(value(output, "buyer.address"), "Rua Torreon, Potira, Caucaia, Ceará, 61650350");
 });
 
+test("interpreta sinônimos e valores abaixo dos rótulos de Reserva", () => {
+  const output = extractDeterministicFields(
+    [
+      "Proponente",
+      "Maria de Souza",
+      "CPFCNPJ",
+      "123.456.789-09",
+      "Fone",
+      "+55 (85) 99999-1111",
+      "Correio eletrônico",
+      "maria&exemplo.com",
+      "Valor total",
+      "R$ 240.000,00",
+      "Valor Financiamento",
+      "R$ 180.000,00",
+      "Recursos próprios",
+      "R$ 60.000,00",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "DADOS_RESERVA",
+  );
+
+  assert.equal(value(output, "buyer.name"), "Maria de Souza");
+  assert.equal(value(output, "buyer.cpf"), "123.456.789-09");
+  assert.equal(value(output, "buyer.phone"), "+55 (85) 99999-1111");
+  assert.equal(value(output, "buyer.email"), "maria@exemplo.com");
+  assert.equal(value(output, "financial.totalValue"), "R$ 240.000,00");
+  assert.equal(value(output, "financial.financing"), "R$ 180.000,00");
+  assert.equal(value(output, "financial.downPayment"), "R$ 60.000,00");
+});
+
 test("extrai dados da Reserva quando cada rótulo aparece acima do valor", () => {
   const output = extractDeterministicFields(
     [
