@@ -265,24 +265,28 @@ export class DocumentExtractionService {
     // Só após consolidar a fonte é possível saber se os valores críticos ficaram
     // ausentes. Nesse caso, relemos todas as imagens com o prompt financeiro e
     // mantemos apenas valores que tragam a evidência da própria linha.
-    if (source === "DADOS_RESERVA" && hasMissingReservationFinancials(consolidated.values)) {
-      const financialRecoveries = await Promise.all(
-        documents
-          .filter((document) => document.mimeType.includes("image") || isTiff(document))
-          .map((document) => this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist)
-            .catch((recoveryError) => {
-              console.warn("[ConferIA] Recuperação financeira da fonte Reserva falhou", {
-                documentName: document.name,
-                error: sanitizeExtractionError(recoveryError),
-              });
-              return null;
-            })),
-      );
-      const validRecoveries = financialRecoveries.filter((output): output is ProviderExtractionOutput => Boolean(output));
+    if (source === "DADOS_RESERVA") {
+      const imageDocuments = documents.filter((document) => document.mimeType.includes("image") || isTiff(document));
+      const recoveries: Array<Promise<ProviderExtractionOutput | null>> = [];
+      if (hasMissingReservationFinancials(consolidated.values)) {
+        recoveries.push(...imageDocuments.map((document) => this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist)
+          .catch((recoveryError) => {
+            console.warn("[ConferIA] Recuperação financeira da fonte Reserva falhou", { documentName: document.name, error: sanitizeExtractionError(recoveryError) });
+            return null;
+          })));
+      }
+      if (hasMissingReservationIdentity(consolidated.values)) {
+        recoveries.push(...imageDocuments.map((document) => this.kimiProvider.extractReservationIdentityFromImage(document, checklist)
+          .catch((recoveryError) => {
+            console.warn("[ConferIA] Recuperação de identidade da fonte Reserva falhou", { documentName: document.name, error: sanitizeExtractionError(recoveryError) });
+            return null;
+          })));
+      }
+      const validRecoveries = (await Promise.all(recoveries)).filter((output): output is ProviderExtractionOutput => Boolean(output));
       if (validRecoveries.length) {
         outputs.push(...sanitizeReservationOutputs(validRecoveries, checklist));
         consolidated = consolidateSourceOutputs(source, outputs, checklist);
-        for (const fieldId of ["financial.totalValue", "financial.financing"]) {
+        for (const fieldId of ["financial.totalValue", "financial.financing", ...reservationIdentityFieldIds]) {
           if (consolidated.values.some((value) => value.fieldId === fieldId && value.value != null && String(value.value).trim())) {
             recoveredFields.push(fieldId);
           }
@@ -545,6 +549,13 @@ function hasMissingReservationFinancials(values: ExtractedFieldValue[]) {
     values.filter((value) => value.value != null && String(value.value).trim()).map((value) => value.fieldId),
   );
   return !available.has("financial.totalValue") || !available.has("financial.financing");
+}
+
+const reservationIdentityFieldIds = ["buyer.name", "buyer.cpf", "buyer.rg", "buyer.maritalStatus", "buyer.address", "buyer.email", "buyer.phone"];
+
+function hasMissingReservationIdentity(values: ExtractedFieldValue[]) {
+  const available = new Set(values.filter((value) => value.value != null && String(value.value).trim()).map((value) => value.fieldId));
+  return reservationIdentityFieldIds.some((fieldId) => !available.has(fieldId));
 }
 
 function reservationRecoveryTargets(output: ProviderExtractionOutput, ocrText: string) {
