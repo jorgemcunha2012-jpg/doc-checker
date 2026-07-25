@@ -403,24 +403,25 @@ export class DocumentExtractionService {
       ocrText,
     );
     const layout = reservationLayout(ocrText);
-    const missing = reservationFieldsMissingForLayout(merged, layout);
-    if (!missing.length) return merged;
-
-    const visualRecovery = reservationVisualRecovery(this.kimiProvider, document, checklist, layout);
-    try {
-      const recovered = await visualRecovery;
-      merged = enrichReservationFinancialComposition(
-        mergeReservationOutputs(sanitizeReservationOutputs([deterministic, recovered], checklist), checklist),
-        checklist,
-        ocrText,
-      );
-    } catch (error) {
-      console.warn("[ConferIA] Recuperação visual dirigida da Reserva falhou", {
-        documentName: document.name,
-        layout,
-        missing,
-        error: sanitizeExtractionError(error),
-      });
+    let missing = reservationFieldsMissingForLayout(merged, layout);
+    for (let attempt = 1; missing.length && attempt <= 2; attempt += 1) {
+      try {
+        const recovered = await reservationVisualRecovery(this.kimiProvider, document, checklist, layout);
+        merged = enrichReservationFinancialComposition(
+          mergeReservationOutputs(sanitizeReservationOutputs([deterministic, visualFallback, recovered].filter((output): output is ProviderExtractionOutput => Boolean(output)), checklist), checklist),
+          checklist,
+          ocrText,
+        );
+        missing = reservationFieldsMissingForLayout(merged, layout);
+      } catch (error) {
+        console.warn("[ConferIA] Recuperação visual dirigida da Reserva falhou", {
+          documentName: document.name,
+          layout,
+          missing,
+          attempt,
+          error: sanitizeExtractionError(error),
+        });
+      }
     }
     return merged;
   }
