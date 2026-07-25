@@ -254,12 +254,42 @@ export class DocumentExtractionService {
       }),
     );
     const outputs = attempts.flatMap((attempt) => (attempt.output ? [attempt.output] : []));
-    const consolidated = consolidateSourceOutputs(source, outputs, checklist);
+    let consolidated = consolidateSourceOutputs(source, outputs, checklist);
     const recoveredFields = [...new Set(attempts.flatMap((attempt) => attempt.recoveredFields ?? []))];
     const deterministicFields = [...new Set(attempts.flatMap((attempt) => attempt.deterministicFields ?? []))];
     const unreadable = outputs.length === 0;
     const error = attempts.find((attempt) => attempt.error)?.error;
     const extractionMethods = [...new Set(attempts.map((attempt) => attempt.extractionMethod).filter(Boolean))];
+
+    // A Reserva costuma chegar em duas telas: uma de cliente e outra financeira.
+    // Só após consolidar a fonte é possível saber se os valores críticos ficaram
+    // ausentes. Nesse caso, relemos todas as imagens com o prompt financeiro e
+    // mantemos apenas valores que tragam a evidência da própria linha.
+    if (source === "DADOS_RESERVA" && hasMissingReservationFinancials(consolidated.values)) {
+      const financialRecoveries = await Promise.all(
+        documents
+          .filter((document) => document.mimeType.includes("image") || isTiff(document))
+          .map((document) => this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist)
+            .catch((recoveryError) => {
+              console.warn("[ConferIA] Recuperação financeira da fonte Reserva falhou", {
+                documentName: document.name,
+                error: sanitizeExtractionError(recoveryError),
+              });
+              return null;
+            })),
+      );
+      const validRecoveries = financialRecoveries.filter((output): output is ProviderExtractionOutput => Boolean(output));
+      if (validRecoveries.length) {
+        outputs.push(...sanitizeReservationOutputs(validRecoveries, checklist));
+        consolidated = consolidateSourceOutputs(source, outputs, checklist);
+        for (const fieldId of ["financial.totalValue", "financial.financing"]) {
+          if (consolidated.values.some((value) => value.fieldId === fieldId && value.value != null && String(value.value).trim())) {
+            recoveredFields.push(fieldId);
+          }
+        }
+        extractionMethods.push("MIXED");
+      }
+    }
 
     return {
       source,
@@ -508,6 +538,13 @@ export class DocumentExtractionService {
       return firstPassOutputs.length ? merged : emptyOutput(checklist);
     }
   }
+}
+
+function hasMissingReservationFinancials(values: ExtractedFieldValue[]) {
+  const available = new Set(
+    values.filter((value) => value.value != null && String(value.value).trim()).map((value) => value.fieldId),
+  );
+  return !available.has("financial.totalValue") || !available.has("financial.financing");
 }
 
 function reservationRecoveryTargets(output: ProviderExtractionOutput, ocrText: string) {

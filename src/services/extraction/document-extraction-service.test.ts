@@ -140,6 +140,47 @@ test("força a revisão financeira quando uma tela de Reserva não produz evidê
   }
 });
 
+test("recupera valores financeiros depois de consolidar duas telas de Reserva", async () => {
+  const previous = process.env.CONFERIA_SKIP_LOCAL_OCR;
+  process.env.CONFERIA_SKIP_LOCAL_OCR = "true";
+  let financialCalls = 0;
+  const service = new DocumentExtractionService({
+    extractReservationFromImage: async () => output([
+      extracted("buyer.name", "MARIA SILVA", "NOME DO CLIENTE: MARIA SILVA"),
+    ]),
+    transcribeReservationImage: async () => "",
+    extractReservationIdentityFromImage: async () => output([]),
+    extractReservationUnitFromImage: async () => output([]),
+    extractReservationFinancialComponentsFromImage: async (document: { name: string }) => {
+      financialCalls += 1;
+      return document.name === "pagamento.png"
+        ? output([
+            extracted("financial.totalValue", "R$ 261.946,53", "Valor do contrato: R$ 261.946,53"),
+            extracted("financial.financing", "R$ 189.600,00", "Financiamento: R$ 189.600,00"),
+          ])
+        : output([]);
+    },
+    extractFromImage: async () => output([]),
+  } as never, {} as never);
+
+  try {
+    const result = await service.extractReconciliation({
+      validationType: "RECONCILIATION",
+      checklist: getChecklist("RECONCILIATION"),
+      documents: [
+        reservationDocument("cliente.png"),
+        reservationDocument("pagamento.png"),
+      ],
+    });
+    assert.equal(financialCalls, 2);
+    assert.equal(result.values.find((field) => field.fieldId === "financial.totalValue")?.value, "R$ 261.946,53");
+    assert.equal(result.values.find((field) => field.fieldId === "financial.financing")?.value, "R$ 189.600,00");
+  } finally {
+    if (previous === undefined) delete process.env.CONFERIA_SKIP_LOCAL_OCR;
+    else process.env.CONFERIA_SKIP_LOCAL_OCR = previous;
+  }
+});
+
 test("não repete a leitura financeira quando a extração focada já tem evidências confiáveis", async () => {
   const previous = process.env.CONFERIA_SKIP_LOCAL_OCR;
   process.env.CONFERIA_SKIP_LOCAL_OCR = "true";
@@ -178,6 +219,18 @@ function extractReservationVisual(service: DocumentExtractionService) {
     mimeType: "image/png",
     buffer: Buffer.from("image"),
   } as never, getChecklist("RECONCILIATION"), "DADOS_RESERVA");
+}
+
+function reservationDocument(name: string) {
+  return {
+    id: name,
+    organizationId: "organization",
+    name,
+    type: "IMAGE",
+    source: "DADOS_RESERVA",
+    mimeType: "image/png",
+    buffer: Buffer.from("image"),
+  } as never;
 }
 
 function output(fields: Array<{ fieldId: string; value: string; confidence: number; sourceLocation: { rawText: string; section: string } }>) {
