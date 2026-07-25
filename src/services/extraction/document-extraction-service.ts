@@ -377,156 +377,77 @@ export class DocumentExtractionService {
   ) {
     if (source !== "DADOS_RESERVA") return this.kimiProvider.extractFromImage(document, checklist);
 
-    const localOcrPromise = process.env.CONFERIA_SKIP_LOCAL_OCR === "true"
-      ? Promise.reject(new Error("OCR local desabilitado para esta execução."))
-      : extractImageOcrText(document.buffer);
-    const [focusedAttempt, ocrAttempt, localOcrAttempt] = await Promise.allSettled([
-      this.kimiProvider.extractReservationFromImage(document, checklist),
-      this.kimiProvider.transcribeReservationImage(document).then((text) => ({
-        output: extractDeterministicFields(text, checklist, "DADOS_RESERVA"),
-        text,
-      })),
-      localOcrPromise.then((text) => ({
-        output: extractDeterministicFields(text, checklist, "DADOS_RESERVA"),
-        text,
-      })),
-    ]);
-    const focusedOutput = focusedAttempt.status === "fulfilled" ? focusedAttempt.value : null;
-    const ocrOutput = ocrAttempt.status === "fulfilled" ? ocrAttempt.value.output : null;
-    const localOcrOutput = localOcrAttempt.status === "fulfilled" ? localOcrAttempt.value.output : null;
-    const ocrText = [
-      ocrAttempt.status === "fulfilled" ? ocrAttempt.value.text : "",
-      localOcrAttempt.status === "fulfilled" ? localOcrAttempt.value.text : "",
-    ].filter(Boolean).join("\n");
-    const focusedPaymentIsComplete = hasReliableReservationFinancialEvidence(focusedOutput, ["financial.totalValue", "financial.financing"]);
-    const focusedPreRegistrationIsComplete = hasReliableReservationFinancialEvidence(focusedOutput, ["financial.totalValue"]);
-    const initialOutputs = sanitizeReservationOutputs(
-      [focusedOutput, ocrOutput, localOcrOutput]
-        .filter((output): output is ProviderExtractionOutput => Boolean(output)),
-      checklist,
-    );
-    let merged = enrichReservationFinancialComposition(mergeReservationOutputs(initialOutputs, checklist), checklist, ocrText);
-    const recoveryTargets = reservationRecoveryTargets(merged, ocrText);
-    // As leituras financeira, de identidade e de unidade não dependem entre si.
-    // Executá-las na mesma etapa mantém as camadas de conferência sem encadear seus tempos máximos.
-    const [financialAttempt, preRegistrationAttempt, ...targetedAttempts] = await Promise.all([
-      hasReservationPaymentTable(ocrText) && !focusedPaymentIsComplete
-        ? this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
-          console.warn("[ConferIA] Leitura especializada da condição de pagamento falhou", {
-            documentName: document.name,
-            error: sanitizeExtractionError(error),
-          });
-          return null;
-        })
-        : Promise.resolve(null),
-      hasReservationPreRegistrationSummary(ocrText) && !focusedPreRegistrationIsComplete
-        ? this.kimiProvider.extractReservationPreRegistrationFinancials(document, checklist).catch((error) => {
-          console.warn("[ConferIA] Leitura especializada do pré-cadastro falhou", {
-            documentName: document.name,
-            error: sanitizeExtractionError(error),
-          });
-          return null;
-        })
-        : Promise.resolve(null),
-      recoveryTargets.includes("identity")
-        ? this.kimiProvider.extractReservationIdentityFromImage(document, checklist).catch((error) => {
-          console.warn("[ConferIA] Revisão dirigida de dados pessoais falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
-          return null;
-        })
-        : Promise.resolve(null),
-      recoveryTargets.includes("unit")
-        ? this.kimiProvider.extractReservationUnitFromImage(document, checklist).catch((error) => {
-          console.warn("[ConferIA] Revisão dirigida da unidade falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
-          return null;
-        })
-        : Promise.resolve(null),
-      recoveryTargets.includes("payment") && !hasReservationPaymentTable(ocrText)
-        ? this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
-          console.warn("[ConferIA] Revisão dirigida financeira falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
-          return null;
-        })
-        : Promise.resolve(null),
-    ]);
-    const firstPassOutputs = sanitizeReservationOutputs(
-      [focusedOutput, ocrOutput, localOcrOutput, financialAttempt, preRegistrationAttempt, ...targetedAttempts]
-        .filter((output): output is ProviderExtractionOutput => Boolean(output)),
-      checklist,
-    );
-    merged = enrichReservationFinancialComposition(mergeReservationOutputs(firstPassOutputs, checklist), checklist, ocrText);
-    if (!recoveryTargets.length) {
-        if (ocrOutput || localOcrOutput) {
-          console.info("[ConferIA] Dados da Reserva extraídos com camadas OCR determinísticas", {
-            documentName: document.name,
-            extractedTextCharacters: ocrAttempt.status === "fulfilled" ? ocrAttempt.value.text.length : 0,
-            localOcrTextCharacters: localOcrAttempt.status === "fulfilled" ? localOcrAttempt.value.text.length : 0,
-          });
-        }
-        return merged;
-    }
-
-    if (!reservationRecoveryTargets(merged, ocrText).length) return merged;
-
-    if (focusedAttempt.status === "rejected") {
-      console.warn("[ConferIA] Extração focada de Dados da Reserva falhou", {
-        documentName: document.name,
-        error: sanitizeExtractionError(focusedAttempt.reason),
-      });
-    }
-    if (ocrAttempt.status === "rejected") {
-      console.warn("[ConferIA] OCR textual de Dados da Reserva falhou", {
-        documentName: document.name,
-        error: sanitizeExtractionError(ocrAttempt.reason),
-      });
-    }
-    if (localOcrAttempt.status === "rejected") {
-      console.warn("[ConferIA] OCR local de Dados da Reserva falhou", {
-        documentName: document.name,
-        error: sanitizeExtractionError(localOcrAttempt.reason),
-      });
-    }
-
+    let ocrText = "";
     try {
-      const genericOutput = await this.kimiProvider.extractFromImage(document, checklist);
-      merged = enrichReservationFinancialComposition(mergeReservationOutputs([...firstPassOutputs, ...sanitizeReservationOutputs([genericOutput], checklist)], checklist), checklist, ocrText);
-      if (!reservationRecoveryTargets(merged, ocrText).length) {
-        console.info("[ConferIA] Dados da Reserva recuperados com extração visual genérica", {
-          documentName: document.name,
-        });
-      }
-      return merged;
+      ocrText = process.env.CONFERIA_SKIP_LOCAL_OCR === "true" ? "" : await extractImageOcrText(document.buffer);
     } catch (error) {
-      console.warn("[ConferIA] Todas as camadas visuais de Dados da Reserva falharam", {
+      console.warn("[ConferIA] OCR local de Dados da Reserva falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
+    }
+    let visualFallback: ProviderExtractionOutput | null = null;
+    if (!ocrText.trim()) {
+      try {
+        ocrText = await this.kimiProvider.transcribeReservationImage(document);
+        visualFallback = await this.kimiProvider.extractReservationFromImage(document, checklist);
+      } catch (error) {
+        console.warn("[ConferIA] Fallback visual inicial da Reserva falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
+      }
+    }
+    const deterministic = extractDeterministicFields(ocrText, checklist, "DADOS_RESERVA");
+    let merged = enrichReservationFinancialComposition(
+      mergeReservationOutputs(sanitizeReservationOutputs([deterministic, visualFallback].filter((output): output is ProviderExtractionOutput => Boolean(output)), checklist), checklist),
+      checklist,
+      ocrText,
+    );
+    const layout = reservationLayout(ocrText);
+    const missing = reservationFieldsMissingForLayout(merged, layout);
+    if (!missing.length) return merged;
+
+    const visualRecovery = reservationVisualRecovery(this.kimiProvider, document, checklist, layout);
+    try {
+      const recovered = await visualRecovery;
+      merged = enrichReservationFinancialComposition(
+        mergeReservationOutputs(sanitizeReservationOutputs([deterministic, recovered], checklist), checklist),
+        checklist,
+        ocrText,
+      );
+    } catch (error) {
+      console.warn("[ConferIA] Recuperação visual dirigida da Reserva falhou", {
         documentName: document.name,
+        layout,
+        missing,
         error: sanitizeExtractionError(error),
       });
-      return firstPassOutputs.length ? merged : emptyOutput(checklist);
     }
+    return merged;
   }
 }
 
-function reservationRecoveryTargets(output: ProviderExtractionOutput, ocrText: string) {
-  const available = new Set(
-    output.fields
-      .filter((field) => field.value != null && String(field.value).trim())
-      .map((field) => field.fieldId),
-  );
-  const groups = {
-    identity: ["buyer.name", "buyer.cpf", "buyer.rg", "buyer.maritalStatus", "buyer.address", "buyer.email", "buyer.phone"],
-    unit: ["property.development", "property.registration", "property.unit", "property.tower"],
-    payment: ["financial.totalValue", "financial.financing"],
-  } as const;
-  const text = ocrText.toLowerCase();
-  const selected = new Set<keyof typeof groups>();
-  if (/nome(?:\s+do\s+cliente)?|cliente|proponente|comprador|adquirente|cpf\s*\/?\s*cnpj|cpfc?npj|estado\s+civil|e-?mail|correio\s+eletr[oô]nico|telefone|celular|fone|whatsapp/.test(text)) selected.add("identity");
-  if (hasReservationPaymentTable(text)) selected.add("payment");
-  if (/\bunidade\b|\btorre\b|matr[ií]cula/.test(text)) selected.add("unit");
-  if (!selected.size) {
-    if ([...groups.identity].some((field) => available.has(field))) selected.add("identity");
-    if ([...groups.payment].some((field) => available.has(field))) selected.add("payment");
-    if ([...groups.unit].some((field) => available.has(field))) selected.add("unit");
-  }
-  if (!selected.size) return ["identity", "unit", "payment"] as Array<keyof typeof groups>;
-  return [...selected].filter((group) => groups[group].some((field) => !available.has(field)));
+type ReservationLayout = "IDENTITY" | "UNIT" | "PAYMENT" | "UNKNOWN";
+
+function reservationLayout(text: string): ReservationLayout {
+  const normalized = text.toLowerCase();
+  if (hasReservationPaymentTable(normalized) || hasReservationPreRegistrationSummary(normalized)) return "PAYMENT";
+  if (/\bunidade\b|\btorre\b|matr[ií]cula/.test(normalized)) return "UNIT";
+  if (/nome(?:\s+do\s+cliente)?|cliente|proponente|cpf\s*\/?\s*cnpj|estado\s+civil|e-?mail|telefone|celular/.test(normalized)) return "IDENTITY";
+  return "UNKNOWN";
+}
+
+function reservationFieldsMissingForLayout(output: ProviderExtractionOutput, layout: ReservationLayout) {
+  const groups: Record<ReservationLayout, string[]> = {
+    IDENTITY: ["buyer.name", "buyer.cpf", "buyer.rg", "buyer.maritalStatus", "buyer.address", "buyer.email", "buyer.phone"],
+    UNIT: ["property.development", "property.registration", "property.unit", "property.tower"],
+    PAYMENT: ["financial.totalValue", "financial.financing"],
+    UNKNOWN: [],
+  };
+  const available = new Set(output.fields.filter((field) => field.value).map((field) => field.fieldId));
+  return groups[layout].filter((field) => !available.has(field));
+}
+
+function reservationVisualRecovery(provider: KimiProvider, document: UploadedDocumentPayload, checklist: ExtractionRequest["checklist"], layout: ReservationLayout) {
+  if (layout === "IDENTITY") return provider.extractReservationIdentityFromImage(document, checklist);
+  if (layout === "UNIT") return provider.extractReservationUnitFromImage(document, checklist);
+  if (layout === "PAYMENT") return provider.extractReservationFinancialComponentsFromImage(document, checklist);
+  return provider.extractReservationFromImage(document, checklist);
 }
 
 function sanitizeReservationOutputs(outputs: ProviderExtractionOutput[], checklist: ExtractionRequest["checklist"]) {
@@ -539,14 +460,6 @@ function hasReservationPaymentTable(text: string) {
 
 function hasReservationPreRegistrationSummary(text: string) {
   return /valor\s+avalia[cç][aã]o|valor\s+aprovado|valor\s+subs[ií]dio|valor\s*fgts/i.test(text);
-}
-
-function hasReliableReservationFinancialEvidence(output: ProviderExtractionOutput | null, fieldIds: string[]) {
-  if (!output) return false;
-  return fieldIds.every((fieldId) => {
-    const field = output.fields.find((candidate) => candidate.fieldId === fieldId);
-    return Boolean(field?.value && field.confidence >= 85 && field.sourceLocation?.rawText);
-  });
 }
 
 function pdfPageSelectionFor(source: DocumentSource) {
