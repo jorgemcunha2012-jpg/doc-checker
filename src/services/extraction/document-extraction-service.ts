@@ -387,10 +387,14 @@ export class DocumentExtractionService {
     if (!ocrText.trim()) {
       try {
         ocrText = await this.kimiProvider.transcribeReservationImage(document);
-        visualFallback = await this.kimiProvider.extractReservationFromImage(document, checklist);
       } catch (error) {
-        console.warn("[ConferIA] Fallback visual inicial da Reserva falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
+        console.warn("[ConferIA] Transcrição de apoio da Reserva falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
       }
+    }
+    try {
+      visualFallback = await this.kimiProvider.extractReservationFromImage(document, checklist);
+    } catch (error) {
+      console.warn("[ConferIA] Leitura visual inicial da Reserva falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
     }
     const deterministic = extractDeterministicFields(ocrText, checklist, "DADOS_RESERVA");
     let merged = enrichReservationFinancialComposition(
