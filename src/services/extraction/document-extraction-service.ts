@@ -406,7 +406,13 @@ export class DocumentExtractionService {
       checklist,
     );
     let merged = enrichReservationFinancialComposition(mergeReservationOutputs(initialOutputs, checklist), checklist, ocrText);
-    const recoveryTargets = reservationRecoveryTargets(merged, ocrText);
+    const recoveryTargets = new Set(reservationRecoveryTargets(merged, ocrText));
+    // Uma tela financeira pode falhar na transcrição e não deixar nenhum rótulo
+    // no OCR. Nessa situação, não a trate como uma tela de cliente: faça uma
+    // leitura financeira isolada antes de declarar os valores ausentes.
+    if (!hasReservationEvidence(initialOutputs) && !focusedPaymentIsComplete) {
+      recoveryTargets.add("payment");
+    }
     // As leituras financeira, de identidade e de unidade não dependem entre si.
     // Executá-las na mesma etapa mantém as camadas de conferência sem encadear seus tempos máximos.
     const [financialAttempt, preRegistrationAttempt, ...targetedAttempts] = await Promise.all([
@@ -428,19 +434,19 @@ export class DocumentExtractionService {
           return null;
         })
         : Promise.resolve(null),
-      recoveryTargets.includes("identity")
+      recoveryTargets.has("identity")
         ? this.kimiProvider.extractReservationIdentityFromImage(document, checklist).catch((error) => {
           console.warn("[ConferIA] Revisão dirigida de dados pessoais falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
           return null;
         })
         : Promise.resolve(null),
-      recoveryTargets.includes("unit")
+      recoveryTargets.has("unit")
         ? this.kimiProvider.extractReservationUnitFromImage(document, checklist).catch((error) => {
           console.warn("[ConferIA] Revisão dirigida da unidade falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
           return null;
         })
         : Promise.resolve(null),
-      recoveryTargets.includes("payment") && !hasReservationPaymentTable(ocrText)
+      recoveryTargets.has("payment") && !hasReservationPaymentTable(ocrText)
         ? this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
           console.warn("[ConferIA] Revisão dirigida financeira falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
           return null;
@@ -453,7 +459,7 @@ export class DocumentExtractionService {
       checklist,
     );
     merged = enrichReservationFinancialComposition(mergeReservationOutputs(firstPassOutputs, checklist), checklist, ocrText);
-    if (!recoveryTargets.length) {
+    if (!recoveryTargets.size) {
         if (ocrOutput || localOcrOutput) {
           console.info("[ConferIA] Dados da Reserva extraídos com camadas OCR determinísticas", {
             documentName: document.name,
@@ -547,6 +553,12 @@ function hasReliableReservationFinancialEvidence(output: ProviderExtractionOutpu
     const field = output.fields.find((candidate) => candidate.fieldId === fieldId);
     return Boolean(field?.value && field.confidence >= 85 && field.sourceLocation?.rawText);
   });
+}
+
+function hasReservationEvidence(outputs: ProviderExtractionOutput[]) {
+  return outputs.some((output) => output.fields.some((field) =>
+    field.value != null && String(field.value).trim() && field.confidence >= 70 && field.sourceLocation?.rawText,
+  ));
 }
 
 function pdfPageSelectionFor(source: DocumentSource) {
