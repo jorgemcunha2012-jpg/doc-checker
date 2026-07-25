@@ -280,6 +280,29 @@ test("extrai dados pessoais de tela de reserva em grade", () => {
   assert.equal(value(output, "buyer.phone"), "+5585984057983");
 });
 
+test("recompõe grade de cliente sem assumir CPF duplicado como RG", () => {
+  const output = extractDeterministicFields(
+    [
+      "NOME DO CLIENTE CPF / CNPJ RG CELULAR",
+      "JESSYKA MARIA DA SILVA 052.359.133-02 052.359.133-02 (85) 99876-5432",
+      "TELEFONE E-MAIL PROFISSÃO",
+      "(85) 99876-5432 jessyka.silva&gmail.com Assistente administrativa",
+      "NASCIMENTO ESTADO CIVIL CLASSIFICAÇÃO ENDEREÇO",
+      "12/03/1998 Solteira - Rua das Flores, 120",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "DADOS_RESERVA",
+  );
+
+  assert.equal(value(output, "buyer.name"), "JESSYKA MARIA DA SILVA");
+  assert.equal(value(output, "buyer.cpf"), "052.359.133-02");
+  assert.equal(value(output, "buyer.rg"), null);
+  assert.equal(value(output, "buyer.phone"), "(85) 99876-5432");
+  assert.equal(value(output, "buyer.email"), "jessyka.silva@gmail.com");
+  assert.equal(value(output, "buyer.maritalStatus"), "Solteira");
+  assert.equal(value(output, "buyer.address"), "das Flores, 120");
+});
+
 test("recompõe a Reserva quando o OCR separa cabeçalhos e valores em colunas", () => {
   const output = extractDeterministicFields(
     [

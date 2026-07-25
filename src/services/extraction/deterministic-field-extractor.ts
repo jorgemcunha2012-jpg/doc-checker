@@ -399,6 +399,7 @@ function extractMinutaFloor(value: string) {
 
 function recoverReservationGridFields(fields: ExtractedField[], text: string) {
   const recovered = new Map<string, { value: string; rawText: string }>();
+  const rejected = new Set<string>();
   // Algumas telas de reserva apresentam os rótulos em uma linha e os valores na
   // linha abaixo, em colunas independentes. Esse formato não forma uma grade
   // sequencial no OCR, então cada rótulo precisa ser resolvido isoladamente.
@@ -408,7 +409,11 @@ function recoverReservationGridFields(fields: ExtractedField[], text: string) {
   };
   const name = reservationValue(/(?:^|\n)\s*(?:NOME(?:\s+DO\s+CLIENTE)?|CLIENTE|PROPONENTE|COMPRADOR|ADQUIRENTE)/im);
   const cpf = reservationValue(/(?:^|\n)\s*(?:CPF\s*\/?\s*CNPJ|CPFC?NPJ|CPF)/im)?.match(/\d{3}\.?\d{3}\.?\d{3}-?\d{2}/)?.[0];
-  const rg = reservationValue(/(?:^|\n)\s*RG/im)?.match(/[A-Z0-9.-]{5,30}/i)?.[0];
+  const rgCandidate = reservationValue(/(?:^|\n)\s*RG/im)?.match(/[A-Z0-9.-]{5,30}/i)?.[0];
+  // Não aceite o próximo cabeçalho (por exemplo, "CELULAR") como RG quando o
+  // OCR preserva toda a grade na mesma linha. RGs extraídos precisam carregar
+  // ao menos quatro dígitos, mesmo quando trazem letras, pontos ou hífens.
+  const rg = rgCandidate && /\d{4}/.test(rgCandidate) ? rgCandidate : undefined;
   const maritalStatus = reservationValue(/(?:^|\n)\s*ESTADO\s+CIVIL/im);
   const emailValue = reservationValue(/(?:^|\n)\s*(?:E-?MAIL|CORREIO\s+ELETR[OÔ]NICO)/im)?.match(/[\w.+-]+(?:@|&)[\w.-]+\.[A-Z]{2,}/i)?.[0]?.replace("&", "@");
   const phoneValue = reservationValue(/(?:^|\n)\s*(?:TELEFONE(?:\s*2)?|CELULAR|FONE|WHATSAPP)/im)?.match(/\+?\d[\d\s().-]{8,24}/)?.[0];
@@ -457,10 +462,10 @@ function recoverReservationGridFields(fields: ExtractedField[], text: string) {
     /CIDADE\s+ESTADO\s+BAIRRO:\s+CEP:\s*\r?\n\s*([A-ZÀ-Úa-zà-ú\s]+?)\s+([A-ZÀ-Úa-zà-ú\s]+?)\s+([A-ZÀ-Úa-zà-ú\s]+?)\s+(\d{5}-?\d{3})/i,
   );
   const clientHeaderGrid = text.match(
-    /NOME\s+DO\s+CLIENTE\s+CPF\s*\/?\s*CNPJ\s+RG\s+CELULAR\s*\r?\n\s*([A-ZÀ-Ú][A-ZÀ-Ú\s]+?)\s+(\d{3}\.?\d{3}\.?\d{3}-?\d{2})\s+([A-Z0-9.-]{5,30})\s+(\(?\d{2}\)?\s*\d[\d -]{7,})/i,
+    /NOME\s+DO\s+CLIENTE\s+CPF\s*\/?\s*CNPJ\s+RG\s+CELULAR\s*\r?\n\s*([^\r\n]+?)\s+(\d{3}\.?\d{3}\.?\d{3}-?\d{2})\s+([A-Z0-9.-]{5,30})\s+(\+?[\d(][\d\s().-]{8,24})/i,
   );
   const clientContactGrid = text.match(
-    /TELEFONE\s+E-?MAIL\s+PROFISS[ÃA]O[\s\S]{0,80}?\r?\n\s*(\(?\d{2}\)?\s*\d[\d -]{7,})\s+([\w.+-]+(?:@|&|Q)[\w.-]+\.[A-Z]{2,})/i,
+    /TELEFONE\s+E-?MAIL\s+PROFISS[ÃA]O[\s\S]{0,80}?\r?\n\s*(\+?[\d(][\d\s().-]{8,24})\s+([\w.+-]+(?:@|&|Q)[\w.-]+\.[A-Z]{2,})/i,
   );
   const clientCivilGrid = text.match(
     /NASCIMENTO\s+ESTADO\s+CIVIL[\s\S]{0,80}?\r?\n\s*\d{1,2}[/-]\d{1,2}[/-]\d{4}\s+([^\r\n]+?)\s+(?:—|-)?\s*(?:RUA|AV(?:ENIDA)?\.?|ALAMEDA|TRAVESSA)\s+([^\r\n]+)/i,
@@ -468,7 +473,15 @@ function recoverReservationGridFields(fields: ExtractedField[], text: string) {
   if (clientHeaderGrid) {
     recovered.set("buyer.name", { value: clientHeaderGrid[1].trim(), rawText: `NOME DO CLIENTE: ${clientHeaderGrid[1].trim()}` });
     recovered.set("buyer.cpf", { value: clientHeaderGrid[2], rawText: `CPF/CNPJ: ${clientHeaderGrid[2]}` });
-    if (clientHeaderGrid[3] !== clientHeaderGrid[2]) recovered.set("buyer.rg", { value: clientHeaderGrid[3], rawText: `RG: ${clientHeaderGrid[3]}` });
+    if (clientHeaderGrid[3] !== clientHeaderGrid[2]) {
+      recovered.set("buyer.rg", { value: clientHeaderGrid[3], rawText: `RG: ${clientHeaderGrid[3]}` });
+      rejected.delete("buyer.rg");
+    } else {
+      // Colunas deslocadas de Reserva às vezes repetem o CPF no lugar do RG.
+      // O valor não é evidência de RG e deve permanecer ausente para revisão.
+      recovered.delete("buyer.rg");
+      rejected.add("buyer.rg");
+    }
     recovered.set("buyer.phone", { value: clientHeaderGrid[4], rawText: `CELULAR: ${clientHeaderGrid[4]}` });
   }
   if (clientContactGrid) {
@@ -505,6 +518,7 @@ function recoverReservationGridFields(fields: ExtractedField[], text: string) {
     recovered.set("buyer.name", { value: identity[1].trim(), rawText: `NOME DO CLIENTE: ${identity[1].trim()}` });
     recovered.set("buyer.cpf", { value: identity[2], rawText: `CPF / CNPJ: ${identity[2]}` });
     recovered.set("buyer.rg", { value: identity[3], rawText: `RG: ${identity[3]}` });
+    rejected.delete("buyer.rg");
     recovered.set("buyer.phone", { value: identity[4], rawText: `CELULAR: ${identity[4]}` });
   }
   const phone = text.match(/TELEFONE[^\n\r]*[\n\r]+\s*(\+?\d{10,15})/i)?.[1];
@@ -514,8 +528,14 @@ function recoverReservationGridFields(fields: ExtractedField[], text: string) {
 
   return fields.map((field) => {
     const value = recovered.get(field.fieldId);
-    if (!value) return field;
-    return { ...field, value: value.value, confidence: 90, sourceLocation: { section: "Dados da reserva", rawText: value.rawText } };
+    if (rejected.has(field.fieldId)) {
+      return { ...field, value: null, confidence: 0, sourceLocation: undefined };
+    }
+    if (value) return { ...field, value: value.value, confidence: 90, sourceLocation: { section: "Dados da reserva", rawText: value.rawText } };
+    if (field.fieldId === "buyer.rg" && /^(?:RG|CELULAR|TELEFONE|E-?MAIL)$/i.test(field.value ?? "")) {
+      return { ...field, value: null, confidence: 0, sourceLocation: undefined };
+    }
+    return field;
   });
 }
 
