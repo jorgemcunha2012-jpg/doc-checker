@@ -456,6 +456,29 @@ function recoverReservationGridFields(fields: ExtractedField[], text: string) {
   const columnLocation = text.match(
     /CIDADE\s+ESTADO\s+BAIRRO:\s+CEP:\s*\r?\n\s*([A-ZÀ-Úa-zà-ú\s]+?)\s+([A-ZÀ-Úa-zà-ú\s]+?)\s+([A-ZÀ-Úa-zà-ú\s]+?)\s+(\d{5}-?\d{3})/i,
   );
+  const clientHeaderGrid = text.match(
+    /NOME\s+DO\s+CLIENTE\s+CPF\s*\/?\s*CNPJ\s+RG\s+CELULAR\s*\r?\n\s*([A-ZÀ-Ú][A-ZÀ-Ú\s]+?)\s+(\d{3}\.?\d{3}\.?\d{3}-?\d{2})\s+([A-Z0-9.-]{5,30})\s+(\(?\d{2}\)?\s*\d[\d -]{7,})/i,
+  );
+  const clientContactGrid = text.match(
+    /TELEFONE\s+E-?MAIL\s+PROFISS[ÃA]O[\s\S]{0,80}?\r?\n\s*(\(?\d{2}\)?\s*\d[\d -]{7,})\s+([\w.+-]+(?:@|&|Q)[\w.-]+\.[A-Z]{2,})/i,
+  );
+  const clientCivilGrid = text.match(
+    /NASCIMENTO\s+ESTADO\s+CIVIL[\s\S]{0,80}?\r?\n\s*\d{1,2}[/-]\d{1,2}[/-]\d{4}\s+([^\r\n]+?)\s+(?:—|-)?\s*(?:RUA|AV(?:ENIDA)?\.?|ALAMEDA|TRAVESSA)\s+([^\r\n]+)/i,
+  );
+  if (clientHeaderGrid) {
+    recovered.set("buyer.name", { value: clientHeaderGrid[1].trim(), rawText: `NOME DO CLIENTE: ${clientHeaderGrid[1].trim()}` });
+    recovered.set("buyer.cpf", { value: clientHeaderGrid[2], rawText: `CPF/CNPJ: ${clientHeaderGrid[2]}` });
+    if (clientHeaderGrid[3] !== clientHeaderGrid[2]) recovered.set("buyer.rg", { value: clientHeaderGrid[3], rawText: `RG: ${clientHeaderGrid[3]}` });
+    recovered.set("buyer.phone", { value: clientHeaderGrid[4], rawText: `CELULAR: ${clientHeaderGrid[4]}` });
+  }
+  if (clientContactGrid) {
+    recovered.set("buyer.phone", { value: clientContactGrid[1], rawText: `TELEFONE: ${clientContactGrid[1]}` });
+    recovered.set("buyer.email", { value: clientContactGrid[2].replace(/[&Q]/i, "@"), rawText: `E-MAIL: ${clientContactGrid[2]}` });
+  }
+  if (clientCivilGrid) {
+    recovered.set("buyer.maritalStatus", { value: clientCivilGrid[1].trim(), rawText: `ESTADO CIVIL: ${clientCivilGrid[1].trim()}` });
+    recovered.set("buyer.address", { value: clientCivilGrid[2].trim(), rawText: `ENDEREÇO: ${clientCivilGrid[2].trim()}` });
+  }
   if (columnIdentity) {
     recovered.set("buyer.name", { value: columnIdentity[1].trim(), rawText: "NOME: " + columnIdentity[1].trim() });
     recovered.set("buyer.cpf", { value: columnIdentity[3], rawText: "CPF/CNPJ: " + columnIdentity[3] });
