@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AuthError, isMasterAdmin, requireUser } from "@/lib/auth";
+import { AuthError, canAccessProcess, requireUser } from "@/lib/auth";
 import type { HumanReview } from "@/domain/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { saveHumanReview } from "@/services/process/process-repository";
@@ -17,7 +17,7 @@ export async function PUT(request: Request, context: { params: Promise<{ process
     }
     const supabase = createSupabaseAdminClient();
     const { data: process } = await supabase.from("validation_processes").select("user_id, organization_id").eq("id", processId).single();
-    if (!process || process.organization_id !== user.organizationId || (!isMasterAdmin(user) && process.user_id !== user.id)) {
+    if (!process || !canAccessProcess(user, { userId: process.user_id, organizationId: process.organization_id })) {
       return NextResponse.json({ error: "Processo não encontrado." }, { status: 404 });
     }
     const { data: validationResult, error: validationResultError } = await supabase
@@ -53,7 +53,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ proc
     const fieldId = new URL(request.url).searchParams.get("fieldId");
     if (!fieldId) return NextResponse.json({ error: "Campo obrigatório." }, { status: 400 });
     const { data: process } = await createSupabaseAdminClient().from("validation_processes").select("user_id, organization_id").eq("id", processId).single();
-    if (!process || process.organization_id !== user.organizationId || (!isMasterAdmin(user) && process.user_id !== user.id)) {
+    if (!process || !canAccessProcess(user, { userId: process.user_id, organizationId: process.organization_id })) {
       return NextResponse.json({ error: "Processo não encontrado." }, { status: 404 });
     }
     await saveHumanReview(processId, fieldId, undefined, user);

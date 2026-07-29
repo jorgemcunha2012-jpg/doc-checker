@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { AuthError, isMasterAdmin, requireUser } from "@/lib/auth";
+import { AuthError, isMasterAdmin, isOrganizationAdmin, requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { audit } from "@/services/process/process-repository";
 
 export async function GET(_request: Request, context: { params: Promise<{ processId: string; documentId: string }> }) {
   try {
@@ -10,27 +11,32 @@ export async function GET(_request: Request, context: { params: Promise<{ proces
     let processQuery = supabase
       .from("validation_processes")
       .select("id")
-      .eq("id", processId)
-      .eq("organization_id", user.organizationId);
-    if (!isMasterAdmin(user)) processQuery = processQuery.eq("user_id", user.id);
+      .eq("id", processId);
+    if (!isMasterAdmin(user)) processQuery = processQuery.eq("organization_id", user.organizationId);
+    if (!isOrganizationAdmin(user)) processQuery = processQuery.eq("user_id", user.id);
     const { data: process } = await processQuery.maybeSingle();
     if (!process) return NextResponse.json({ error: "Processo não encontrado." }, { status: 404 });
 
     const { data: document } = await supabase
       .from("process_documents")
-      .select("storage_path")
+      .select("storage_path, purged_at")
       .eq("id", documentId)
       .eq("process_id", processId)
       .eq("organization_id", user.organizationId)
       .maybeSingle();
     if (!document?.storage_path) {
-      return NextResponse.json({ error: "O arquivo original não está disponível." }, { status: 404 });
+      return NextResponse.json({
+        error: document?.purged_at
+          ? "Arquivo original removido após o período de retenção de 40 dias."
+          : "O arquivo original não está disponível.",
+      }, { status: 404 });
     }
 
     const { data, error } = await supabase.storage
       .from("process-documents")
       .createSignedUrl(document.storage_path, 60);
     if (error || !data?.signedUrl) throw error ?? new Error("URL temporária não gerada.");
+    await audit(user, "DOCUMENT_VIEWED", "process_document", documentId, { processId });
     return NextResponse.redirect(data.signedUrl);
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });

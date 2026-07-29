@@ -9,6 +9,7 @@ export type ProcessDocumentItem = {
   name: string;
   source?: string | null;
   storage_path?: string | null;
+  purged_at?: string | null;
 };
 
 export function ProcessDocumentList({
@@ -79,7 +80,9 @@ function DocumentRow({
           Visualizar
         </button>
       ) : (
-        <span className="shrink-0 text-xs text-slate-400">Original indisponível</span>
+        <span className="shrink-0 text-xs text-slate-400">
+          {document.purged_at ? "Removido após 40 dias" : "Original indisponível"}
+        </span>
       )}
       {document.storage_path ? (
         <div className="pointer-events-none absolute right-0 top-9 z-30 hidden w-[min(520px,calc(100vw-3rem))] border border-slate-200 bg-white shadow-2xl group-hover/document:block group-focus-within/document:block">

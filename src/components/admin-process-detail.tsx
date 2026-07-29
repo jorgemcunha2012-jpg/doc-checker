@@ -16,7 +16,7 @@ export function AdminProcessDetail({
   backHref = "/admin",
   embedded = false,
 }: {
-  process: { id: string; result: ReconciliationRun; final_status: string; started_at: string; profiles: { name: string } | null; process_documents: Array<{ id: string; name: string; source?: string; storage_path?: string | null }> };
+  process: { id: string; result: ReconciliationRun; final_status: string; started_at: string; profiles: { name: string } | null; process_documents: Array<{ id: string; name: string; source?: string; storage_path?: string | null; purged_at?: string | null }> };
   reviews: ReviewRow[];
   currentUser: User;
   backHref?: string;

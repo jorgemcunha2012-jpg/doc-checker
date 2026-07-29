@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AuthError, isMasterAdmin, requireAdmin } from "@/lib/auth";
+import { AuthError, requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
 
@@ -8,14 +8,11 @@ export async function GET() {
     const admin = await requireAdmin();
     const { data, error } = await createSupabaseAdminClient()
       .from("profiles")
-      .select("id, name, email, role, active, must_change_password, created_at")
+      .select("id, name, email, role, active, must_change_password, is_master_admin, created_at")
       .eq("organization_id", admin.organizationId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return NextResponse.json({ users: (data ?? []).map((profile) => ({
-      ...profile,
-      is_master_admin: isMasterAdmin({ email: profile.email, role: profile.role }),
-    })) });
+    return NextResponse.json({ users: data ?? [] });
   } catch (error) {
     return authResponse(error);
   }
@@ -43,6 +40,8 @@ export async function POST(request: Request) {
       role: "ANALISTA",
       active: true,
       must_change_password: true,
+      is_master_admin: false,
+      mfa_required: true,
     });
     if (profileError) {
       await supabase.auth.admin.deleteUser(data.user.id);

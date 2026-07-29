@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AuthError, isMasterAdmin, requireUser } from "@/lib/auth";
+import { AuthError, isMasterAdmin, isOrganizationAdmin, requireUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { resumePersistedValidationProcess } from "@/services/process/process-validation";
@@ -18,9 +18,9 @@ export async function POST(_request: Request, context: { params: Promise<{ proce
     let query = supabase
       .from("validation_processes")
       .select("id, user_id, processing_status, updated_at")
-      .eq("id", processId)
-      .eq("organization_id", user.organizationId);
-    if (!isMasterAdmin(user)) query = query.eq("user_id", user.id);
+      .eq("id", processId);
+    if (!isMasterAdmin(user)) query = query.eq("organization_id", user.organizationId);
+    if (!isOrganizationAdmin(user)) query = query.eq("user_id", user.id);
     const { data: process, error } = await query.single();
     if (error || !process) return NextResponse.json({ error: "Processo não encontrado." }, { status: 404 });
 

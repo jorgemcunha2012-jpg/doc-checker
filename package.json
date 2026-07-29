@@ -16,7 +16,7 @@
     "@react-pdf/renderer": "^4.5.1",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
-    "@tailwindcss/postcss": "^4.1.17",
+    "@tailwindcss/postcss": "^4.3.3",
     "@xmldom/xmldom": "^0.8.13",
     "bmp-js": "^0.1.0",
     "clsx": "^2.1.1",
@@ -25,13 +25,14 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
     "mammoth": "^1.12.0",
-    "next": "^15.0.0",
+    "next": "^15.5.22",
     "node-fetch": "^2.7.0",
     "opencollective-postinstall": "^2.0.3",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "regenerator-runtime": "^0.13.11",
+    "server-only": "^0.0.1",
     "sharp": "^0.35.3",
     "tesseract.js": "^7.0.0",
     "tesseract.js-core": "^7.0.0",
@@ -44,10 +45,14 @@
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.1",
     "eslint": "^9.17.0",
-    "eslint-config-next": "^15.0.0",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^4.1.17",
+    "eslint-config-next": "^15.5.22",
+    "postcss": "^8.5.25",
+    "tailwindcss": "^4.3.3",
     "tsx": "^4.22.4",
     "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "postcss": "^8.5.25",
+    "sharp": "^0.35.3"
   }
 }

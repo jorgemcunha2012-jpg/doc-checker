@@ -15,7 +15,10 @@ export function LoginForm() {
       const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: login, password }) });
       const payload = await response.json().catch(() => ({ error: "Não foi possível concluir o login." }));
       if (!response.ok) return setError(payload.error ?? "Não foi possível concluir o login.");
-      router.push(payload.mustChangePassword ? "/change-password" : "/"); router.refresh();
+      if (payload.mustChangePassword) router.push("/change-password");
+      else if (payload.requiresMfa) window.location.assign("/mfa");
+      else router.push("/");
+      router.refresh();
     } catch {
       setError("Falha de conexão ao tentar entrar.");
     } finally {

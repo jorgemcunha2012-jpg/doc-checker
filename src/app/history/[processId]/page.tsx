@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { AdminProcessDetail } from "@/components/admin-process-detail";
-import { getCurrentUser, isMasterAdmin } from "@/lib/auth";
+import { getCurrentUser, isMasterAdmin, isOrganizationAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
 import { IncompleteProcessDetail } from "@/components/incomplete-process-detail";
@@ -12,10 +12,10 @@ export default async function HistoryProcessPage({ params }: { params: Promise<{
   const { processId } = await params;
   let query = createSupabaseAdminClient()
     .from("validation_processes")
-    .select("id, user_id, result, processing_status, final_status, error, started_at, completed_at, profiles!validation_processes_user_id_fkey(name), process_documents(id, name, source, size_bytes, storage_path)")
-    .eq("id", processId)
-    .eq("organization_id", user.organizationId);
-  if (!isMasterAdmin(user)) query = query.eq("user_id", user.id);
+    .select("id, user_id, result, processing_status, final_status, error, started_at, completed_at, profiles!validation_processes_user_id_fkey(name), process_documents(id, name, source, size_bytes, storage_path, purged_at)")
+    .eq("id", processId);
+  if (!isMasterAdmin(user)) query = query.eq("organization_id", user.organizationId);
+  if (!isOrganizationAdmin(user)) query = query.eq("user_id", user.id);
   const { data: process } = await query.maybeSingle();
   if (!process) notFound();
   const normalizedProcess = {

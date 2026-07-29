@@ -10,7 +10,7 @@ type IncompleteProcess = {
   started_at: string;
   completed_at: string | null;
   profiles: { name: string } | null;
-  process_documents: Array<{ id: string; name: string; source?: string; storage_path?: string | null }>;
+  process_documents: Array<{ id: string; name: string; source?: string; storage_path?: string | null; purged_at?: string | null }>;
 };
 
 export function IncompleteProcessDetail({

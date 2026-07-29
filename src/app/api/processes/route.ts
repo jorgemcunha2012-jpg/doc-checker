@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AuthError, isMasterAdmin, requireUser } from "@/lib/auth";
+import { AuthError, isMasterAdmin, isOrganizationAdmin, requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { listValidationProcesses } from "@/services/process/validation-process-store";
@@ -11,8 +11,8 @@ export async function GET(request: Request) {
     if (!isSupabaseConfigured()) {
       const status = url.searchParams.get("status");
       const processes = listValidationProcesses()
-        .filter((process) => process.organizationId === user.organizationId)
-        .filter((process) => isMasterAdmin(user) || process.userId === user.id)
+        .filter((process) => isMasterAdmin(user) || process.organizationId === user.organizationId)
+        .filter((process) => isOrganizationAdmin(user) || process.userId === user.id)
         .filter((process) => !status || localFinalStatus(process) === status)
         .slice(0, 100)
         .map((process) => ({
@@ -39,14 +39,14 @@ export async function GET(request: Request) {
     let query = supabase
       .from("validation_processes")
       .select("id, user_id, processing_status, final_status, result, summary, error, started_at, completed_at, profiles!validation_processes_user_id_fkey(name), process_documents(id, name, source, storage_path)")
-      .eq("organization_id", user.organizationId)
       .order("started_at", { ascending: false })
       .limit(100);
-    if (!isMasterAdmin(user)) query = query.eq("user_id", user.id);
+    if (!isMasterAdmin(user)) query = query.eq("organization_id", user.organizationId);
+    if (!isOrganizationAdmin(user)) query = query.eq("user_id", user.id);
     const status = url.searchParams.get("status");
     const analyst = url.searchParams.get("userId");
     if (status) query = query.eq("final_status", status);
-    if (analyst && isMasterAdmin(user)) query = query.eq("user_id", analyst);
+    if (analyst && isOrganizationAdmin(user)) query = query.eq("user_id", analyst);
     const { data, error } = await query;
     if (error) throw error;
     return NextResponse.json({

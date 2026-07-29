@@ -20,6 +20,7 @@ type ManagedProcess = {
 };
 type AuditEvent = {
   id: string;
+  actor_id: string | null;
   event_type: string;
   entity_type: string;
   entity_id: string | null;
@@ -34,16 +35,16 @@ export function AdminDashboard({ isMasterAdmin, embedded = false }: { isMasterAd
   const [loading, setLoading] = useState(true); const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null); const [filter, setFilter] = useState("ALL");
   const load = useCallback(async () => {
     setLoading(true);
-    const requests: Promise<Response>[] = [fetch("/api/admin/users"), fetch("/api/admin/audit")];
-    if (isMasterAdmin) requests.push(fetch("/api/processes"));
-    const [u, p, a] = await Promise.all(requests);
+    const [u, p, a] = await Promise.all([
+      fetch("/api/admin/users"),
+      fetch("/api/processes"),
+      fetch("/api/admin/audit"),
+    ]);
     if (u.ok) setUsers((await u.json()).users);
-    const auditResponse = isMasterAdmin ? a : p;
-    const processResponse = isMasterAdmin ? p : undefined;
-    if (processResponse?.ok) setProcesses((await processResponse.json()).processes);
-    if (auditResponse?.ok) setEvents((await auditResponse.json()).events);
+    if (p.ok) setProcesses((await p.json()).processes);
+    if (a.ok) setEvents((await a.json()).events);
     setLoading(false);
-  }, [isMasterAdmin]);
+  }, []);
   useEffect(() => { void load(); const timer = window.setInterval(load, 15000); return () => window.clearInterval(timer); }, [load]);
   const operationalAlerts = useMemo(
     () => processes.flatMap((process) => {
@@ -56,6 +57,7 @@ export function AdminDashboard({ isMasterAdmin, embedded = false }: { isMasterAd
     () => events.filter((event) => event.entity_type === "development_extraction"),
     [events],
   );
+  const securityAlerts = useMemo(() => buildSecurityAlerts(events), [events]);
   const visible = useMemo(
     () => filter === "ALL"
       ? processes
@@ -78,8 +80,8 @@ export function AdminDashboard({ isMasterAdmin, embedded = false }: { isMasterAd
   return <main className={embedded ? "" : "min-h-screen bg-slate-50"}>
     {!embedded ? <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4"><div><div className="text-lg font-bold">ConferIA Admin</div><div className="text-xs text-slate-500">Gestão operacional</div></div><div className="flex items-center gap-4"><Link href={{ pathname: "/history" }} className="text-sm font-bold text-slate-600">Histórico</Link><Link href="/change-password" className="text-sm font-bold text-slate-600">Alterar minha senha</Link><Link href="/" className="text-sm font-bold text-blue-600">Nova conferência</Link></div></div></header> : null}
     <div className={`mx-auto max-w-7xl space-y-8 ${embedded ? "" : "px-5 py-8"}`}>
-      {isMasterAdmin ? <section><div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Visão geral</h1><p className="mt-1 text-sm text-slate-500">Atividades e resultados da equipe.</p></div><button title="Atualizar" onClick={load} className="rounded-md border border-slate-200 bg-white p-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button></div><div className="mt-5 grid gap-3 sm:grid-cols-5"><Metric label="Documentos analisados" value={documentsAnalyzed} /><Metric label="Documentos em análise" value={documentsInProgress} /><Metric label="Documentos cadastrados" value={documentsTotal} /><Metric label="Processos em andamento" value={inProgressProcesses.length} /><Metric label="Alertas operacionais" value={operationalAlerts.length} alert={operationalAlerts.length > 0} /></div><div className="mt-3 grid gap-3 sm:grid-cols-4"><Metric label="Com pendências" value={count("PENDING_REVIEW")} /><Metric label="Conferidos" value={count("FULLY_CHECKED")} /><Metric label="Falhas" value={count("FAILED")} /><Metric label="Usuários ativos" value={users.filter((user) => user.active).length} /></div><div className="mt-3 grid gap-3 sm:grid-cols-4"><Metric label="Campos críticos ausentes" value={qualityMetrics.missingCritical} alert={qualityMetrics.missingCritical > 0} /><Metric label="Baixa confiança crítica" value={qualityMetrics.lowConfidence} alert={qualityMetrics.lowConfidence > 0} /><Metric label="Conflitos internos críticos" value={qualityMetrics.ambiguous} alert={qualityMetrics.ambiguous > 0} /><Metric label="Recuperados automaticamente" value={qualityMetrics.recovered + qualityMetrics.deterministic} /></div></section> : <section><div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Gestão de usuários</h1><p className="mt-1 text-sm text-slate-500">Criação de acessos para novos analistas.</p></div><button title="Atualizar" onClick={load} className="rounded-md border border-slate-200 bg-white p-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button></div></section>}
-      {isMasterAdmin && operationalAlerts.length ? <section className="border border-amber-300 bg-amber-50">
+      <section><div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Visão geral</h1><p className="mt-1 text-sm text-slate-500">{isMasterAdmin ? "Atividades, segurança e resultados de todas as organizações." : "Atividades e resultados da sua organização."}</p></div><button title="Atualizar" onClick={load} className="rounded-md border border-slate-200 bg-white p-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button></div><div className="mt-5 grid gap-3 sm:grid-cols-5"><Metric label="Documentos analisados" value={documentsAnalyzed} /><Metric label="Documentos em análise" value={documentsInProgress} /><Metric label="Documentos cadastrados" value={documentsTotal} /><Metric label="Processos em andamento" value={inProgressProcesses.length} /><Metric label="Alertas operacionais" value={operationalAlerts.length} alert={operationalAlerts.length > 0} /></div><div className="mt-3 grid gap-3 sm:grid-cols-4"><Metric label="Com pendências" value={count("PENDING_REVIEW")} /><Metric label="Conferidos" value={count("FULLY_CHECKED")} /><Metric label="Falhas" value={count("FAILED")} /><Metric label="Usuários ativos" value={users.filter((user) => user.active).length} /></div><div className="mt-3 grid gap-3 sm:grid-cols-4"><Metric label="Campos críticos ausentes" value={qualityMetrics.missingCritical} alert={qualityMetrics.missingCritical > 0} /><Metric label="Baixa confiança crítica" value={qualityMetrics.lowConfidence} alert={qualityMetrics.lowConfidence > 0} /><Metric label="Conflitos internos críticos" value={qualityMetrics.ambiguous} alert={qualityMetrics.ambiguous > 0} /><Metric label="Recuperados automaticamente" value={qualityMetrics.recovered + qualityMetrics.deterministic} /></div></section>
+      {operationalAlerts.length ? <section className="border border-amber-300 bg-amber-50">
         <div className="flex items-start gap-3 border-b border-amber-200 p-5">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
           <div><h2 className="font-bold text-amber-950">Alertas operacionais</h2><p className="mt-1 text-sm text-amber-800">Processos com falha, duração acima do esperado ou possível travamento.</p></div>
@@ -93,20 +95,28 @@ export function AdminDashboard({ isMasterAdmin, embedded = false }: { isMasterAd
           </div>)}
         </div>
       </section> : null}
-      {isMasterAdmin ? <section className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+      {isMasterAdmin && securityAlerts.length ? <section className="border border-rose-300 bg-rose-50">
+        <div className="flex items-start gap-3 border-b border-rose-200 p-5">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-700" />
+          <div><h2 className="font-bold text-rose-950">Alertas de segurança</h2><p className="mt-1 text-sm text-rose-800">Tentativas suspeitas, retenção com falha ou volume fora do padrão.</p></div>
+        </div>
+        <div className="divide-y divide-rose-200">
+          {securityAlerts.map((alert) => <div key={alert.id} className="p-4"><div className="text-sm font-bold text-rose-900">{alert.title}</div><div className="mt-1 text-xs text-rose-800">{alert.detail}</div></div>)}
+        </div>
+      </section> : null}
+      <section className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
         <div className="border border-slate-200 bg-white p-5"><h2 className="font-bold">Documentos em análise agora</h2><p className="mt-1 text-sm text-slate-500">Atualiza automaticamente a cada 15 segundos.</p><div className="mt-4 divide-y divide-slate-100">{inProgressProcesses.length ? inProgressProcesses.map((process) => <div key={process.id} className="py-3"><div className="flex items-center justify-between gap-3"><div><div className="text-xs font-bold text-[#0f8f88]">{processCode(process.id)}</div><div className="text-sm font-bold">{process.profiles?.name ?? "Usuário"}</div></div><div className="text-xs font-bold text-blue-600">{process.process_documents.length} documento(s)</div></div><div className="mt-1 text-xs text-slate-500">Iniciado em {new Date(process.started_at).toLocaleString("pt-BR")} · {durationLabel(process.started_at, process.completed_at)}</div><div className="mt-2 space-y-1">{process.process_documents.map((document) => <div key={`${process.id}-${document.name}`} className="truncate text-sm text-slate-700">{document.name}</div>)}</div></div>) : <div className="py-6 text-sm text-slate-500">Nenhum documento em análise neste momento.</div>}</div></div>
         <div className="border border-slate-200 bg-white p-5"><h2 className="font-bold">Log recente</h2><div className="mt-4 space-y-3">{events.slice(0, 8).map((event) => <div key={event.id} className="border-l-2 border-slate-200 pl-3"><div className="text-sm font-bold text-slate-800">{eventLabel(event.event_type)}</div><div className="text-xs text-slate-500">{event.profiles?.name ?? "Sistema"} · {new Date(event.created_at).toLocaleString("pt-BR")}{eventDurationLabel(event) ? ` · ${eventDurationLabel(event)}` : ""}</div></div>)}{events.length === 0 ? <div className="text-sm text-slate-500">Nenhum evento registrado ainda.</div> : null}</div></div>
-      </section> : null}
+      </section>
       {extractionAttempts.length ? <section className="border border-slate-200 bg-white p-5"><div className="flex items-start justify-between gap-4"><div><h2 className="font-bold">Tentativas de extração de matrícula</h2><p className="mt-1 text-sm text-slate-500">Inclui sucessos e falhas, com etapa, páginas, duração e motivo registrado.</p></div><span className="text-xs font-bold text-slate-500">{extractionAttempts.length} registro(s)</span></div><div className="mt-4 divide-y divide-slate-100">{extractionAttempts.slice(0, 30).map((event) => <div key={event.id} className="py-3"><div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><div className={`text-sm font-bold ${event.event_type === "DEVELOPMENT_EXTRACTION_FAILED" ? "text-rose-700" : event.event_type === "DEVELOPMENT_EXTRACTION_FINISHED" ? "text-emerald-700" : "text-blue-700"}`}>{eventLabel(event.event_type)}</div><div className="text-xs text-slate-500">{event.profiles?.name ?? "Sistema"} · {new Date(event.created_at).toLocaleString("pt-BR")}</div></div><div className="mt-1 text-sm text-slate-700">{String(event.metadata?.sourceDocumentName ?? "Arquivo não informado")}</div><div className="mt-1 text-xs text-slate-500">Etapa: {String(event.metadata?.stage ?? "-")} · {String(event.metadata?.pageCount ?? 0)} página(s) · {formatDuration(Number(event.metadata?.durationMs ?? 0))}</div>{event.event_type === "DEVELOPMENT_EXTRACTION_FAILED" ? <div className="mt-2 text-xs font-semibold text-rose-700">Motivo: {String(event.metadata?.reason ?? "Motivo não registrado")}</div> : <div className="mt-2 text-xs text-slate-600">Unidades encontradas: {String(event.metadata?.extractedUnits ?? event.metadata?.ocrUnits ?? 0)} · Revisões apontadas: {String(event.metadata?.reviewRequired ?? 0)}</div>}</div>)}</div></section> : null}
       <section className="border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><Users className="h-5 w-5 text-blue-600" /><h2 className="font-bold">Usuários</h2></div>
         <form onSubmit={createUser} className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]"><input name="name" required placeholder="Nome" className="min-h-10 rounded-md border border-slate-300 px-3 text-sm" /><input name="email" required type="email" placeholder="Email" className="min-h-10 rounded-md border border-slate-300 px-3 text-sm" /><button className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white"><Plus className="h-4 w-4" />Criar Analista</button></form>
         {temporaryPassword ? <div className="mt-4 flex items-center justify-between gap-3 border border-amber-200 bg-amber-50 p-3 text-sm"><div><strong>Senha temporária:</strong> <code>{temporaryPassword}</code><div className="text-xs text-amber-700">Copie agora. Ela não será exibida novamente.</div></div><button onClick={() => navigator.clipboard.writeText(temporaryPassword)} title="Copiar"><Copy className="h-4 w-4" /></button></div> : null}
         <div className="mt-4 divide-y divide-slate-100">{users.map((user) => <div key={user.id} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="text-sm font-bold">{user.name}{user.is_master_admin ? " · Master" : ""}</div><div className="text-xs text-slate-500">{user.email} · {user.active ? "Ativo" : "Desativado"}{user.must_change_password ? " · Troca de senha pendente" : ""}</div></div>{(isMasterAdmin || !user.is_master_admin) ? <div className="flex gap-2"><button onClick={() => userAction(user.id, "RESET_PASSWORD")} className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold"><KeyRound className="h-3.5 w-3.5" />Redefinir senha</button><button onClick={() => userAction(user.id, user.active ? "DEACTIVATE" : "ACTIVATE")} className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold"><Power className="h-3.5 w-3.5" />{user.active ? "Desativar" : "Ativar"}</button></div> : null}</div>)}</div>
       </section>
-      {!isMasterAdmin ? <section className="border border-slate-200 bg-white p-5"><h2 className="font-bold">Log de acesso da organização</h2><p className="mt-1 text-sm text-slate-500">Eventos registrados somente para a sua organização.</p><div className="mt-4 space-y-3">{events.slice(0, 100).map((event) => <div key={event.id} className="border-l-2 border-slate-200 pl-3"><div className="text-sm font-bold text-slate-800">{eventLabel(event.event_type)}</div><div className="text-xs text-slate-500">{event.profiles?.name ?? "Sistema"} · {new Date(event.created_at).toLocaleString("pt-BR")}{eventDurationLabel(event) ? ` · ${eventDurationLabel(event)}` : ""}</div></div>)}{events.length === 0 ? <div className="text-sm text-slate-500">Nenhum evento registrado ainda.</div> : null}</div></section> : null}
-      {isMasterAdmin ? <section className="border border-slate-200 bg-white"><div className="flex items-center justify-between border-b p-5"><h2 className="font-bold">Processos da equipe</h2><select className="rounded-md border px-3 py-2 text-sm" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">Todos</option><option value="ANOMALY">Com alerta</option><option value="IN_PROGRESS">Em andamento</option><option value="PENDING_REVIEW">Pendentes</option><option value="FULLY_CHECKED">Conferidos</option><option value="FAILED">Falhas</option></select></div>
+      <section className="border border-slate-200 bg-white"><div className="flex items-center justify-between border-b p-5"><h2 className="font-bold">Processos da equipe</h2><select className="rounded-md border px-3 py-2 text-sm" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">Todos</option><option value="ANOMALY">Com alerta</option><option value="IN_PROGRESS">Em andamento</option><option value="PENDING_REVIEW">Pendentes</option><option value="FULLY_CHECKED">Conferidos</option><option value="FAILED">Falhas</option></select></div>
         {loading ? <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div> : <div className="divide-y">{visible.map((process) => { const anomaly = processAnomaly(process); return <div key={process.id} className="grid gap-3 p-4 sm:grid-cols-[180px_1fr_1fr_150px_100px]"><div><div className="text-xs font-bold text-[#0f8f88]">{processCode(process.id)}</div><div className="text-sm font-bold">{process.profiles?.name ?? "Usuário"}</div><div className="text-xs text-slate-500">{new Date(process.started_at).toLocaleString("pt-BR")}</div></div><div>{process.process_documents.map((document) => <div key={document.name} className="truncate text-sm text-slate-700">{document.name}</div>)}</div><div><div className="text-sm font-bold text-slate-600">{durationLabel(process.started_at, process.completed_at)}</div>{anomaly ? <div className={`mt-1 text-xs font-bold ${anomaly.severity === "critical" ? "text-rose-700" : "text-amber-700"}`}>{anomaly.label}</div> : null}</div><div className="text-sm font-bold text-slate-600">{statusLabel(process.final_status)}</div><Link href={`/admin/processes/${process.id}`} className="text-sm font-bold text-blue-600">Ver resultado</Link></div>; })}</div>}
-      </section> : null}
+      </section>
     </div>
   </main>;
 }
@@ -196,6 +206,12 @@ function processDurationMs(process: ManagedProcess) {
 function eventLabel(type: string) {
   return ({
     LOGIN: "Login realizado",
+    LOGIN_FAILED: "Tentativa de login sem sucesso",
+    LOGOUT: "Logout realizado",
+    PASSWORD_CHANGED: "Senha alterada",
+    DOCUMENT_VIEWED: "Documento visualizado",
+    DOCUMENTS_PURGED: "Arquivos removidos pela retenção",
+    DOCUMENT_RETENTION_FAILED: "Falha na retenção de arquivos",
     USER_CREATED: "Usuário criado",
     USER_ACTIVATED: "Usuário ativado",
     USER_DEACTIVATED: "Usuário desativado",
@@ -211,4 +227,58 @@ function eventLabel(type: string) {
     REVIEW_REVOKED: "Validação desfeita",
     LEARNING_RULE_RECORDED: "Aprendizado supervisionado registrado",
   } as Record<string, string>)[type] ?? type;
+}
+
+function buildSecurityAlerts(events: AuditEvent[]) {
+  const now = Date.now();
+  const alerts: Array<{ id: string; title: string; detail: string }> = [];
+  const recentLoginFailures = events.filter(
+    (event) => event.event_type === "LOGIN_FAILED" && now - new Date(event.created_at).getTime() <= 15 * 60 * 1000,
+  );
+  const failuresByUser = groupEvents(recentLoginFailures);
+  for (const [actor, attempts] of failuresByUser) {
+    if (attempts.length >= 3) alerts.push({
+      id: `login-${actor}`,
+      title: "Tentativas repetidas de login",
+      detail: `${attempts[0].profiles?.name ?? "Usuário"} teve ${attempts.length} tentativas sem sucesso nos últimos 15 minutos.`,
+    });
+  }
+  const recentViews = events.filter(
+    (event) => event.event_type === "DOCUMENT_VIEWED" && now - new Date(event.created_at).getTime() <= 60 * 60 * 1000,
+  );
+  for (const [actor, views] of groupEvents(recentViews)) {
+    if (views.length >= 50) alerts.push({
+      id: `views-${actor}`,
+      title: "Volume elevado de visualização",
+      detail: `${views[0].profiles?.name ?? "Usuário"} abriu ${views.length} documentos na última hora.`,
+    });
+  }
+  const recentProcesses = events.filter(
+    (event) => event.event_type === "PROCESS_CREATED" && now - new Date(event.created_at).getTime() <= 60 * 60 * 1000,
+  );
+  for (const [actor, processes] of groupEvents(recentProcesses)) {
+    if (processes.length >= 25) alerts.push({
+      id: `processes-${actor}`,
+      title: "Volume elevado de processos",
+      detail: `${processes[0].profiles?.name ?? "Usuário"} iniciou ${processes.length} processos na última hora.`,
+    });
+  }
+  const retentionFailure = events.find(
+    (event) => event.event_type === "DOCUMENT_RETENTION_FAILED" && now - new Date(event.created_at).getTime() <= 24 * 60 * 60 * 1000,
+  );
+  if (retentionFailure) alerts.push({
+    id: `retention-${retentionFailure.id}`,
+    title: "Falha na exclusão automática de documentos",
+    detail: "A rotina de retenção encontrou arquivos que não puderam ser removidos e fará nova tentativa.",
+  });
+  return alerts;
+}
+
+function groupEvents(events: AuditEvent[]) {
+  const grouped = new Map<string, AuditEvent[]>();
+  for (const event of events) {
+    const key = event.actor_id ?? event.entity_id ?? "unknown";
+    grouped.set(key, [...(grouped.get(key) ?? []), event]);
+  }
+  return grouped;
 }
