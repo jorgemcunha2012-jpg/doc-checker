@@ -11,6 +11,8 @@ import { getDevelopmentUnit } from "@/services/development/development-repositor
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 const MAX_TOTAL_SIZE_BYTES = 60 * 1024 * 1024;
 const MAX_FILES = 20;
+const CONFERIA_CREDITS_PAUSED = true;
+const CREDITS_MESSAGE = "Créditos insuficientes para iniciar a conferência.";
 export const maxDuration = 300;
 const ACCEPTED_MIME_TYPES = new Set([
   "image/png",
@@ -30,6 +32,9 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     throw error;
+  }
+  if (CONFERIA_CREDITS_PAUSED) {
+    return NextResponse.json({ error: CREDITS_MESSAGE }, { status: 402 });
   }
   const contentType = request.headers.get("content-type") ?? "";
 

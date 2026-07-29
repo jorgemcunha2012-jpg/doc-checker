@@ -23,6 +23,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
   const [process, setProcess] = useState<ValidationProcess | null>(null);
   const [run, setRun] = useState<ValidationRun | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [processingStartedAt, setProcessingStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [developments, setDevelopments] = useState<Development[]>([]);
@@ -196,6 +197,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
 
   async function handleRunValidation() {
     setIsSubmitting(true);
+    setSubmissionError(null);
     setProcessingStartedAt(Date.now());
     setElapsedSeconds(0);
     setRun(null);
@@ -216,17 +218,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
     setIsSubmitting(false);
 
     if (!response.ok || !payload?.processId) {
-      setProcess({
-        id: "local_error",
-        organizationId: defaultOrganization.id,
-        userId: "usr_conferia_analista",
-        validationType,
-        status: "FAILED",
-        documents,
-        error: payload?.error ?? "Falha ao iniciar processo.",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+      setSubmissionError(payload?.error ?? "Falha ao iniciar processo.");
       setProcessingStartedAt(null);
       return;
     }
@@ -368,14 +360,17 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
                 <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--muted)]">Conclua as duas etapas abaixo. Sem cadastro mestre, adicione documentos de pelo menos duas fontes.</p>
               </div>
             </div>
-            <button
-              className="app-button-primary hidden min-h-11 shrink-0 items-center justify-center gap-2 px-5 py-2 text-sm font-semibold lg:inline-flex"
-              disabled={!hasDocuments || isProcessing}
-              onClick={handleRunValidation}
-            >
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-              Iniciar conferência
-            </button>
+            <div className="hidden shrink-0 lg:block">
+              {submissionError ? <p className="mb-2 max-w-xs text-right text-sm font-medium text-rose-700">{submissionError}</p> : null}
+              <button
+                className="app-button-primary inline-flex min-h-11 items-center justify-center gap-2 px-5 py-2 text-sm font-semibold"
+                disabled={!hasDocuments || isProcessing}
+                onClick={handleRunValidation}
+              >
+                {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+                Iniciar conferência
+              </button>
+            </div>
           </div>
 
           <section className="app-card p-5 sm:p-6">
@@ -433,9 +428,12 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
                 <div className="text-sm font-semibold text-[var(--foreground)]">{hasDocuments ? "Tudo pronto para conferir" : "Complete as fontes da conferência"}</div>
                 <div className="mt-1 text-xs text-[var(--muted)]">{hasDocuments ? `${documents.length} arquivo(s) em ${sourceCount} fonte(s)${developmentUnitId ? " e uma unidade de referência" : ""}.` : developmentUnitId ? "Adicione ao menos uma fonte documental." : "Adicione documentos de pelo menos duas fontes diferentes."}</div>
               </div>
-              <button className="app-button-primary inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 px-5 text-sm font-semibold sm:w-auto" disabled={!hasDocuments} onClick={handleRunValidation}>
-                <UploadCloud className="h-4 w-4" /> Iniciar conferência
-              </button>
+              <div className="shrink-0">
+                {submissionError ? <p className="mb-2 text-sm font-medium text-rose-700 sm:text-right">{submissionError}</p> : null}
+                <button className="app-button-primary inline-flex min-h-11 w-full items-center justify-center gap-2 px-5 text-sm font-semibold sm:w-auto" disabled={!hasDocuments} onClick={handleRunValidation}>
+                  <UploadCloud className="h-4 w-4" /> Iniciar conferência
+                </button>
+              </div>
             </div>
           ) : null}
 
