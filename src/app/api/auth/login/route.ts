@@ -3,19 +3,21 @@ import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/sup
 import { audit } from "@/services/process/process-repository";
 
 export async function POST(request: Request) {
+  const isFormSubmission = request.headers.get("content-type")?.includes("application/x-www-form-urlencoded") ?? false;
   try {
-    const { email, password } = await request.json();
+    const credentials = isFormSubmission
+      ? Object.fromEntries(await request.formData())
+      : await request.json();
+    const { email, password } = credentials;
     const normalizedEmail = normalizeLogin(email);
     if (await loginRateLimited(normalizedEmail)) {
-      return NextResponse.json({
-        error: "Muitas tentativas de acesso. Aguarde 15 minutos antes de tentar novamente.",
-      }, { status: 429 });
+      return loginFailure(request, isFormSubmission, "Muitas tentativas de acesso. Aguarde 15 minutos antes de tentar novamente.", 429);
     }
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (error || !data.user) {
       await auditFailedLogin(normalizedEmail, request);
-      return NextResponse.json({ error: "Email ou senha inválidos." }, { status: 401 });
+      return loginFailure(request, isFormSubmission, "Email ou senha inválidos.", 401);
     }
 
     const { data: profile, error: profileError } = await supabase
@@ -25,11 +27,11 @@ export async function POST(request: Request) {
       .single();
     if (profileError || !profile) {
       await supabase.auth.signOut();
-      return NextResponse.json({ error: "Usuário autenticado, mas sem perfil operacional cadastrado." }, { status: 403 });
+      return loginFailure(request, isFormSubmission, "Usuário autenticado, mas sem perfil operacional cadastrado.", 403);
     }
     if (!profile.active) {
       await supabase.auth.signOut();
-      return NextResponse.json({ error: "Usuário desativado." }, { status: 403 });
+      return loginFailure(request, isFormSubmission, "Usuário desativado.", 403);
     }
     try {
       await createSupabaseAdminClient().from("profiles").update({
@@ -44,14 +46,26 @@ export async function POST(request: Request) {
       console.error("[ConferIA] Falha ao registrar auditoria de login", error);
     }
     const { data: assurance } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    return NextResponse.json({
-      mustChangePassword: profile.must_change_password,
-      requiresMfa: profile.mfa_required && assurance?.currentLevel !== "aal2",
-    });
+    const mustChangePassword = profile.must_change_password;
+    const requiresMfa = profile.mfa_required && assurance?.currentLevel !== "aal2";
+    if (isFormSubmission) {
+      const destination = mustChangePassword ? "/change-password" : requiresMfa ? "/mfa" : "/";
+      return NextResponse.redirect(new URL(destination, request.url), 303);
+    }
+    return NextResponse.json({ mustChangePassword, requiresMfa });
   } catch (error) {
     console.error("[ConferIA] Falha inesperada no login", error);
-    return NextResponse.json({ error: "Não foi possível concluir o login. Confira as variáveis do Supabase em produção." }, { status: 500 });
+    return loginFailure(request, isFormSubmission, "Não foi possível concluir o login. Confira as variáveis do Supabase em produção.", 500);
   }
+}
+
+function loginFailure(request: Request, isFormSubmission: boolean, error: string, status: number) {
+  if (isFormSubmission) {
+    const url = new URL("/login", request.url);
+    url.searchParams.set("error", error);
+    return NextResponse.redirect(url, 303);
+  }
+  return NextResponse.json({ error }, { status });
 }
 
 async function loginRateLimited(email: string) {
