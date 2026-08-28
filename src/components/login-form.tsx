@@ -10,7 +10,13 @@ export function LoginForm() {
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setLoading(true); setError("");
     try {
-      const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: login, password }) });
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: login, password }),
+      });
       const payload = await response.json().catch(() => ({ error: "Não foi possível concluir o login." }));
       if (!response.ok) return setError(payload.error ?? "Não foi possível concluir o login.");
       const destination = payload.mustChangePassword
@@ -18,7 +24,7 @@ export function LoginForm() {
         : payload.requiresMfa
           ? "/mfa"
           : "/";
-      window.location.assign(destination);
+      window.location.replace(destination);
     } catch {
       setError("Falha de conexão ao tentar entrar.");
     } finally {
