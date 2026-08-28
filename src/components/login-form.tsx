@@ -1,10 +1,8 @@
 "use client";
 import { useState } from "react";
 import { Loader2, LogIn } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 export function LoginForm() {
-  const router = useRouter();
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -15,10 +13,12 @@ export function LoginForm() {
       const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: login, password }) });
       const payload = await response.json().catch(() => ({ error: "Não foi possível concluir o login." }));
       if (!response.ok) return setError(payload.error ?? "Não foi possível concluir o login.");
-      if (payload.mustChangePassword) router.push("/change-password");
-      else if (payload.requiresMfa) window.location.assign("/mfa");
-      else router.push("/");
-      router.refresh();
+      const destination = payload.mustChangePassword
+        ? "/change-password"
+        : payload.requiresMfa
+          ? "/mfa"
+          : "/";
+      window.location.assign(destination);
     } catch {
       setError("Falha de conexão ao tentar entrar.");
     } finally {
