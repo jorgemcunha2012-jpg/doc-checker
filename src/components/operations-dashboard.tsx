@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowRight, CheckCircle2, Clock3, FileCheck2, Plus, Timer } from "lucide-react";
+import { AlertCircle, ArrowRight, CheckCircle2, Clock3, FileCheck2, Timer } from "lucide-react";
 import Link from "next/link";
 import type { User } from "@/domain/validation";
 import { processCode } from "@/lib/process-code";
@@ -40,6 +40,7 @@ export function OperationsDashboard({ user }: { user: User }) {
       active: processes.filter((process) => process.final_status === "IN_PROGRESS").length,
       documents: finished.reduce((total, process) => total + process.process_documents.length, 0),
       pending: processes.filter((process) => process.final_status === "PENDING_REVIEW").length,
+      completed: finished.length,
       approval: finished.length ? Math.round((checked / finished.length) * 100) : 0,
       averageMs: durations.length ? durations.reduce((sum, value) => sum + value, 0) / durations.length : 0,
     };
@@ -47,15 +48,12 @@ export function OperationsDashboard({ user }: { user: User }) {
 
   return (
     <div className="mx-auto max-w-[1360px] space-y-7">
-      <section className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+      <section className="max-w-2xl">
         <div>
-          <p className="text-sm font-medium text-[var(--primary)]">Visão geral</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-[-0.035em] text-[var(--foreground)]">Olá, {user.name.split(" ")[0]}</h1>
-          <p className="mt-2 text-sm text-[var(--muted)]">Veja o que precisa da sua atenção e acompanhe as conferências recentes.</p>
+          <p className="text-sm font-semibold text-[var(--primary)]">Operação documental</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-[-0.035em] text-[var(--foreground)]">Acompanhe as conferências da sua equipe.</h1>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Priorize o que precisa de revisão e consulte as operações recentes.</p>
         </div>
-        <Link href="/validation" className="app-button-primary inline-flex min-h-11 items-center justify-center gap-2 px-5 text-sm font-semibold">
-          <Plus className="h-4 w-4" /> Nova conferência
-        </Link>
       </section>
 
       {loading ? <DashboardSkeleton /> : error ? (
@@ -63,30 +61,30 @@ export function OperationsDashboard({ user }: { user: User }) {
       ) : (
         <>
           <section className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)]">
-            <div className="app-card overflow-hidden bg-[var(--navy)] text-white">
+            <div className="app-card overflow-hidden border-[#d5e1f5] bg-[#10233d] text-white">
               <div className="flex h-full flex-col justify-between gap-8 p-6 sm:p-7">
                 <div className="flex items-start justify-between gap-5">
                   <div>
-                    <div className="text-sm font-medium text-[#9cc7c1]">Próxima ação</div>
+                    <div className="text-sm font-medium text-[#aec7fa]">Fila de revisão</div>
                     <div className="mt-2 text-4xl font-semibold tracking-[-0.04em]">{metrics.pending}</div>
-                    <p className="mt-2 max-w-md text-sm leading-6 text-slate-300">{metrics.pending === 1 ? "conferência aguarda sua revisão" : "conferências aguardam sua revisão"}</p>
+                    <p className="mt-2 max-w-md text-sm leading-6 text-slate-300">{metrics.pending === 1 ? "operação aguarda validação humana" : "operações aguardam validação humana"}</p>
                   </div>
-                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-[#62d4c9]"><AlertCircle className="h-6 w-6" /></span>
+                  <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-white/10 text-[#8eb4ff]"><AlertCircle className="h-6 w-6" /></span>
                 </div>
-                <Link href="/pending" className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-[#78ddd3] hover:text-white">Revisar pendências <ArrowRight className="h-4 w-4" /></Link>
+                <Link href="/pending" className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-[#aecaFF] hover:text-white">Abrir pendências <ArrowRight className="h-4 w-4" /></Link>
               </div>
             </div>
             <div className="app-card p-6">
-              <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]"><Timer className="h-5 w-5" /></span><span className="text-sm font-medium text-[var(--muted)]">Tempo médio</span></div>
+              <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]"><Timer className="h-5 w-5" /></span><span className="text-sm font-medium text-[var(--muted)]">Tempo médio de conclusão</span></div>
               <div className="mt-6 text-4xl font-semibold tracking-[-0.04em] text-[var(--foreground)]">{formatDuration(metrics.averageMs)}</div>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">por conferência concluída</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">considerando as operações já finalizadas</p>
             </div>
           </section>
 
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Metric icon={Clock3} label="Em andamento" value={metrics.active} />
             <Metric icon={FileCheck2} label="Documentos analisados" value={metrics.documents} />
-            <Metric icon={CheckCircle2} label="Taxa de conferência" value={`${metrics.approval}%`} />
+            <Metric icon={CheckCircle2} label="Conferências concluídas" value={metrics.completed} />
             <Metric icon={AlertCircle} label="Pendências abertas" value={metrics.pending} />
           </section>
 
@@ -122,7 +120,7 @@ function Metric({ icon: Icon, label, value }: { icon: typeof Clock3; label: stri
 
 function Status({ value }: { value: string }) {
   const copy = ({ IN_PROGRESS: "Em análise", PENDING_REVIEW: "Com pendências", FULLY_CHECKED: "Conferido", FAILED: "Falhou" } as Record<string, string>)[value] ?? value;
-  const tone = ({ IN_PROGRESS: "bg-blue-50 text-blue-700", PENDING_REVIEW: "bg-amber-50 text-amber-700", FULLY_CHECKED: "bg-emerald-50 text-emerald-700", FAILED: "bg-rose-50 text-rose-700" } as Record<string, string>)[value] ?? "bg-slate-100 text-slate-600";
+  const tone = ({ IN_PROGRESS: "bg-[#e9f0ff] text-[#2458c6]", PENDING_REVIEW: "bg-amber-50 text-amber-700", FULLY_CHECKED: "bg-emerald-50 text-emerald-700", FAILED: "bg-rose-50 text-rose-700" } as Record<string, string>)[value] ?? "bg-slate-100 text-slate-600";
   return <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-medium ${tone}`}>{copy}</span>;
 }
 

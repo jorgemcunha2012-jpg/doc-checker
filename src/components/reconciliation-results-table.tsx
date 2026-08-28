@@ -300,14 +300,14 @@ function SourceValueCell({ source, result }: { source: DocumentSource; result: F
       <div className="mt-1 flex items-center gap-1 text-xs font-semibold text-slate-500">{sourceValue.confidence}% confiança <InfoTooltip text="Estimativa de segurança da extração deste campo, baseada na qualidade da evidência, no método de leitura e na consistência encontrada. Não é a probabilidade de o documento ser verdadeiro." /></div>
       {location ? (
         <details className="mt-2">
-          <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-teal-700">
+          <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-[var(--primary)]">
             <FileSearch className="h-3.5 w-3.5" />
             Ver evidência <InfoTooltip text="Mostra a localização e o trecho original usado para extrair este valor. A evidência permite conferir de onde o dado veio." />
           </summary>
           <div className="mt-2 rounded-md border border-slate-200 bg-white p-2 text-xs leading-5 text-slate-600">
             {location.page ? <div>Página {location.page}</div> : null}
             {location.section ? <div>Seção: {location.section}</div> : null}
-            {location.rawText ? <blockquote className="mt-1 border-l-2 border-teal-600 pl-2">{location.rawText}</blockquote> : null}
+            {location.rawText ? <blockquote className="mt-1 border-l-2 border-[var(--primary)] pl-2">{location.rawText}</blockquote> : null}
           </div>
         </details>
       ) : null}
