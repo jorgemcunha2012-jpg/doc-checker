@@ -23,20 +23,20 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     text("contract.financingModality", "Identificação do contrato", 90, [/modalidade\s+de\s+financiamento[^:\n\r]*:\s*([^\n\r]+)/i]),
     text("contract.housingProgram", "Identificação do contrato", 90, [/programa\s+habitacional[^:\n\r]*:\s*([^\n\r]+)/i]),
     money("financial.financing", "Composição dos recursos", 100, [
-      /B\.4\.1[^\n\r:]*:\s*\|?\s*(R\$\s*\d[\d.,]*)/i,
+      /B\s*\.\s*4\s*\.\s*1[\s\S]{0,180}?(R\$\s*\d[\d.,]*)/i,
       /B\s*1\s*\.\s*3[^\n\r]*?financiamento[^\n\r]*?(R\$\s*\d[\d.,]*)/i,
     ]),
     money("financial.downPayment", "Composição dos recursos", 100, [
-      /B\.4\.2[^\n\r:]*:\s*\|?\s*(R\$\s*\d[\d.,]*)/i,
+      /B\s*\.\s*4\s*\.\s*2[\s\S]{0,180}?(R\$\s*\d[\d.,]*)/i,
       /B\s*1\s*\.\s*1[^\n\r]*?recursos\s+pr[oó]prios[^\n\r]*?(R\$\s*\d[\d.,]*)/i,
     ]),
     money("financial.fgts", "Composição dos recursos", 100, [
-      /B\.4\.3[^\n\r:]*:\s*\|?\s*(R\$\s*\d[\d.,]*)/i,
+      /B\s*\.\s*4\s*\.\s*3[\s\S]{0,180}?(R\$\s*\d[\d.,]*)/i,
       /B\s*1\s*\.\s*2[^\n\r]*?FGTS[^\n\r]*?(R\$\s*\d[\d.,]*)/i,
     ]),
-    money("financial.subsidy", "Composição dos recursos", 100, [/B\.4\.5[^\n\r:]*:\s*\|?\s*(R\$\s*\d[\d.,]*)/i]),
+    money("financial.subsidy", "Composição dos recursos", 100, [/B\s*\.\s*4\s*\.\s*5[\s\S]{0,180}?(R\$\s*\d[\d.,]*)/i]),
     money("financial.totalValue", "Valor do contrato", 98, [
-      /valor destinado[^.\n\r]*?\s+é\s*(R\$\s*\d[\d.,]*)/i,
+      /valor destinado[\s\S]{0,240}?\s+é\s*(R\$\s*\d[\d.,]*)/i,
       /valor (?:total|do imóvel|da venda)[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
       /valor\s+de\s+aquisi[cç][aã]o[^.\n\r]*?objeto\s+deste\s+contrato\s+equivale\s+a\s*(R\$\s*\d[\d.,]*)/i,
     ]),
@@ -88,7 +88,11 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
     text("property.development", "Dados da reserva", 92, [/unidade\s*:?\s*([^/\n\r]+?)(?:\s*\/\s*torre|\s*\/\s*\d|\n|\r)/i]),
     text("property.tower", "Dados da reserva", 94, [/\/\s*torre\s*([A-Z0-9-]{1,12})/i]),
     text("property.unit", "Dados da reserva", 94, [/\/\s*torre\s*[A-Z0-9-]{1,12}\s*\/\s*([A-Z0-9-]{1,12})/i]),
-    text("property.registration", "Dados da reserva", 88, [/matr[ií]cula\s*:?\s*([A-Z0-9./-]+)/i]),
+    text("property.registration", "Dados da reserva", 88, [
+      // A reservation screen can place the delivery date right after an empty
+      // "Matrícula" label. A matrícula is numeric; a date must never become one.
+      /matr[ií]cula\s*:?\s*((?!\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b)\d{2,}(?:[./-]\d+)*)\b/i,
+    ]),
     money("financial.totalValue", "Print de pagamento", 94, [
       /valor\s+do\s+contrato[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,
       /valor\s+total[^\n\r:]*:\s*(R\$\s*\d[\d.,]*)/i,

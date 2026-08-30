@@ -54,3 +54,20 @@ test("aceita RTF com BOM e espaços antes do cabeçalho", () => {
   ]);
   assert.equal(extractRtfText(rtf), "Nome: João");
 });
+
+test("ignora dados internos e payload binário de RTF sem perder o contrato", () => {
+  const rtf = String.raw`{\rtf1\ansi
+    {\*\datastore METADADO_INTERNO_QUE_NAO_E_DOCUMENTO}
+    {\*\themedata OUTRO_METADADO}\bin8 ABCDEFGH
+    Comprador: Gabriel Barros\par
+    B.4.1 - Valor do financiamento: R$ 186.400,00\par
+    Matrícula: 6426
+  }`;
+
+  const text = extractRtfText(Buffer.from(rtf, "latin1"));
+
+  assert.match(text, /Comprador: Gabriel Barros/);
+  assert.match(text, /B\.4\.1 - Valor do financiamento: R\$ 186\.400,00/);
+  assert.match(text, /Matrícula: 6426/);
+  assert.doesNotMatch(text, /METADADO_INTERNO|OUTRO_METADADO|ABCDEFGH/);
+});

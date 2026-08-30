@@ -69,6 +69,11 @@ export function focusDocumentText(text: string, checklist: ChecklistField[]) {
   selected.set(0, text.slice(0, 3_500));
   selected.set(Number.MAX_SAFE_INTEGER, text.slice(-2_000));
 
+  // CAIXA contracts often place the financial composition after the initial
+  // qualification and property sections. Keep it explicitly when the document
+  // is long so high-frequency buyer/property words cannot crowd it out.
+  selectAnchorWindow(selected, text, /B\s*\.\s*4\s*(?:-|\.)\s*(?:valor\s+de\s+)?composi[cç][aã]o\s+dos\s+recursos/i, maximumCharacters);
+
   for (const domainKeywords of keywordGroupsByDomain(checklist)) {
     const best = windows
       .map((window, index) => ({ index, text: window, score: scoreWindow(window, domainKeywords) }))
@@ -188,6 +193,13 @@ function selectWithinBudget(selected: Map<number, string>, index: number, text: 
   if (selected.has(index)) return;
   if (currentLength([...selected.values()]) + text.length > maximumCharacters) return;
   selected.set(index, text);
+}
+
+function selectAnchorWindow(selected: Map<number, string>, document: string, anchor: RegExp, maximumCharacters: number) {
+  const match = anchor.exec(document);
+  if (!match || match.index === undefined) return;
+  const start = Math.max(0, match.index - 450);
+  selectWithinBudget(selected, start, document.slice(start, start + 2_800), maximumCharacters);
 }
 
 function shouldRetryWithBroaderContext(output: ProviderExtractionOutput, checklist: ChecklistField[]) {

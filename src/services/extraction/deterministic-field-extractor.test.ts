@@ -92,6 +92,34 @@ test("associa valores agrupados aos itens B.4 quando o PDF separa rótulos e nú
   assert.match(String(field(output, "financial.financing")?.sourceLocation?.rawText), /B\.4\.1.*158\.384,70/);
 });
 
+test("extrai composição da minuta RTF quando rótulos e valores ficam em linhas separadas", () => {
+  const output = extractDeterministicFields(
+    [
+      "B.4 - VALOR DE COMPOSIÇÃO DOS RECURSOS:",
+      "O valor destinado à aquisição de imóvel residencial urbano objeto deste contrato é",
+      "R$ 234.000,00, composto pela integralização dos valores abaixo:",
+      "B.4.1 - Valor do financiamento concedido pela CAIXA:",
+      "B.4.2 - Valor dos recursos próprios:",
+      "B.4.3 - Valor dos recursos da conta vinculada de FGTS:",
+      "B.4.4 - Valor da Cessão de Direitos Creditórios do FGTS Futuro, se houver:",
+      "B.4. 5 - Valor do desconto complemento concedido pelo FGTS/União:",
+      "R$ 186.400,00",
+      "R$ 28.063,18",
+      "R$ 19.536,82",
+      "R$ 0,00",
+      "R$ 0,00",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "financial.totalValue"), "R$ 234.000,00");
+  assert.equal(value(output, "financial.financing"), "R$ 186.400,00");
+  assert.equal(value(output, "financial.downPayment"), "R$ 28.063,18");
+  assert.equal(value(output, "financial.fgts"), "R$ 19.536,82");
+  assert.equal(value(output, "financial.subsidy"), "R$ 0,00");
+});
+
 test("extrai área do terreno quando o contrato informa o valor na descrição do terreno", () => {
   const output = extractDeterministicFields(
     "D1 - O terreno possui 22.688,71m² de área total, constituído de 30 torres.",

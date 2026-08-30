@@ -21,6 +21,20 @@ test("preserva a seção financeira no contexto de contratos extensos", () => {
   assert.match(focused, /B\.4\.1 - Valor do financiamento concedido pela CAIXA: \| R\$ 114\.616,91/);
 });
 
+test("prioriza B.4 quando o início do contrato já contém dados do comprador e imóvel", () => {
+  const text = [
+    "ADQUIRENTE GABRIEL BARROS CPF 619.422.763-03 ".repeat(180),
+    "IMÓVEL MATRÍCULA 6426 TORRE 23 UNIDADE 103 ".repeat(180),
+    "B.4 - VALOR DE COMPOSIÇÃO DOS RECURSOS:\nB.4.1 - Valor do financiamento concedido pela CAIXA: R$ 186.400,00\nB.4.2 - Valor dos recursos próprios: R$ 28.063,18",
+    "CLÁUSULAS E ASSINATURAS ".repeat(1_000),
+  ].join("\n\n");
+
+  const focused = focusDocumentText(text, getChecklist("RECONCILIATION"));
+
+  assert.match(focused, /B\.4\.1 - Valor do financiamento concedido pela CAIXA: R\$ 186\.400,00/);
+  assert.match(focused, /B\.4\.2 - Valor dos recursos próprios: R\$ 28\.063,18/);
+});
+
 test("preenche financiamento padronizado quando o provider omite o campo", () => {
   const checklist = getChecklist("RECONCILIATION");
   const output = {

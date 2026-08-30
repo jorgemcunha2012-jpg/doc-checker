@@ -21,7 +21,15 @@ export function extractRtfText(buffer: Buffer) {
   if (!/^\s*\{\\rtf/i.test(input)) throw new Error("Arquivo RTF inválido ou corrompido.");
 
   const output: string[] = [];
-  const skipDestinations = new Set(["fonttbl", "colortbl", "stylesheet", "info", "pict", "object", "header", "footer", "filetbl"]);
+  // These groups carry Word internals, revisions, and embedded payloads rather than
+  // document content. Letting them through can push the visible contract text out
+  // of the extraction window used by the provider.
+  const skipDestinations = new Set([
+    "fonttbl", "colortbl", "stylesheet", "info", "pict", "object", "header", "footer", "filetbl",
+    "datastore", "themedata", "colorschememapping", "latentstyles", "listtable", "listoverridetable",
+    "rsidtbl", "revtbl", "xmlopen", "xmlattrname", "xmlattrvalue", "smarttagtype", "userprops",
+    "docvar", "factoidname", "htmltag", "htmlrtf", "fldinst", "annotation",
+  ]);
   const stack: Array<{ skip: boolean; uc: number }> = [];
   let skip = false;
   let unicodeFallbackCount = 1;
@@ -61,6 +69,13 @@ export function extractRtfText(buffer: Buffer) {
       index += 3;
       continue;
     }
+    // RTF marks ignorable destinations with {\*\destination ...}. The asterisk is
+    // a symbol, so it must be handled before parsing alphabetical control words.
+    if (control === "*") {
+      skip = true;
+      index += 1;
+      continue;
+    }
 
     const wordStart = index;
     while (index < input.length && /[a-z]/i.test(input[index])) index += 1;
@@ -75,8 +90,12 @@ export function extractRtfText(buffer: Buffer) {
     const parameter = numberStart === index ? undefined : sign * Number(input.slice(numberStart, index));
     if (input[index] === " ") index += 1;
 
-    if (word === "*" || skipDestinations.has(word)) {
+    if (skipDestinations.has(word)) {
       skip = true;
+    } else if (word === "bin" && parameter !== undefined) {
+      // \bin contains a byte payload, not readable RTF text. Skip it even when it
+      // appears in a group whose destination was not declared as ignorable.
+      index = Math.min(input.length, index + Math.max(0, parameter));
     } else if (word === "uc" && parameter !== undefined) {
       unicodeFallbackCount = Math.max(0, parameter);
     } else if (word === "u" && parameter !== undefined) {
