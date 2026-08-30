@@ -23,6 +23,21 @@ test("extrai composição financeira padronizada da minuta sem depender da IA", 
   assert.equal(value(output, "financial.totalValue"), "R$ 237.000,00");
 });
 
+test("extrai endereço, áreas e fração ideal da descrição da unidade na minuta", () => {
+  const output = extractDeterministicFields(
+    "Futura unidade autônoma Apartamento nº 1504 da Torre 02, 15º Pavimento, Tipo B, do Empreendimento denominado VISTA PARQUE CONDOMÍNIO CLUBE, RUA BENVINDA Nº 130, COMPL. PARTE GLEBA-M PASSARÉ, FORTALEZA-CE, com área privativa de 48,95m², área de uso comum de 37,338423m² e área total de 86,288423m² com Fração Ideal de 0,003699811434.",
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "property.tower"), "02");
+  assert.equal(value(output, "property.privateArea"), "48,95m²");
+  assert.equal(value(output, "property.commonArea"), "37,338423m²");
+  assert.equal(value(output, "property.totalArea"), "86,288423m²");
+  assert.equal(value(output, "property.idealFraction"), "0,003699811434");
+  assert.match(String(value(output, "property.address")), /RUA BENVINDA/i);
+});
+
 test("extrai composição B1 de minuta de aquisição e construção", () => {
   const output = extractDeterministicFields(
     [

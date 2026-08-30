@@ -63,6 +63,22 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /(\d{1,2}\s*[ºo]\s*pavimento)\b/i,
       /(?:pavimento|andar)[^:\n\r:]*:\s*([A-Z0-9-]+)/i,
     ]),
+    text("property.address", "Descrição do imóvel", 94, [
+      /empreendimento\s+denominado\s+[^,\n\r]+,\s*([^\n\r]+?)\s*,\s*com\s+[áa]rea\s+privativa/i,
+    ]),
+    text("property.privateArea", "Descrição do imóvel", 96, [
+      /[áa]rea\s+privativa\s+(?:coberta\s+)?(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i,
+    ]),
+    text("property.commonArea", "Descrição do imóvel", 96, [
+      /[áa]rea\s+(?:de\s+)?uso\s+comum\s+(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i,
+      /[áa]rea\s+comum\s+(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i,
+    ]),
+    text("property.totalArea", "Descrição do imóvel", 96, [
+      /[áa]rea\s+total\s+(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i,
+    ]),
+    text("property.idealFraction", "Descrição do imóvel", 96, [
+      /fra[cç][ãa]o\s+ideal\s+(?:de\s*)?(\d[\d.,]*)/i,
+    ]),
     text("property.terrainArea", "Descrição do imóvel", 96, [
       /área\s+(?:total\s+)?do\s+terreno[^\d]*(\d+[\d.,]*\s*m[²2]?)/i,
       /\bterreno\b[^.\n\r]{0,100}?\b(?:possui|tem)\b\s*(\d+[\d.,]*\s*m[²2]?)/i,
