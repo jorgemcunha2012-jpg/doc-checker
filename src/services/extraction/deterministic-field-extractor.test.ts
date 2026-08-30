@@ -41,6 +41,27 @@ test("extrai composição B1 de minuta de aquisição e construção", () => {
   assert.equal(value(output, "financial.financing"), "R$ 328.360,00");
 });
 
+test("recupera adquirentes da qualificação da minuta mantendo cada pessoa separada", () => {
+  const output = extractDeterministicFields(
+    [
+      "ADQUIRENTE E DEVEDOR(ES) FIDUCIANTE(S):",
+      "GABRIEL BARROS ARAGAO SILVA, nacionalidade brasileira, e-mail: pessoal.gabrielbarros@gmail.com, portador do CPF 619.422.763-03, solteiro(a), residente e domiciliado(a) em Av F, 481, Fortaleza/CE. e",
+      "LORANA ALMEIDA BRAGA, nacionalidade brasileira, e-mail: lorana@gmail.com, portador do CPF 123.456.789-09, casada(a), residente e domiciliado(a) em Rua A, 10, Maracanaú/CE.",
+      "D - DESCRIÇÃO DO IMÓVEL OBJETO DA AQUISIÇÃO",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+  const names = output.fields.filter((field) => field.fieldId === "buyer.name" && field.value);
+  const cpfs = output.fields.filter((field) => field.fieldId === "buyer.cpf" && field.value);
+
+  assert.deepEqual(names.map((field) => [field.participantId, field.value]), [
+    ["buyer_1", "GABRIEL BARROS ARAGAO SILVA"],
+    ["buyer_2", "LORANA ALMEIDA BRAGA"],
+  ]);
+  assert.deepEqual(cpfs.map((field) => field.value), ["619.422.763-03", "123.456.789-09"]);
+});
+
 test("extrai a data do contrato no bloco de assinaturas da minuta", () => {
   const output = extractDeterministicFields(
     "E por estarem de acordo, as partes assinam. FORTALEZA, CE 15 de Julho de 2026",

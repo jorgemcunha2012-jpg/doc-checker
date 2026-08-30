@@ -285,9 +285,50 @@ export function extractDeterministicFields(
   const output = source === "DADOS_RESERVA"
     ? { fields: recoverReservationGridFields(recoverReservationOcrLabelTypos(fields, text), text) }
     : source === "MINUTA"
-      ? { fields: recoverMinutaPropertyDescription(recoverMinutaCompositionTable(fields, text), text) }
+      ? { fields: recoverMinutaParticipants(recoverMinutaPropertyDescription(recoverMinutaCompositionTable(fields, text), text), text) }
       : { fields };
   return resolvedSource === "ITBI" ? mergeDtiStructuredFields(output, text, checklist) : output;
+}
+
+function recoverMinutaParticipants(fields: ExtractedField[], text: string) {
+  const start = text.search(/ADQUIRENTE\s+E\s+DEVEDOR|DEVEDOR\(ES\)\s+FIDUCIANTE/i);
+  const end = text.search(/(?:\n|^)\s*D\s*-\s*DESCRI[CÇ][AÃ]O\s+DO\s+IM[ÓO]VEL/i);
+  if (start < 0) return fields;
+  const block = text.slice(start, end > start ? end : start + 14_000);
+  const matches = [...block.matchAll(/([A-ZÀ-Ú][A-ZÀ-Ú\s]{5,}),\s*nacionalidade\b([\s\S]*?)(?=\.\s*(?:e\s+)?[A-ZÀ-Ú][A-ZÀ-Ú\s]{5,},\s*nacionalidade\b|$)/gi)];
+  if (!matches.length) return fields;
+
+  const participantFields = new Set(["buyer.name", "buyer.cpf", "buyer.rg", "buyer.maritalStatus", "buyer.address", "buyer.email", "buyer.phone"]);
+  const recovered: ExtractedField[] = [];
+  matches.forEach((match, index) => {
+    const name = match[1].replace(/^e\s+/i, "").replace(/\s+/g, " ").trim();
+    const details = match[2];
+    const participantId = `buyer_${index + 1}`;
+    const evidence = `${name}, nacionalidade${details}`.replace(/\s+/g, " ").slice(0, 500);
+    recovered.push(participantField("buyer.name", name, participantId, evidence));
+
+    const cpf = details.match(/\bCPF\s*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i)?.[1];
+    if (cpf) recovered.push(participantField("buyer.cpf", cpf, participantId, evidence));
+    const email = details.match(/e-?mail\s*:\s*([\w.+-]+@[\w.-]+\.[A-Z]{2,})/i)?.[1];
+    if (email) recovered.push(participantField("buyer.email", email, participantId, evidence));
+    const maritalStatus = details.match(/\b(solteir[oa](?:\(a\))?|casad[oa](?:\(a\))?|divorciad[oa](?:\(a\))?|vi[úu]v[oa](?:\(a\))?)\b/i)?.[1];
+    if (maritalStatus) recovered.push(participantField("buyer.maritalStatus", maritalStatus, participantId, evidence));
+    const address = details.match(/residente\s+e\s+domiciliado\(a\)\s+em\s+([^\.\r\n]+)/i)?.[1]?.trim();
+    if (address) recovered.push(participantField("buyer.address", address, participantId, evidence));
+  });
+
+  if (!recovered.length) return fields;
+  return [...fields.filter((field) => !participantFields.has(field.fieldId)), ...recovered];
+}
+
+function participantField(fieldId: string, value: string, participantId: string, rawText: string): ExtractedField {
+  return {
+    fieldId,
+    value,
+    participantId,
+    confidence: 96,
+    sourceLocation: { section: "Qualificação do(s) adquirente(s)", rawText },
+  };
 }
 
 function recoverMinutaCompositionTable(fields: ExtractedField[], text: string) {
