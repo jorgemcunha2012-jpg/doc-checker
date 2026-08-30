@@ -474,6 +474,30 @@ function recoverReservationGridFields(fields: ExtractedField[], text: string) {
   const clientCivilGrid = text.match(
     /NASCIMENTO\s+ESTADO\s+CIVIL[\s\S]{0,80}?\r?\n\s*\d{1,2}[/-]\d{1,2}[/-]\d{4}\s+([^\r\n]+?)\s+(?:—|-)?\s*(?:RUA|AV(?:ENIDA)?\.?|ALAMEDA|TRAVESSA)\s+([^\r\n]+)/i,
   );
+  // Compact reservation summaries render the labels in one row and all values
+  // below it. OCR keeps that geometry but drops the normal "label: value" shape.
+  const reservationSummaryUnit = text.match(
+    /UNIDADE\s*:[^\r\n]*\r?\n\s*([^/\r\n]+?)\s*\/\s*TORRE\s*([A-Z0-9-]{1,12})\s*\/\s*([A-Z0-9-]{1,12})\s*\/\s*MATR[IÍ]CULA\s*:\s*([^\s\r\n]*)/i,
+  );
+  const reservationSummaryContact = text.match(
+    /CLIENTE\s*:\s+TELEFONE\s*:\s+E-?MAIL\s*:\s*\r?\n\s*([A-ZÀ-Ú][A-ZÀ-Ú\s]+?)\s+(\+?\d[\d\s().-]{8,24})\s+([A-Z0-9._%+-]+(?:\s+|@|&)[A-Z0-9.-]+\.(?:COM(?:\.BR)?|NET|ORG|BR))/i,
+  );
+  if (reservationSummaryUnit) {
+    const development = reservationSummaryUnit[1].trim();
+    const registration = reservationSummaryUnit[4].trim();
+    recovered.set("property.development", { value: development, rawText: `UNIDADE: ${development}` });
+    recovered.set("property.tower", { value: reservationSummaryUnit[2], rawText: `TORRE: ${reservationSummaryUnit[2]}` });
+    recovered.set("property.unit", { value: reservationSummaryUnit[3], rawText: `UNIDADE: ${reservationSummaryUnit[3]}` });
+    if (/^\d{2,}(?:[./-]\d+)*$/.test(registration) && !/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(registration)) {
+      recovered.set("property.registration", { value: registration, rawText: `MATRÍCULA: ${registration}` });
+    }
+  }
+  if (reservationSummaryContact) {
+    const email = normalizeReservationEmail(reservationSummaryContact[3]);
+    recovered.set("buyer.name", { value: reservationSummaryContact[1].trim(), rawText: `CLIENTE: ${reservationSummaryContact[1].trim()}` });
+    recovered.set("buyer.phone", { value: reservationSummaryContact[2].replace(/\s+/g, ""), rawText: `TELEFONE: ${reservationSummaryContact[2]}` });
+    if (email) recovered.set("buyer.email", { value: email, rawText: `E-MAIL: ${email}` });
+  }
   if (clientHeaderGrid) {
     recovered.set("buyer.name", { value: clientHeaderGrid[1].trim(), rawText: `NOME DO CLIENTE: ${clientHeaderGrid[1].trim()}` });
     recovered.set("buyer.cpf", { value: clientHeaderGrid[2], rawText: `CPF/CNPJ: ${clientHeaderGrid[2]}` });
@@ -541,6 +565,11 @@ function recoverReservationGridFields(fields: ExtractedField[], text: string) {
     }
     return field;
   });
+}
+
+function normalizeReservationEmail(value: string) {
+  const compact = value.trim().replace("&", "@").replace(/\s+(?=[A-Z0-9.-]+\.(?:COM(?:\.BR)?|NET|ORG|BR)$)/i, "@");
+  return /^[\w.+-]+@[\w.-]+\.[A-Z]{2,}$/i.test(compact) ? compact : null;
 }
 
 function recoverReservationOcrLabelTypos(fields: ExtractedField[], text: string) {

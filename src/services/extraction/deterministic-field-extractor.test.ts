@@ -428,6 +428,27 @@ test("extrai dados da Reserva quando cada rótulo aparece acima do valor", () =>
   assert.equal(value(output, "buyer.address"), "Rua Torreon, Potira, Caucaia, Ceará, 61650350");
 });
 
+test("recompõe o resumo compacto de Reserva com cliente, contato e unidade", () => {
+  const output = extractDeterministicFields(
+    [
+      "Unidade: . Previsão de entrega do Empreendimento: Situação atual:",
+      "VITÓRIA MARACANAÚ / TORRE 23 / 103 /Matrícula: 31/07/2028",
+      "Cliente: Telefone: E-mail:",
+      "GABRIEL BARROS ARAGAO SILVA +5585989875252 pessoal.gabrielbarros gmail.com",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "DADOS_RESERVA",
+  );
+
+  assert.equal(value(output, "buyer.name"), "GABRIEL BARROS ARAGAO SILVA");
+  assert.equal(value(output, "buyer.phone"), "+5585989875252");
+  assert.equal(value(output, "buyer.email"), "pessoal.gabrielbarros@gmail.com");
+  assert.equal(value(output, "property.development"), "VITÓRIA MARACANAÚ");
+  assert.equal(value(output, "property.tower"), "23");
+  assert.equal(value(output, "property.unit"), "103");
+  assert.equal(value(output, "property.registration"), null);
+});
+
 test("preserva os rótulos e valores financeiros da Reserva para validação de evidência", () => {
   const output = extractDeterministicFields(
     [
