@@ -64,7 +64,7 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /(?:pavimento|andar)[^:\n\r:]*:\s*([A-Z0-9-]+)/i,
     ]),
     text("property.address", "Descrição do imóvel", 94, [
-      /empreendimento\s+denominado\s+[^,\n\r]+,\s*([^\n\r]+?)\s*,\s*com\s+[áa]rea\s+privativa/i,
+      /empreendimento\s+denominado\s+[^,\n\r]+,\s*([\s\S]{1,320}?)\s*,\s*com\s+[áa]rea\s+privativa/i,
     ]),
     text("property.privateArea", "Descrição do imóvel", 96, [
       /[áa]rea\s+privativa\s+(?:coberta\s+)?(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i,
