@@ -445,6 +445,9 @@ function extractMinutaFloor(value: string) {
 function recoverReservationGridFields(fields: ExtractedField[], text: string) {
   const recovered = new Map<string, { value: string; rawText: string }>();
   const rejected = new Set<string>();
+  // In compact portal screenshots, OCR commonly reads the @ before a known
+  // mail domain as O or 0. Correct only this constrained, verifiable pattern.
+  const layoutText = text.replace(/([A-Z0-9._%+-])[O0](?=(?:gmail|hotmail|outlook|yahoo)\.com(?:\.br)?\b)/gi, "$1@");
   // Algumas telas de reserva apresentam os rótulos em uma linha e os valores na
   // linha abaixo, em colunas independentes. Esse formato não forma uma grade
   // sequencial no OCR, então cada rótulo precisa ser resolvido isoladamente.
@@ -517,10 +520,10 @@ function recoverReservationGridFields(fields: ExtractedField[], text: string) {
   );
   // Compact reservation summaries render the labels in one row and all values
   // below it. OCR keeps that geometry but drops the normal "label: value" shape.
-  const reservationSummaryUnit = text.match(
+  const reservationSummaryUnit = layoutText.match(
     /UNIDADE\s*:[^\r\n]*\r?\n\s*([^/\r\n]+?)\s*\/\s*TORRE\s*([A-Z0-9-]{1,12})\s*\/\s*([A-Z0-9-]{1,12})\s*\/\s*MATR[IÍ]CULA\s*:\s*([^\s\r\n]*)/i,
   );
-  const reservationSummaryContact = text.match(
+  const reservationSummaryContact = layoutText.match(
     /CLIENTE\s*:\s+TELEFONE\s*:\s+E-?MAIL\s*:\s*\r?\n\s*([A-ZÀ-Ú][A-ZÀ-Ú\s]+?)\s+(\+?\d[\d\s().-]{8,24})\s+([A-Z0-9._%+-]+(?:\s+|@|&)[A-Z0-9.-]+\.(?:COM(?:\.BR)?|NET|ORG|BR))/i,
   );
   if (reservationSummaryUnit) {

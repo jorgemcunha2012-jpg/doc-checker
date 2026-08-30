@@ -455,7 +455,7 @@ test("recompõe o resumo compacto de Reserva com cliente, contato e unidade", ()
       "Unidade: . Previsão de entrega do Empreendimento: Situação atual:",
       "VITÓRIA MARACANAÚ / TORRE 23 / 103 /Matrícula: 31/07/2028",
       "Cliente: Telefone: E-mail:",
-      "GABRIEL BARROS ARAGAO SILVA +5585989875252 pessoal.gabrielbarros gmail.com",
+      "GABRIEL BARROS ARAGAO SILVA +5585989875252 pessoal.gabrielbarrosOgmail.com",
     ].join("\n"),
     getChecklist("RECONCILIATION"),
     "DADOS_RESERVA",

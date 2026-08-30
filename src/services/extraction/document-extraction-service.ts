@@ -409,6 +409,23 @@ export class DocumentExtractionService {
     checklist: ExtractionRequest["checklist"],
     source?: DocumentSource,
   ) {
+    if (source === "DOCUMENTO_COMPLEMENTAR") {
+      // Payment tables are often uploaded under "Outros documentos". Their
+      // fields are still reservation evidence, so recognize them from OCR before
+      // sending a large table through the generic visual provider.
+      try {
+        const text = await extractImageOcrText(document.buffer);
+        if (hasReservationPaymentTable(text)) {
+          const deterministic = extractDeterministicFields(text, checklist, "DADOS_RESERVA");
+          return enrichReservationFinancialComposition(deterministic, checklist, text);
+        }
+      } catch (error) {
+        console.warn("[ConferIA] OCR local do documento complementar indisponível", {
+          documentName: document.name,
+          error: sanitizeExtractionError(error),
+        });
+      }
+    }
     if (source !== "DADOS_RESERVA") return this.kimiProvider.extractFromImage(document, checklist);
 
     const localOcrPromise = process.env.CONFERIA_SKIP_LOCAL_OCR === "true"
