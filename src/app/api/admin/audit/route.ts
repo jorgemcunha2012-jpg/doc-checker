@@ -13,7 +13,10 @@ export async function GET() {
     if (!isMasterAdmin(admin)) query = query.eq("organization_id", admin.organizationId);
     const { data, error } = await query;
     if (error) throw error;
-    return NextResponse.json({ events: data });
+    const events = isMasterAdmin(admin)
+      ? data
+      : (data ?? []).filter((event) => event.entity_type !== "development_extraction");
+    return NextResponse.json({ events });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });

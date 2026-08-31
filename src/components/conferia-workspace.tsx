@@ -17,7 +17,7 @@ import { processCode } from "@/lib/process-code";
 const validationType = "RECONCILIATION" as const;
 const usesPersistentReviews = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
-export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded = false }: { currentUser: User; publicAccess?: boolean; embedded?: boolean }) {
+export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded = false, showTechnicalExtractionDetails = false }: { currentUser: User; publicAccess?: boolean; embedded?: boolean; showTechnicalExtractionDetails?: boolean }) {
   const [documents, setDocuments] = useState<ClientUploadedDocument[]>([]);
   const [processId, setProcessId] = useState<string | null>(null);
   const [process, setProcess] = useState<ValidationProcess | null>(null);
@@ -510,7 +510,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
               </div>
               {run.validationType === "RECONCILIATION" ? (
                 <>
-                  <ExtractionQualityPanel reports={run.extractionQualityBySource} checklist={run.checklist} />
+                  {showTechnicalExtractionDetails ? <ExtractionQualityPanel reports={run.extractionQualityBySource} checklist={run.checklist} /> : null}
                   <ReconciliationResultsTable
                     results={run.results}
                     sources={run.participatingSources}

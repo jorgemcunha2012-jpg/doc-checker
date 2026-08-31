@@ -49,9 +49,16 @@ export async function GET(request: Request) {
     if (analyst && isOrganizationAdmin(user)) query = query.eq("user_id", analyst);
     const { data, error } = await query;
     if (error) throw error;
+    const showTechnicalExtractionDetails = isMasterAdmin(user);
     return NextResponse.json({
       processes: (data ?? []).map((process) => ({
         ...process,
+        result: showTechnicalExtractionDetails || !process.result
+          ? process.result
+          : { ...process.result, extractionQualityBySource: undefined },
+        summary: showTechnicalExtractionDetails || !process.summary
+          ? process.summary
+          : { ...process.summary, extractionQualityBySource: undefined },
         process_documents: process.process_documents.map((document) => ({
           id: document.id,
           name: document.name,

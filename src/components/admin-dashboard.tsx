@@ -48,10 +48,10 @@ export function AdminDashboard({ isMasterAdmin, embedded = false }: { isMasterAd
   useEffect(() => { void load(); const timer = window.setInterval(load, 15000); return () => window.clearInterval(timer); }, [load]);
   const operationalAlerts = useMemo(
     () => processes.flatMap((process) => {
-      const anomaly = processAnomaly(process);
+      const anomaly = processAnomaly(process, isMasterAdmin);
       return anomaly ? [{ process, ...anomaly }] : [];
     }).sort((left, right) => right.durationMs - left.durationMs),
-    [processes],
+    [isMasterAdmin, processes],
   );
   const extractionAttempts = useMemo(
     () => events.filter((event) => event.entity_type === "development_extraction"),
@@ -62,9 +62,9 @@ export function AdminDashboard({ isMasterAdmin, embedded = false }: { isMasterAd
     () => filter === "ALL"
       ? processes
       : filter === "ANOMALY"
-        ? processes.filter((process) => Boolean(processAnomaly(process)))
+        ? processes.filter((process) => Boolean(processAnomaly(process, isMasterAdmin)))
         : processes.filter((process) => process.final_status === filter),
-    [filter, processes],
+    [filter, isMasterAdmin, processes],
   );
   const count = (status: string) => processes.filter((process) => process.final_status === status).length;
   const inProgressProcesses = processes.filter(
@@ -80,7 +80,7 @@ export function AdminDashboard({ isMasterAdmin, embedded = false }: { isMasterAd
   return <main className={embedded ? "" : "min-h-screen bg-slate-50"}>
     {!embedded ? <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4"><div><div className="text-lg font-bold">ConferIA Admin</div><div className="text-xs text-slate-500">Gestão operacional</div></div><div className="flex items-center gap-4"><Link href={{ pathname: "/history" }} className="text-sm font-bold text-slate-600">Histórico</Link><Link href="/change-password" className="text-sm font-bold text-slate-600">Alterar minha senha</Link><Link href="/" className="text-sm font-bold text-blue-600">Nova conferência</Link></div></div></header> : null}
     <div className={`mx-auto max-w-7xl space-y-8 ${embedded ? "" : "px-5 py-8"}`}>
-      <section><div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Visão geral</h1><p className="mt-1 text-sm text-slate-500">{isMasterAdmin ? "Atividades, segurança e resultados de todas as organizações." : "Atividades e resultados da sua organização."}</p></div><button title="Atualizar" onClick={load} className="rounded-md border border-slate-200 bg-white p-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button></div><div className="mt-5 grid gap-3 sm:grid-cols-5"><Metric label="Documentos analisados" value={documentsAnalyzed} /><Metric label="Documentos em análise" value={documentsInProgress} /><Metric label="Documentos cadastrados" value={documentsTotal} /><Metric label="Processos em andamento" value={inProgressProcesses.length} /><Metric label="Alertas operacionais" value={operationalAlerts.length} alert={operationalAlerts.length > 0} /></div><div className="mt-3 grid gap-3 sm:grid-cols-4"><Metric label="Com pendências" value={count("PENDING_REVIEW")} /><Metric label="Conferidos" value={count("FULLY_CHECKED")} /><Metric label="Falhas" value={count("FAILED")} /><Metric label="Usuários ativos" value={users.filter((user) => user.active).length} /></div><div className="mt-3 grid gap-3 sm:grid-cols-4"><Metric label="Campos críticos ausentes" value={qualityMetrics.missingCritical} alert={qualityMetrics.missingCritical > 0} /><Metric label="Baixa confiança crítica" value={qualityMetrics.lowConfidence} alert={qualityMetrics.lowConfidence > 0} /><Metric label="Conflitos internos críticos" value={qualityMetrics.ambiguous} alert={qualityMetrics.ambiguous > 0} /><Metric label="Recuperados automaticamente" value={qualityMetrics.recovered + qualityMetrics.deterministic} /></div></section>
+      <section><div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Visão geral</h1><p className="mt-1 text-sm text-slate-500">{isMasterAdmin ? "Atividades, segurança e resultados de todas as organizações." : "Atividades e resultados da sua organização."}</p></div><button title="Atualizar" onClick={load} className="rounded-md border border-slate-200 bg-white p-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button></div><div className="mt-5 grid gap-3 sm:grid-cols-5"><Metric label="Documentos analisados" value={documentsAnalyzed} /><Metric label="Documentos em análise" value={documentsInProgress} /><Metric label="Documentos cadastrados" value={documentsTotal} /><Metric label="Processos em andamento" value={inProgressProcesses.length} /><Metric label="Alertas operacionais" value={operationalAlerts.length} alert={operationalAlerts.length > 0} /></div><div className="mt-3 grid gap-3 sm:grid-cols-4"><Metric label="Com pendências" value={count("PENDING_REVIEW")} /><Metric label="Conferidos" value={count("FULLY_CHECKED")} /><Metric label="Falhas" value={count("FAILED")} /><Metric label="Usuários ativos" value={users.filter((user) => user.active).length} /></div>{isMasterAdmin ? <div className="mt-3 grid gap-3 sm:grid-cols-4"><Metric label="Campos críticos ausentes" value={qualityMetrics.missingCritical} alert={qualityMetrics.missingCritical > 0} /><Metric label="Baixa confiança crítica" value={qualityMetrics.lowConfidence} alert={qualityMetrics.lowConfidence > 0} /><Metric label="Conflitos internos críticos" value={qualityMetrics.ambiguous} alert={qualityMetrics.ambiguous > 0} /><Metric label="Recuperados automaticamente" value={qualityMetrics.recovered + qualityMetrics.deterministic} /></div> : null}</section>
       {operationalAlerts.length ? <section className="border border-amber-300 bg-amber-50">
         <div className="flex items-start gap-3 border-b border-amber-200 p-5">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
@@ -139,7 +139,7 @@ function formatDuration(milliseconds: number) {
   if (minutes <= 0) return `${seconds}s`;
   return `${minutes}min ${seconds}s`;
 }
-function processAnomaly(process: ManagedProcess) {
+function processAnomaly(process: ManagedProcess, includeExtractionDetails = true) {
   const durationMs = processDurationMs(process);
   if (!Number.isFinite(durationMs)) return null;
   if (process.process_documents.length === 0) {
@@ -166,6 +166,7 @@ function processAnomaly(process: ManagedProcess) {
       durationMs,
     };
   }
+  if (!includeExtractionDetails) return null;
   const incompleteSources = Object.values(process.summary?.extractionQualityBySource ?? {})
     .filter((report) => report?.status === "PARTIAL" || report?.status === "FAILED");
   if (incompleteSources.length) {

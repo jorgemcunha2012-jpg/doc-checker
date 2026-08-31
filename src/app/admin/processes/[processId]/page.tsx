@@ -25,5 +25,9 @@ export default async function AdminProcessPage({ params }: { params: Promise<{ p
     return <AppShell user={user}><IncompleteProcessDetail process={normalizedProcess} backHref="/admin" /></AppShell>;
   }
   const { data: reviews } = await createSupabaseAdminClient().from("human_reviews").select("*").eq("process_id", processId);
-  return <AppShell user={user}><AdminProcessDetail process={normalizedProcess} reviews={reviews ?? []} currentUser={user} embedded /></AppShell>;
+  const showTechnicalExtractionDetails = isMasterAdmin(user);
+  const visibleProcess = showTechnicalExtractionDetails
+    ? normalizedProcess
+    : { ...normalizedProcess, result: { ...normalizedProcess.result, extractionQualityBySource: undefined } };
+  return <AppShell user={user}><AdminProcessDetail process={visibleProcess} reviews={reviews ?? []} currentUser={user} embedded showTechnicalExtractionDetails={showTechnicalExtractionDetails} /></AppShell>;
 }
