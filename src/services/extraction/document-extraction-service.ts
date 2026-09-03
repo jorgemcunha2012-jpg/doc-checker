@@ -4,13 +4,7 @@ import type { DocumentSource, ExtractedFieldValue, ProviderExtractionOutput } fr
 import { normalizeValue } from "@/services/normalization/normalization-service";
 import { DeepSeekProvider } from "./deepseek-provider";
 import { KimiProvider } from "./kimi-provider";
-import { extractPdfText, hasEnoughPdfText } from "./pdf-text-service";
-import { extractPdfOcrText } from "./pdf-ocr-service";
-import { extractImageOcrText } from "./image-ocr-service";
-import { extractDocxText, extractRtfText } from "./word-text-service";
-import { extractXlsxText, isXlsxName } from "./xlsx-text-service";
 import { enrichReservationFinancialComposition } from "./reservation-financial-composition";
-import { convertTiffToPngPages } from "./tiff-image-service";
 import type { ExtractionRequest, ExtractionResult, ReconciliationExtractionResult, UploadedDocumentPayload } from "./types";
 import { buildExtractionQuality, missingCriticalFields, validateCriticalEvidence } from "./extraction-quality-service";
 import { extractDeterministicFields } from "./deterministic-field-extractor";
@@ -112,7 +106,7 @@ export class DocumentExtractionService {
       if (document.mimeType.includes("pdf") || document.name.toLowerCase().endsWith(".pdf")) {
         const text = await tryExtractPdfText(document.buffer);
 
-        if (hasEnoughPdfText(text)) {
+        if (hasEnoughText(text)) {
           outputs.push(await this.deepSeekProvider.structureText(text, checklist));
         } else {
           usedPdfVisionFallback = true;
@@ -144,19 +138,19 @@ export class DocumentExtractionService {
           const isPdf = document.mimeType.includes("pdf") || document.name.toLowerCase().endsWith(".pdf");
           if (isPdf) {
             const pageSelection = pdfPageSelectionFor(source);
-            const text = await extractPdfText(
+            const text = await readPdfText(
               document.buffer,
               pageSelection,
             );
-            if (!hasEnoughPdfText(text)) {
+            if (!hasEnoughText(text)) {
               console.info("[ConferIA] PDF sem texto extraível suficiente; iniciando OCR", {
                 source,
                 documentName: document.name,
                 extractedTextCharacters: text.length,
                 pageSelection,
               });
-              const ocrText = await extractPdfOcrText(document.buffer, { maxPages: pdfOcrPageLimitFor(source) });
-              if (!hasEnoughPdfText(ocrText)) {
+              const ocrText = await readPdfOcrText(document.buffer, { maxPages: pdfOcrPageLimitFor(source) });
+              if (!hasEnoughText(ocrText)) {
                 return {
                   output: null,
                   recoveredFields: [],
@@ -376,7 +370,7 @@ export class DocumentExtractionService {
     source?: DocumentSource,
   ) {
     if (!isTiff(document)) return this.extractSingleVisualDocument(document, checklist, source);
-    const pages = await convertTiffToPngPages(document.buffer);
+    const pages = await convertTiff(document.buffer);
     const outputs = await Promise.all(
       pages.map((buffer, index) =>
         this.extractSingleVisualDocument(
@@ -414,7 +408,7 @@ export class DocumentExtractionService {
       // fields are still reservation evidence, so recognize them from OCR before
       // sending a large table through the generic visual provider.
       try {
-        const text = await extractImageOcrText(document.buffer);
+        const text = await readImageOcrText(document.buffer);
         if (hasReservationPaymentTable(text)) {
           const deterministic = extractDeterministicFields(text, checklist, "DADOS_RESERVA");
           return enrichReservationFinancialComposition(deterministic, checklist, text);
@@ -430,7 +424,7 @@ export class DocumentExtractionService {
 
     const localOcrPromise = process.env.CONFERIA_SKIP_LOCAL_OCR === "true"
       ? Promise.reject(new Error("OCR local desabilitado para esta execução."))
-      : extractImageOcrText(document.buffer);
+      : readImageOcrText(document.buffer);
     const [focusedAttempt, ocrAttempt, localOcrAttempt] = await Promise.allSettled([
       this.kimiProvider.extractReservationFromImage(document, checklist),
       this.kimiProvider.transcribeReservationImage(document).then((text) => ({
@@ -700,12 +694,19 @@ function isRtf(document: UploadedDocumentPayload) {
 }
 
 function isXlsx(document: UploadedDocumentPayload) {
-  return document.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || isXlsxName(document.name);
+  return document.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || document.name.toLowerCase().endsWith(".xlsx");
 }
 
 async function extractTextDocument(document: UploadedDocumentPayload) {
-  if (isRtf(document)) return extractRtfText(document.buffer);
-  if (isXlsx(document)) return extractXlsxText(document.buffer);
+  if (isRtf(document)) {
+    const { extractRtfText } = await import("./word-text-service");
+    return extractRtfText(document.buffer);
+  }
+  if (isXlsx(document)) {
+    const { extractXlsxText } = await import("./xlsx-text-service");
+    return extractXlsxText(document.buffer);
+  }
+  const { extractDocxText } = await import("./word-text-service");
   return extractDocxText(document.buffer);
 }
 
@@ -716,10 +717,34 @@ function isTiff(document: UploadedDocumentPayload) {
 
 async function tryExtractPdfText(buffer: Buffer) {
   try {
-    return await extractPdfText(buffer);
+    return await readPdfText(buffer);
   } catch {
     return "";
   }
+}
+
+function hasEnoughText(text: string) {
+  return text.replace(/\s+/g, "").length >= 250;
+}
+
+async function readPdfText(buffer: Buffer, options?: { headPages?: number; tailPages?: number }) {
+  const { extractPdfText } = await import("./pdf-text-service");
+  return extractPdfText(buffer, options);
+}
+
+async function readPdfOcrText(buffer: Buffer, options?: { maxPages?: number }) {
+  const { extractPdfOcrText } = await import("./pdf-ocr-service");
+  return extractPdfOcrText(buffer, options);
+}
+
+async function readImageOcrText(buffer: Buffer) {
+  const { extractImageOcrText } = await import("./image-ocr-service");
+  return extractImageOcrText(buffer);
+}
+
+async function convertTiff(buffer: Buffer) {
+  const { convertTiffToPngPages } = await import("./tiff-image-service");
+  return convertTiffToPngPages(buffer);
 }
 
 function emptyOutput(checklist: ExtractionRequest["checklist"]): ProviderExtractionOutput {

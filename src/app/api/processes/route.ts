@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     const supabase = createSupabaseAdminClient();
     let query = supabase
       .from("validation_processes")
-      .select("id, user_id, processing_status, final_status, result, summary, error, started_at, completed_at, profiles!validation_processes_user_id_fkey(name), process_documents(id, name, source, storage_path)")
+      .select("id, organization_id, user_id, processing_status, final_status, result, summary, error, started_at, updated_at, completed_at, profiles!validation_processes_user_id_fkey(name), process_documents(id, name, source, storage_path)")
       .order("started_at", { ascending: false })
       .limit(100);
     if (!isMasterAdmin(user)) query = query.eq("organization_id", user.organizationId);
@@ -50,8 +50,41 @@ export async function GET(request: Request) {
     const { data, error } = await query;
     if (error) throw error;
     const showTechnicalExtractionDetails = isMasterAdmin(user);
+    const processes = data ?? [];
+    const staleProcesses = processes.filter((process) =>
+      process.processing_status !== "DONE" &&
+      process.processing_status !== "FAILED" &&
+      Date.now() - new Date(process.updated_at).getTime() >= 30 * 60 * 1000,
+    );
+    if (staleProcesses.length) {
+      const now = new Date().toISOString();
+      await Promise.all(staleProcesses.map(async (process) => {
+        const elapsedMinutes = Math.floor((Date.now() - new Date(process.updated_at).getTime()) / 60000);
+        const errorMessage = `Processo encerrado automaticamente: não houve atualização há ${elapsedMinutes} minutos. Etapa interrompida em ${process.processing_status}. O worker não concluiu a extração ou comparação.`;
+        const { error: updateError } = await supabase
+          .from("validation_processes")
+          .update({ processing_status: "FAILED", final_status: "FAILED", error: errorMessage, completed_at: now, updated_at: now })
+          .eq("id", process.id)
+          .not("processing_status", "in", "(DONE,FAILED)");
+        if (!updateError) {
+          await supabase.from("audit_events").insert({
+            organization_id: process.organization_id,
+            actor_id: user.id,
+            event_type: "PROCESS_FAILED",
+            entity_type: "validation_process",
+            entity_id: process.id,
+            metadata: { reason: "STALE_PROCESS", previousStage: process.processing_status, error: errorMessage },
+          });
+        }
+        process.processing_status = "FAILED";
+        process.final_status = "FAILED";
+        process.error = errorMessage;
+        process.completed_at = now;
+        process.updated_at = now;
+      }));
+    }
     return NextResponse.json({
-      processes: (data ?? []).map((process) => ({
+      processes: processes.map((process) => ({
         ...process,
         result: showTechnicalExtractionDetails || !process.result
           ? process.result
