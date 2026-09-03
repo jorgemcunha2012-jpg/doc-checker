@@ -23,6 +23,34 @@ test("extrai composição financeira padronizada da minuta sem depender da IA", 
   assert.equal(value(output, "financial.totalValue"), "R$ 237.000,00");
 });
 
+test("extrai participantes, unidade e valores do espelho SIOPI sem confundir terreno", () => {
+  const output = extractDeterministicFields(
+    [
+      "Número Contrato para Administração:8.7877.2858864-5 Unidade/Responsável:4254",
+      "Tipo de Financiamento:336 - PMCMV PF - Imóvel na Planta - Aquisição de Terreno e Construção Residencial (TP009) Correspondente Caixa Aqui:72126-3",
+      "2.1 - Dados do Participante - Proponente/Comprador COCLI: CPF:532.237.993-20 Nome:FRANKSLEI VICENTE QUEIROZ Sexo:Masculino Estado Civil:Casado(a) Com Comunhão Parcial de Bens Data de Nascimento:23/11/1973 Nacionalidade:BRASILEIRA Profissão:PORTEIRO DE EDIFICIO Ocupação:0000000501 Tipo de Identificação:Carteira de Identidade Número:90003059281 Telefone Celular:(85) 98654-1498 E-mail:VIRGINIA@GMAIL.COM Endereço Tipo de Logradouro:R Logradouro:MANOEL GOMES Número:77 Complemento:CS 07 Bairro:COACU Município:EUSEBIO UF:CE CEP:61769-260",
+      "2.1.1 - Dados do Participante - Coobrigado/Proponente COCLI: CPF:744.338.903-59 Nome:VIRGINIA SANDRA FIRMINO DA SILVA QUEIROZ Sexo:Feminino Estado Civil:Casado(a) Com Comunhão Parcial de Bens Data de Nascimento:01/05/1975 Nacionalidade:BRASILEIRA Profissão:GOVERNANTA DE HOTEL Ocupação:0000000521 Tipo de Identificação:Carteira de Identidade Número:93002158183 Telefone Celular:(85) 98654-1498 E-mail:VIRGINIA@GMAIL.COM",
+      "3 - UNIDADE HABITACIONAL Nome do Empreendimento:CONDOMINIO VITORIA EUSEBIO MOD II Tipo de Unidade:A3 Endereço da Unidade Habitacional:RUA JOSE BENTO, nº 1625, BL. T17, AP201, GUARIBAS, CEP 61.770-210, EUSEBIO/CE Vagas de Garagem:1 Descrição da Unidade Habitacional:Futura unidade autônoma Apartamento nº 201 da Torre 17 do Empreendimento denominado CONDOMÍNIO VITÓRIA EUSÉBIO, com área privativa de 40,02m², área de uso comum de 32,98m² e área total de 73,00m² com Coeficiente de Proporcionalidade de 0,001683710767. Tudo descrito na matrícula n° 2391. 4 - PESQUISA DE SUBSÍDIOS",
+      "5.3 - Negociação da Proposta Valor Total Utilizado FGTS:0,00 Valor Compra e Venda ou Orçamento Proposto pelo Cliente:217.000,00 Valor Financiamento Negociado:156.232,52 Subsídio Complemento Capacidade Financeira:2.224,00 Valor Recursos Próprios:38.543,48 5.5 - Terreno Valor Financiamento:17.134,31",
+      "12.1 - Entrada Moradia - CE Valores de Subvenção Entrada:20.000,00",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "SIOPI",
+  );
+
+  assert.equal(value(output, "contract.number"), "8.7877.2858864-5");
+  assert.equal(value(output, "contract.agencyCode"), "4254");
+  assert.match(String(value(output, "contract.financingModality")), /PMCMV/i);
+  assert.equal(value(output, "property.unit"), "201");
+  assert.equal(value(output, "property.tower"), "17");
+  assert.equal(value(output, "property.privateArea"), "40,02m²");
+  assert.equal(value(output, "financial.financing"), "156.232,52");
+  assert.equal(value(output, "financial.totalValue"), "217.000,00");
+  assert.equal(value(output, "financial.housingEntry"), "20.000,00");
+  const buyers = output.fields.filter((field) => field.fieldId === "buyer.cpf" && field.value);
+  assert.deepEqual(buyers.map((field) => field.value), ["532.237.993-20", "744.338.903-59"]);
+});
+
 test("extrai endereço, áreas e fração ideal da descrição da unidade na minuta", () => {
   const output = extractDeterministicFields(
     "Futura unidade autônoma Apartamento nº 1504 da Torre 02, 15º Pavimento, Tipo B, do Empreendimento denominado VISTA PARQUE CONDOMÍNIO CLUBE, RUA BENVINDA Nº 130, COMPL. PARTE GLEBA-M PASSARÉ, FORTALEZA-CE, com área privativa de 48,95m², área de uso comum de 37,338423m² e área total de 86,288423m² com Fração Ideal de 0,003699811434.",

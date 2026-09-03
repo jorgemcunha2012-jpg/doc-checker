@@ -302,8 +302,100 @@ export function extractDeterministicFields(
     ? { fields: recoverReservationGridFields(recoverReservationOcrLabelTypos(fields, text), text) }
     : source === "MINUTA"
       ? { fields: recoverMinutaParticipants(recoverMinutaPropertyDescription(recoverMinutaCompositionTable(fields, text), text), text) }
+      : source === "SIOPI"
+        ? { fields: recoverSiopiFields(fields, text) }
       : { fields };
   return resolvedSource === "ITBI" ? mergeDtiStructuredFields(output, text, checklist) : output;
+}
+
+function recoverSiopiFields(fields: ExtractedField[], text: string) {
+  const compact = text.replace(/\u00a0/g, " ").replace(/\r/g, "").replace(/\s*\n\s*/g, " ").replace(/\s+/g, " ").trim();
+  const recovered = new Map<string, { value: string; rawText: string; section: string }>();
+  const add = (fieldId: string, value: string | undefined, rawText: string, section: string) => {
+    if (value?.trim()) recovered.set(fieldId, { value: cleanValue(value), rawText: rawText.slice(0, 500), section });
+  };
+  const match = (pattern: RegExp) => compact.match(pattern);
+  const value = (pattern: RegExp) => match(pattern)?.[1]?.trim();
+
+  add("contract.number", value(/N[úu]mero\s+Contrato\s+para\s+Administra[cç][aã]o\s*:\s*([A-Z0-9./-]+)/i), compact, "Identificação da proposta");
+  add("contract.agencyCode", value(/Unidade\s+Solicitante\s*:\s*(\d{3,6})\b/i) ?? value(/Unidade\s*\/\s*Respons[aá]vel\s*:\s*(\d{3,6})\b/i), compact, "Identificação da proposta");
+  add("contract.financingModality", value(/Tipo\s+de\s+Financiamento\s*:\s*(.+?)(?=\s+(?:Correspondente(?:\s+Caixa\s+Aqui)?|C[oó]digo\s+da\s+Reserva|Seguradora)\s*:)/i), compact, "Dados da proposta");
+  add("contract.housingProgram", value(/Item\s+de\s+Produto\s*:\s*\d+\s*-\s*([^:]+?)(?=\s+CPF\s+do\s+Proponente|\s+Data\s+de\s+Nascimento|$)/i), compact, "Identificação da proposta");
+
+  const propertyStart = compact.search(/3\s*-\s*UNIDADE\s+HABITACIONAL/i);
+  const propertyEnd = compact.search(/4\s*-\s*PESQUISA\s+DE\s+SUBS[IÍ]DIOS/i);
+  const property = propertyStart >= 0 ? compact.slice(propertyStart, propertyEnd > propertyStart ? propertyEnd : propertyStart + 8000) : "";
+  const propertyValue = (pattern: RegExp) => property.match(pattern)?.[1]?.trim();
+  add("property.development", propertyValue(/Nome\s+do\s+Empreendimento\s*:\s*(.+?)(?=\s+Tipo\s+de\s+Unidade\s*:)/i), property, "Unidade habitacional");
+  add("property.type", propertyValue(/Tipo\s+de\s+Unidade\s*:\s*([A-Z0-9-]+)/i), property, "Unidade habitacional");
+  add("property.address", propertyValue(/Endere[cç]o\s+da\s+Unidade\s+Habitacional\s*:\s*(.+?)(?=\s+Vagas\s+de\s+Garagem\s*:)/i), property, "Unidade habitacional");
+  add("property.unit", propertyValue(/(?:Apartamento|Apto?|AP)\s*(?:n[ºo.°]*)?\s*(\d{1,6}[A-Z]?)/i), property, "Descrição da unidade");
+  add("property.tower", propertyValue(/(?:Torre|Bloco|BL\.?\s*T)\s*(?:n[ºo.°]*)?\s*([A-Z0-9-]{1,12})\b/i), property, "Descrição da unidade");
+  add("property.registration", propertyValue(/matr[ií]cula\s*n[ºo.°]*\s*([A-Z0-9./-]{2,30})/i), property, "Descrição da unidade");
+  add("property.privateArea", propertyValue(/[áa]rea\s+privativa\s+(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i), property, "Descrição da unidade");
+  add("property.commonArea", propertyValue(/[áa]rea\s+(?:de\s+)?uso\s+comum\s+(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i), property, "Descrição da unidade");
+  add("property.totalArea", propertyValue(/[áa]rea\s+total\s+(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i), property, "Descrição da unidade");
+  add("property.idealFraction", propertyValue(/(?:coeficiente\s+de\s+proporcionalidade|fra[cç][aã]o\s+ideal)\s+(?:de\s*)?(\d[\d.,]*)/i), property, "Descrição da unidade");
+
+  const financialStart = compact.search(/5\.3\s*-\s*Negocia[cç][aã]o\s+da\s+Proposta/i);
+  const financialEnd = compact.search(/5\.5\s*-\s*Terreno/i);
+  const financial = financialStart >= 0 ? compact.slice(financialStart, financialEnd > financialStart ? financialEnd : financialStart + 8000) : "";
+  const money = (label: RegExp) => financial.match(new RegExp(`${label.source}\\s*:?\\s*(\\d[\\d.]*,\\d{2})`, label.flags))?.[1];
+  add("financial.totalValue", money(/Valor\s+Compra\s+e\s+Venda\s+ou\s+Or[cç]amento\s+Proposto\s+pelo\s+Cliente/i), financial, "Valores da operação");
+  add("financial.financing", money(/Valor\s+Financiamento\s+Negociado/i), financial, "Valores da operação");
+  add("financial.financedValue", money(/Valor\s+Financiamento\s+Negociado/i), financial, "Valores da operação");
+  add("financial.downPayment", money(/Valor\s+Recursos\s+Pr[oó]prios(?!\s+Aportados)/i), financial, "Valores da operação");
+  add("financial.fgts", money(/Valor\s+Total\s+Utilizado\s+FGTS/i), financial, "Valores da operação");
+  add("financial.subsidy", money(/Subs[ií]dio\s+Complemento\s+Capacidade\s+Financeira/i), financial, "Valores da operação");
+  add("financial.appraisalValue", value(/Avalia[cç][aã]o\s+do\s+Im[oó]vel\s*:\s*(\d[\d.]*,\d{2})/i), compact, "Avaliação de risco");
+  const housingEntry = compact.match(/Valores\s+de\s+Subven[cç][aã]o\s+Entrada\s*:\s*(\d[\d.]*,\d{2})/i)?.[1]
+    ?? compact.match(/Valor\s+Subven[cç][aã]o\s+Entrada\s*(\d[\d.]*,\d{2})/i)?.[1];
+  add("financial.housingEntry", housingEntry, compact, "Entrada Moradia");
+
+  const baseFields = new Set(["buyer.name", "buyer.cpf", "buyer.rg", "buyer.nationality", "buyer.profession", "buyer.maritalStatus", "buyer.birthDate", "buyer.address", "buyer.email", "buyer.phone"]);
+  const participants = recoverSiopiParticipants(compact);
+  const mapped = fields.map((field) => {
+    const found = recovered.get(field.fieldId);
+    return found ? { ...field, value: found.value, confidence: 98, sourceLocation: { section: found.section, rawText: found.rawText } } : field;
+  });
+  return participants.length ? [...mapped.filter((field) => !baseFields.has(field.fieldId)), ...participants] : mapped;
+}
+
+function recoverSiopiParticipants(text: string) {
+  const headers = /2\.1(?:\.1)?\s*-\s*Dados\s+do\s+Participante\s*-\s*(?:Proponente\/Comprador|Coobrigado\/Proponente)/gi;
+  const matches = [...text.matchAll(headers)];
+  if (!matches.length) return [] as ExtractedField[];
+  const participantFields: ExtractedField[] = [];
+  for (let index = 0; index < matches.length; index += 1) {
+    const start = (matches[index].index ?? 0) + matches[index][0].length;
+    const next = matches[index + 1]?.index ?? text.search(/3\s*-\s*UNIDADE\s+HABITACIONAL/i);
+    const block = text.slice(start, next > start ? next : start + 5000);
+    const field = (pattern: RegExp) => block.match(pattern)?.[1]?.trim();
+    const participantId = `buyer_${index + 1}`;
+    const evidence = block.slice(0, 1000);
+    const add = (fieldId: string, value: string | undefined) => {
+      if (value) participantFields.push(participantField(fieldId, cleanValue(value), participantId, evidence, "Participante SIOPI"));
+    };
+    add("buyer.name", field(/Nome\s*:\s*(.+?)(?=\s+Sexo\s*:)/i));
+    add("buyer.cpf", field(/CPF\s*:\s*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i));
+    add("buyer.rg", field(/Tipo\s+de\s+Identifica[cç][aã]o\s*:[\s\S]*?N[úu]mero\s*:\s*([A-Z0-9.-]{5,30})/i));
+    add("buyer.nationality", field(/Nacionalidade\s*:\s*([^:]+?)(?=\s+Profiss[aã]o\s*:)/i));
+    add("buyer.profession", field(/Profiss[aã]o\s*:\s*(.+?)(?=\s+Ocupa[cç][aã]o\s*:)/i));
+    add("buyer.maritalStatus", field(/Estado\s+Civil\s*:\s*(.+?)(?=\s+Data\s+de\s+Nascimento\s*:)/i));
+    add("buyer.birthDate", field(/Data\s+de\s+Nascimento\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i));
+    add("buyer.email", field(/E-?mail\s*:\s*([^\s]+)/i));
+    add("buyer.phone", field(/Telefone\s+Celular\s*:\s*([+()\d\s.-]{8,24})/i) ?? field(/Telefone\s+Residencial\s*:\s*([+()\d\s.-]{8,24})/i));
+    const street = field(/Tipo\s+de\s+Logradouro\s*:\s*([^\s]+)\s+Logradouro\s*:\s*(.+?)(?=\s+N[úu]mero\s*:)/i);
+    const number = field(/N[úu]mero\s*:\s*([^\s]+)(?=\s+Complemento\s*:)/i);
+    const complement = field(/Complemento\s*:\s*(.+?)(?=\s+Bairro\s*:)/i);
+    const neighborhood = field(/Bairro\s*:\s*(.+?)(?=\s+Munic[ií]pio\s*:)/i);
+    const city = field(/Munic[ií]pio\s*:\s*(.+?)(?=\s+UF\s*:)/i);
+    const state = field(/UF\s*:\s*([A-Z]{2})(?=\s+CEP\s*:)/i);
+    const postalCode = field(/CEP\s*:\s*(\d{5}-?\d{3})/i);
+    const address = [street, number, complement, neighborhood, city, state, postalCode].filter(Boolean).join(", ");
+    add("buyer.address", address || undefined);
+  }
+  return participantFields;
 }
 
 function recoverMinutaParticipants(fields: ExtractedField[], text: string) {
@@ -337,13 +429,13 @@ function recoverMinutaParticipants(fields: ExtractedField[], text: string) {
   return [...fields.filter((field) => !participantFields.has(field.fieldId)), ...recovered];
 }
 
-function participantField(fieldId: string, value: string, participantId: string, rawText: string): ExtractedField {
+function participantField(fieldId: string, value: string, participantId: string, rawText: string, section = "Qualificação do(s) adquirente(s)"): ExtractedField {
   return {
     fieldId,
     value,
     participantId,
     confidence: 96,
-    sourceLocation: { section: "Qualificação do(s) adquirente(s)", rawText },
+    sourceLocation: { section, rawText },
   };
 }
 
