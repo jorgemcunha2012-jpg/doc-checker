@@ -23,6 +23,28 @@ test("extrai composição financeira padronizada da minuta sem depender da IA", 
   assert.equal(value(output, "financial.totalValue"), "R$ 237.000,00");
 });
 
+test("mantém a Entrada Moradia na linha B.4.6 quando a tabela lista todos os valores ao final", () => {
+  const output = extractDeterministicFields(
+    [
+      "B.4 - VALOR DE COMPOSIÇÃO DOS RECURSOS: O valor destinado à aquisição do imóvel é R$ 237.000,00.",
+      "B.4.1 - Valor do financiamento concedido pela CAIXA:",
+      "B.4.2 - Valor dos recursos próprios:",
+      "B.4.3 - Valor dos recursos da conta vinculada de FGTS:",
+      "B.4.4 - Valor do FGTS Futuro:",
+      "B.4.5 - Valor do desconto complemento concedido pelo FGTS/União:",
+      "B.4.6 - Valor da subvenção concedida pela INICIATIVA MCMV CIDADES - CONTRAPARTIDAS",
+      "R$ 158.937,82 R$ 41.760,18 R$ 0,00 R$ 0,00 R$ 16.302,00 R$ 20.000,00",
+    ].join("\n"),
+    getChecklist("RECONCILIATION"),
+    "MINUTA",
+  );
+
+  assert.equal(value(output, "financial.totalValue"), "R$ 237.000,00");
+  assert.equal(value(output, "financial.financing"), "R$ 158.937,82");
+  assert.equal(value(output, "financial.downPayment"), "R$ 41.760,18");
+  assert.equal(value(output, "financial.housingEntry"), "R$ 20.000,00");
+});
+
 test("extrai participantes, unidade e valores do espelho SIOPI sem confundir terreno", () => {
   const output = extractDeterministicFields(
     [

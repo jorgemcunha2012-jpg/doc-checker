@@ -1,4 +1,3 @@
-import mammoth from "mammoth";
 import JSZip from "jszip";
 import { DOMParser } from "@xmldom/xmldom";
 
@@ -10,6 +9,9 @@ export async function extractDocxText(buffer: Buffer) {
     // Some Word-compatible files have nonstandard XML; Mammoth remains the safe fallback.
   }
 
+  // Mammoth is only needed for DOCX fallback. Loading it for every extraction
+  // makes RTF-only operations pay the startup cost (and can stall some runtimes).
+  const { default: mammoth } = await import("mammoth");
   const fallback = await mammoth.extractRawText({ buffer });
   return compactText(fallback.value);
 }

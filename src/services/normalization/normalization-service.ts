@@ -106,10 +106,20 @@ function normalizeAddress(value: string) {
     .replace(/\bAV\b\.?/g, "AV")
     .replace(/\bRUA\b/g, "R")
     .replace(/\bR\b\.?/g, "R")
-    .replace(/\bN[º°.]?\b/g, "NUMERO")
+    .replace(/\bN(?:[º°.]|\s+O)?(?=\s*\d)/g, "NUMERO")
     .replace(/\bNO\b/g, "NUMERO")
     .replace(/\bAPARTAMENTO\b/g, "AP")
-    .replace(/\bAPTO\b/g, "AP");
+    .replace(/\bAPTO\b/g, "AP")
+    // Torre e apartamento são comparados em campos próprios. Um endereço com
+    // esses complementos deve equivaler ao endereço-base da minuta quando a rua,
+    // número, bairro, CEP e cidade forem os mesmos.
+    .replace(/\b(?:BLOCO|BL)\s*\.?\s*(?:TORRE|T)\s*\d+[A-Z]?\b/g, "")
+    .replace(/\bAP\s*\.?\s*\d+[A-Z]?\b/g, "")
+    .replace(/(?:,\s*){2,}/g, ",")
+    .replace(/\s*,\s*/g, ",")
+    .replace(/^\s*,\s*|\s*,\s*$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizeDate(value: string) {

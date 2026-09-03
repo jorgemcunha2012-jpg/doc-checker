@@ -19,7 +19,7 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /\b(?:FORTALEZA|FORTALEZA\/CE)\s*,?\s*CE\s+(\d{1,2}\s+de\s+[A-ZÀ-Úa-zà-ú]+\s+de\s+\d{4})/i,
       /(?:data\s+(?:do\s+contrato|da\s+contrata[cç][aã]o|de\s+assinatura)|contrato\s+celebrado\s+em)\s*[:\-]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4}|\d{1,2}\s+de\s+[A-ZÀ-Úa-zà-ú]+\s+de\s+\d{4})/i,
     ]),
-    text("contract.agencyCode", "Identificação do contrato", 90, [/(?:ag[eê]ncia|c[oó]digo\s+da\s+ag[eê]ncia)[^:\n\r]*:\s*([A-Z0-9./-]+)/i]),
+    text("contract.agencyCode", "Identificação do contrato", 90, [/(?:c[oó]digo\s+da\s+ag[eê]ncia|ag[eê]ncia)(?!\s*\/)[^:\n\r]*:\s*(\d{3,6})\b/i]),
     text("contract.financingModality", "Identificação do contrato", 90, [/modalidade\s+de\s+financiamento[^:\n\r]*:\s*([^\n\r]+)/i]),
     text("contract.housingProgram", "Identificação do contrato", 90, [/programa\s+habitacional[^:\n\r]*:\s*([^\n\r]+)/i]),
     money("financial.financing", "Composição dos recursos", 100, [
@@ -52,7 +52,7 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /\b(?:torre|bloco)\s*(?:n[ºo.]*)?\s*([A-Z0-9-]{1,12})\b/i,
     ]),
     text("property.registration", "Descrição do imóvel", 90, [
-      /\bmatr[ií]cula\s*(?:n[ºo.]*)?\s*([A-Z0-9./-]{2,30})\b/i,
+      /\bmatr[ií]cula\s*(?:n[º°o.]*)?\s*([A-Z0-9./-]{2,30})\b/i,
     ]),
     text("property.registryOffice", "Descrição do imóvel", 88, [/(?:cart[oó]rio|of[ií]cio)\s+(?:de\s+)?registro\s+de\s+im[oó]veis?[^:\n\r]*:?\s*([^\n\r]+)/i]),
     text("property.type", "Descrição do imóvel", 88, [
@@ -67,14 +67,14 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /empreendimento\s+denominado\s+[^,\n\r]+,\s*([\s\S]{1,320}?)\s*,\s*com\s+[áa]rea\s+privativa/i,
     ]),
     text("property.privateArea", "Descrição do imóvel", 96, [
-      /[áa]rea\s+privativa\s+(?:coberta\s+)?(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i,
+      /[áa]rea\s+privativa\s+(?:coberta\s+|total\s+)?(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i,
     ]),
     text("property.commonArea", "Descrição do imóvel", 96, [
       /[áa]rea\s+(?:de\s+)?uso\s+comum\s+(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i,
-      /[áa]rea\s+comum\s+(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i,
+      /[áa]rea\s+comum\s+(?:total\s+)?(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i,
     ]),
     text("property.totalArea", "Descrição do imóvel", 96, [
-      /[áa]rea\s+total\s+(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i,
+      /[áa]rea\s+(?:real\s+)?total\s+(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i,
     ]),
     text("property.idealFraction", "Descrição do imóvel", 96, [
       /fra[cç][ãa]o\s+ideal\s+(?:de\s*)?(\d[\d.,]*)/i,
@@ -312,7 +312,7 @@ function recoverSiopiFields(fields: ExtractedField[], text: string) {
   const compact = text.replace(/\u00a0/g, " ").replace(/\r/g, "").replace(/\s*\n\s*/g, " ").replace(/\s+/g, " ").trim();
   const recovered = new Map<string, { value: string; rawText: string; section: string }>();
   const add = (fieldId: string, value: string | undefined, rawText: string, section: string) => {
-    if (value?.trim()) recovered.set(fieldId, { value: cleanValue(value), rawText: rawText.slice(0, 500), section });
+    if (value?.trim()) recovered.set(fieldId, { value: cleanValue(value), rawText: evidenceExcerpt(rawText, value), section });
   };
   const match = (pattern: RegExp) => compact.match(pattern);
   const value = (pattern: RegExp) => match(pattern)?.[1]?.trim();
@@ -372,9 +372,8 @@ function recoverSiopiParticipants(text: string) {
     const block = text.slice(start, next > start ? next : start + 5000);
     const field = (pattern: RegExp) => block.match(pattern)?.[1]?.trim();
     const participantId = `buyer_${index + 1}`;
-    const evidence = block.slice(0, 1000);
     const add = (fieldId: string, value: string | undefined) => {
-      if (value) participantFields.push(participantField(fieldId, cleanValue(value), participantId, evidence, "Participante SIOPI"));
+      if (value) participantFields.push(participantField(fieldId, cleanValue(value), participantId, evidenceExcerpt(block, value), "Participante SIOPI"));
     };
     add("buyer.name", field(/Nome\s*:\s*(.+?)(?=\s+Sexo\s*:)/i));
     add("buyer.cpf", field(/CPF\s*:\s*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i));
@@ -393,7 +392,8 @@ function recoverSiopiParticipants(text: string) {
     const state = field(/UF\s*:\s*([A-Z]{2})(?=\s+CEP\s*:)/i);
     const postalCode = field(/CEP\s*:\s*(\d{5}-?\d{3})/i);
     const address = [street, number, complement, neighborhood, city, state, postalCode].filter(Boolean).join(", ");
-    add("buyer.address", address || undefined);
+    const addressEvidence = block.match(/Endere[cç]o\s+Tipo\s+de\s+Logradouro[\s\S]{0,700}?\bCEP\s*:\s*\d{5}-?\d{3}/i)?.[0];
+    if (address) participantFields.push(participantField("buyer.address", cleanValue(address), participantId, addressEvidence ?? evidenceExcerpt(block, address), "Participante SIOPI"));
   }
   return participantFields;
 }
@@ -445,7 +445,7 @@ function recoverMinutaCompositionTable(fields: ExtractedField[], text: string) {
   const remainder = text.slice(start);
   const end = remainder.search(/\bB\s*\.\s*5\b/i);
   const block = remainder.slice(0, end >= 0 ? end : remainder.length);
-  const labels = [...block.matchAll(/B\s*\.\s*4\s*\.\s*([1-5])\b[\s\S]{0,260}?(?=B\s*\.\s*4\s*\.\s*[1-5]\b|R\$\s*\d|$)/gi)];
+  const labels = [...block.matchAll(/B\s*\.\s*4\s*\.\s*([1-6])\b[\s\S]{0,260}?(?=B\s*\.\s*4\s*\.\s*[1-6]\b|R\$\s*\d|$)/gi)];
   const amounts = [...block.matchAll(/R\$\s*\d[\d.]*,\d{2}/g)].map((match) => match[0].replace(/\s+/g, " "));
   if (labels.length < 4 || amounts.length < labels.length) return fields;
 
@@ -454,6 +454,7 @@ function recoverMinutaCompositionTable(fields: ExtractedField[], text: string) {
     "2": "financial.downPayment",
     "3": "financial.fgts",
     "5": "financial.subsidy",
+    "6": "financial.housingEntry",
   };
   const recovered = new Map<string, { value: string; rawText: string }>();
   labels.forEach((label, index) => {
@@ -462,6 +463,26 @@ function recoverMinutaCompositionTable(fields: ExtractedField[], text: string) {
     if (!fieldId || !value) return;
     recovered.set(fieldId, { value, rawText: `${label[0].replace(/\s+/g, " ")} ${value}` });
   });
+
+  const total = block.match(/valor\s+destinado[\s\S]{0,260}?(?:[ée]|equivale\s+a)\s*(R\$\s*\d[\d.,]*)/i);
+  if (total?.[1]) recovered.set("financial.totalValue", { value: cleanMoneyToken(total[1]), rawText: total[0].replace(/\s+/g, " ") });
+  const tableBlock = block.slice(0, 2_000);
+  const lastHeader = [...tableBlock.matchAll(/B\s*\.\s*4\s*\.\s*6\b/gi)].at(-1);
+  const tableAmounts = lastHeader
+    ? [...tableBlock.slice(lastHeader.index ?? 0).matchAll(/R\$\s*\d[\d.,]*/g)].map((match) => cleanMoneyToken(match[0]))
+    : [];
+  if (tableAmounts.length >= 6) {
+    const [financing, downPayment, fgts, , subsidy, housingEntry] = tableAmounts;
+    const itemEvidence = (item: number, value: string) => {
+      const header = tableBlock.match(new RegExp(`B\\s*\\.\\s*4\\s*\\.\\s*${item}\\b[\\s\\S]{0,220}`, "i"))?.[0] ?? `B.4.${item}`;
+      return `${header.replace(/\s+/g, " ")} ${value}`;
+    };
+    recovered.set("financial.financing", { value: financing, rawText: itemEvidence(1, financing) });
+    recovered.set("financial.downPayment", { value: downPayment, rawText: itemEvidence(2, downPayment) });
+    recovered.set("financial.fgts", { value: fgts, rawText: itemEvidence(3, fgts) });
+    recovered.set("financial.subsidy", { value: subsidy, rawText: itemEvidence(5, subsidy) });
+    recovered.set("financial.housingEntry", { value: housingEntry, rawText: itemEvidence(6, housingEntry) });
+  }
 
   return fields.map((field) => {
     const value = recovered.get(field.fieldId);
@@ -488,14 +509,23 @@ function recoverMinutaPropertyDescription(fields: ExtractedField[], text: string
     /\b(?:edif[ií]cio)\s*(?:n[ºo.°]*)?\s*[:#-]?\s*([A-Z0-9-]{1,12})\b/i,
   ]);
   const type = extractMinutaPropertyValue(description, [
+    /\btipo\s+([A-ZÀ-Ú][A-ZÀ-Ú0-9 -]{0,24}?)(?=\s+(?:DO\s+EMPREENDIMENTO|COM\s+[ÁA]REA)|[,.])/i,
     /\b(?:tipo\s+da\s+unidade|tipo\s+do\s+im[oó]vel|tipologia|tipo)\s*[:#-]?\s*([A-Z][A-Z0-9-]{0,15})\b/i,
   ]);
   const floor = extractMinutaFloor(description);
+  const registration = extractMinutaPropertyValue(description, [/matr[ií]cula\s*(?:n[º°o.]*)?\s*([A-Z0-9./-]{2,30})\b/i]);
+  const privateArea = extractMinutaPropertyValue(description, [/[áa]rea\s+privativa\s+(?:coberta\s+|total\s+)?(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i]);
+  const commonArea = extractMinutaPropertyValue(description, [/[áa]rea\s+comum\s+(?:total\s+)?(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i]);
+  const totalArea = extractMinutaPropertyValue(description, [/[áa]rea\s+(?:real\s+)?total\s+(?:de\s*)?(\d[\d.,]*\s*m[²2]?)/i]);
   const values = new Map<string, string>();
   if (unit) values.set("property.unit", unit.toUpperCase());
   if (tower) values.set("property.tower", tower.toUpperCase());
   if (type) values.set("property.type", "Tipo " + type.toUpperCase());
   if (floor) values.set("property.floor", floor);
+  if (registration) values.set("property.registration", registration);
+  if (privateArea) values.set("property.privateArea", privateArea);
+  if (commonArea) values.set("property.commonArea", commonArea);
+  if (totalArea) values.set("property.totalArea", totalArea);
 
   return fields.map((field) => {
     const value = values.get(field.fieldId);
@@ -506,10 +536,20 @@ function recoverMinutaPropertyDescription(fields: ExtractedField[], text: string
       confidence: 99,
       sourceLocation: {
         section: "Descrição do imóvel",
-        rawText: description.replace(/\s+/g, " ").slice(0, 500),
+        rawText: evidenceExcerpt(description, value),
       },
     };
   });
+}
+
+function evidenceExcerpt(rawText: string, value: string) {
+  const index = rawText.toLocaleLowerCase("pt-BR").indexOf(value.toLocaleLowerCase("pt-BR"));
+  if (index < 0) return rawText.slice(0, 500);
+  return rawText.slice(Math.max(0, index - 220), Math.min(rawText.length, index + value.length + 280));
+}
+
+function cleanMoneyToken(value: string) {
+  return value.replace(/(\d{2})\.$/, "$1");
 }
 
 function minutaPropertyContext(text: string) {
@@ -521,7 +561,7 @@ function minutaPropertyContext(text: string) {
     /(?:identifica[cç][aã]o|descri[cç][aã]o)\s+do\s+im[oó]vel/i,
   ];
   const candidates = anchors.flatMap((anchor) => [...compact.matchAll(new RegExp(anchor.source, anchor.flags.includes("g") ? anchor.flags : `${anchor.flags}g`))]
-    .map((match) => compact.slice(Math.max(0, (match.index ?? 0) - 160), (match.index ?? 0) + 720)));
+    .map((match) => compact.slice(Math.max(0, (match.index ?? 0) - 160), (match.index ?? 0) + 1400)));
 
   return candidates
     .map((candidate) => ({ candidate, score: minutaPropertyContextScore(candidate) }))

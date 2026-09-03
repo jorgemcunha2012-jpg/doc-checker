@@ -122,6 +122,9 @@ function hasExpectedMinutaFinancialEvidence(source: DocumentSource, fieldId: str
       (acquisitionItem("3") && /financiamento\s+concedido\s+pela\s+caixa/i.test(compact));
   }
   if (fieldId === "financial.downPayment" || fieldId === "financial.housingEntry") {
+    if (fieldId === "financial.housingEntry") {
+      return item("6") && /(?:subven[cç][aã]o|iniciativa\s+mcmv|entrada\s+moradia)/i.test(compact);
+    }
     return (item("2") || acquisitionItem("1")) && /recursos\s+pr[oó]prios/i.test(compact);
   }
   if (fieldId === "financial.fgts") {
@@ -131,7 +134,7 @@ function hasExpectedMinutaFinancialEvidence(source: DocumentSource, fieldId: str
     return item("5") && /(?:desconto|subs[ií]dio)/i.test(compact);
   }
   if (fieldId === "financial.totalValue") {
-    return /valor\s+destinado\s+[àa]\s+aquisi[cç][aã]o|valor\s+do\s+contrato|valor\s+de\s+aquisi[cç][aã]o[^.]*?equivale/i.test(compact);
+    return /valor\s+destinado\s+[àa]\s+aquisi[cç]\s*[aã]o|valor\s+do\s+contrato|valor\s+de\s+aquisi[cç]\s*[aã]o[^.]*?equivale/i.test(compact);
   }
   return true;
 }
@@ -229,6 +232,9 @@ function evidenceContainsValue(value: string, evidence: string, fieldType: Check
   if (["cpf", "cnpj", "rg", "telefone"].includes(fieldType)) return evidence.replace(/\D/g, "").includes(normalizedValue);
   if (fieldType === "valor_monetario" || fieldType === "area") {
     return [...evidence.matchAll(/\d[\d.,]*/g)].some((match) => normalizeValue(match[0], fieldType) === normalizedValue);
+  }
+  if (fieldType === "identificador_imovel") {
+    return normalizeValue(evidence, fieldType).includes(normalizedValue);
   }
   if (fieldType === "email") return evidence.toLowerCase().includes(normalizedValue);
   const tokens = normalizedValue.split(/\s+/).filter((token) => token.length > 2);
