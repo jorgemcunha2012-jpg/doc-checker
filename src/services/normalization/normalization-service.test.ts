@@ -20,3 +20,9 @@ test("equivale matrícula mascarada e áreas apresentadas com precisões diferen
   assert.equal(normalizeValue("113.632", "identificador_imovel"), normalizeValue("113632", "identificador_imovel"));
   assert.equal(normalizeValue("37,352316 m²", "area"), normalizeValue("37,35 m²", "area"));
 });
+
+test("normaliza complementos acessórios de endereço sem perder logradouro e número", () => {
+  const minuta = normalizeValue("RUA BENVINDA Nº 130, COMPL. PARTE GLEBA-M PASSARÉ, FORTALEZA-CE", "endereco");
+  const siopi = normalizeValue("RUA BENVINDA, nº 130, BL. T2, AP1504, PASSARÉ, CEP 60.861-340, FORTALEZA/CE", "endereco");
+  assert.equal(minuta, siopi);
+});

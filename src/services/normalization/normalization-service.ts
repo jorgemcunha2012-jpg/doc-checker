@@ -118,9 +118,14 @@ function normalizeAddress(value: string) {
     // número, bairro, CEP e cidade forem os mesmos.
     .replace(/\b(?:BLOCO|BL)\s*\.?\s*(?:TORRE|T)\s*\d+[A-Z]?\b/g, "")
     .replace(/\bAP\s*\.?\s*\d+[A-Z]?\b/g, "")
+    .replace(/\bCEP\s*\d{2}\.?\d{3}-?\d{3}\b/g, "")
+    // "Parte gleba" é um complemento de origem registral que pode não constar
+    // no espelho operacional. Rua, número, bairro e cidade continuam na chave.
+    .replace(/\bCOMPL\.?\s*(?:PARTE\s+)?GLEBA(?:-[A-Z0-9]+)?\b/g, "")
     .replace(/(?:,\s*){2,}/g, ",")
     .replace(/\s*,\s*/g, ",")
     .replace(/^\s*,\s*|\s*,\s*$/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

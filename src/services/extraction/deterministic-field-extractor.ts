@@ -19,7 +19,7 @@ const sourceDefinitions: Partial<Record<DocumentSource, MatchDefinition[]>> = {
       /\b(?:FORTALEZA|FORTALEZA\/CE)\s*,?\s*CE\s+(\d{1,2}\s+de\s+[A-ZÀ-Úa-zà-ú]+\s+de\s+\d{4})/i,
       /(?:data\s+(?:do\s+contrato|da\s+contrata[cç][aã]o|de\s+assinatura)|contrato\s+celebrado\s+em)\s*[:\-]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4}|\d{1,2}\s+de\s+[A-ZÀ-Úa-zà-ú]+\s+de\s+\d{4})/i,
     ]),
-    text("contract.agencyCode", "Identificação do contrato", 90, [/(?:c[oó]digo\s+da\s+ag[eê]ncia|ag[eê]ncia)(?!\s*\/)[^:\n\r]*:\s*(\d{3,6})\b/i]),
+    text("contract.agencyCode", "Identificação do contrato", 90, [/(?:c[oó]digo\s+(?:da\s+)?ag[eê]ncia|ag[eê]ncia\s*(?:c[oó]digo|n[ºo.]?))\s*[:#-]?\s*(\d{3,6})\b/i, /\bag[eê]ncia\s*:\s*(\d{3,6})\b/i]),
     text("contract.financingModality", "Identificação do contrato", 90, [/modalidade\s+de\s+financiamento[^:\n\r]*:\s*([^\n\r]+)/i]),
     text("contract.housingProgram", "Identificação do contrato", 90, [/programa\s+habitacional[^:\n\r]*:\s*([^\n\r]+)/i]),
     money("financial.financing", "Composição dos recursos", 100, [
@@ -410,14 +410,17 @@ function recoverMinutaParticipants(fields: ExtractedField[], text: string) {
   const recovered: ExtractedField[] = [];
   matches.forEach((match, index) => {
     const name = match[1].replace(/^e\s+/i, "").replace(/\s+/g, " ").trim();
-    const details = match[2];
+    // A qualificação de outros intervenientes pode aparecer depois do comprador.
+    // Mantemos somente o bloco do adquirente para nunca usar o RG do procurador
+    // ou representante da vendedora como se fosse o documento do comprador.
+    const details = match[2].split(/\b(?:INCORPORADORA|CONSTRUTORA|CREDORA\s+FIDUCI[ÁA]RIA|ENTIDADE\s+ORGANIZADORA)\b/i)[0];
     const participantId = `buyer_${index + 1}`;
     const evidence = `${name}, nacionalidade${details}`.replace(/\s+/g, " ").slice(0, 500);
     recovered.push(participantField("buyer.name", name, participantId, evidence));
 
     const cpf = details.match(/\bCPF\s*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i)?.[1];
     if (cpf) recovered.push(participantField("buyer.cpf", cpf, participantId, evidence));
-    const rg = details.match(/\bRG\s*(?:n[ºo.]*)?\s*([A-Z0-9.-]{4,30})/i)?.[1];
+    const rg = details.match(/\b(?:RG|CNH)\s*(?:n[ºo.]*)?\s*([A-Z0-9.-]{4,30})/i)?.[1];
     if (rg) recovered.push(participantField("buyer.rg", rg, participantId, evidence));
     const rgIssuer = details.match(/\b(?:SSP|DETRAN|PC|IFP|SDS|SESP|SEGUP)[/-]?[A-Z]{0,3}\b/i)?.[0];
     if (rgIssuer) recovered.push(participantField("buyer.rgIssuer", rgIssuer, participantId, evidence));
