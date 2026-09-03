@@ -44,6 +44,8 @@ export const documentSourceLabels: Record<DocumentSource, string> = {
 
 export type ValidationStatus =
   | "MATCH"
+  | "PRESENT"
+  | "ABSENT"
   | "DIVERGENCE"
   | "NOT_FOUND"
   | "NOT_APPLICABLE"
@@ -79,7 +81,9 @@ export type ChecklistCategory =
   | "Dados financeiros"
   | "Declaração de valores"
   | "Guias Fortaleza"
-  | "Página de assinaturas";
+  | "Página de assinaturas"
+  | "Informações adicionais / ressalvas"
+  | "Documentação e validade";
 
 export type Organization = {
   id: string;
@@ -195,7 +199,7 @@ export type LegacyValidationRun = {
   usedPdfVisionFallback: boolean;
 };
 
-export type ReconciliationStatus = "MATCH" | "DIVERGENCE" | "REVIEW_REQUIRED" | "SOURCE_UNREADABLE";
+export type ReconciliationStatus = "MATCH" | "PRESENT" | "ABSENT" | "DIVERGENCE" | "REVIEW_REQUIRED" | "SOURCE_UNREADABLE";
 export type HumanReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export type HumanReview = {

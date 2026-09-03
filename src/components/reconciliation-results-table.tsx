@@ -12,9 +12,11 @@ type Filter = "ALL" | ReconciliationStatus | "MISSING";
 const filters: Array<{ id: Filter; label: string }> = [
   { id: "ALL", label: "Todos" },
   { id: "MATCH", label: "Conferidos" },
+  { id: "PRESENT", label: "Presentes" },
   { id: "DIVERGENCE", label: "Divergências" },
   { id: "REVIEW_REQUIRED", label: "Revisão" },
   { id: "MISSING", label: "Ausentes" },
+  { id: "ABSENT", label: "Ausentes no checklist" },
   { id: "SOURCE_UNREADABLE", label: "Ilegíveis" },
 ];
 
@@ -140,7 +142,7 @@ function ResultGroup({
   onReview: (fieldId: string, review?: HumanReview) => void;
   onOpenReview: (result: FieldComparisonResult) => void;
 }) {
-  const pending = results.filter((result) => result.status !== "MATCH" && result.humanReview?.status !== "APPROVED").length;
+  const pending = results.filter((result) => result.status !== "MATCH" && result.status !== "PRESENT" && result.humanReview?.status !== "APPROVED").length;
   return (
     <div className="border-b border-slate-200 last:border-b-0">
       <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 px-4 py-3">
@@ -208,7 +210,7 @@ function ResultRow({
             <div className="mt-1 text-[11px] text-slate-400">{result.humanReview.reviewerName} · {formatReviewDate(result.humanReview.reviewedAt)}</div>
             <button className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900" onClick={() => onReview(result.field.id)}><RotateCcw className="h-3.5 w-3.5" />Desfazer</button>
           </div>
-        ) : result.status !== "MATCH" ? (
+        ) : result.status !== "MATCH" && result.status !== "PRESENT" ? (
           <button className="mt-3 inline-flex min-h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700" onClick={() => onOpenReview(result)}>
             <CheckCircle2 className="h-3.5 w-3.5" />{result.status === "DIVERGENCE" ? "Ignorar divergência" : "Marcar como verificado"}
           </button>

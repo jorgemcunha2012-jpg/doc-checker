@@ -120,6 +120,18 @@ test("marca fonte ilegível mesmo quando nenhum campo foi extraído dela", () =>
   assert.match(cpf.observation, /PDF escaneado/);
 });
 
+test("avalia controles de presença sem tentar compará-los contra outra fonte", () => {
+  const present = run([
+    value("clause.iptuExemption", "MINUTA", "Cláusula de dispensa de IPTU"),
+  ], ["MINUTA"]);
+  assert.equal(field(present, "clause.iptuExemption").status, "PRESENT");
+  assert.match(field(present, "clause.iptuExemption").observation, /localizado/);
+
+  const absent = run([], ["MINUTA"]);
+  assert.equal(field(absent, "clause.iptuExemption").status, "ABSENT");
+  assert.match(field(absent, "clause.iptuExemption").observation, /fonte Minuta/);
+});
+
 test("compara ITBI com qualquer documento complementar que contenha o mesmo campo", () => {
   const result = run(
     [

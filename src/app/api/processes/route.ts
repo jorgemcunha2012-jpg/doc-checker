@@ -82,7 +82,7 @@ function localFinalStatus(process: ReturnType<typeof listValidationProcesses>[nu
       ? "PENDING_REVIEW"
       : "FULLY_CHECKED";
   }
-  return process.result.results.some((result) => result.status !== "MATCH")
+  return process.result.results.some((result) => result.status !== "MATCH" && result.status !== "PRESENT")
     ? "PENDING_REVIEW"
     : "FULLY_CHECKED";
 }

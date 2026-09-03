@@ -586,7 +586,7 @@ function SummaryCard({ label, value, tone, hint }: { label: string; value: numbe
 }
 
 function ReviewProgress({ run }: { run: ReconciliationRun }) {
-  const pendingResults = run.results.filter((result) => result.status !== "MATCH");
+  const pendingResults = run.results.filter((result) => result.status !== "MATCH" && result.status !== "PRESENT");
   const reviewed = pendingResults.filter((result) => result.humanReview?.status === "APPROVED").length;
   const unresolved = pendingResults.length - reviewed;
   const finalChecked = run.summary.matches + reviewed;
@@ -801,7 +801,7 @@ function finalResultCounts(run: ValidationRun) {
 
   return run.results.reduce(
     (counts, result) => {
-      if (result.status === "MATCH" || result.humanReview?.status === "APPROVED") counts.checked += 1;
+      if (result.status === "MATCH" || result.status === "PRESENT" || result.humanReview?.status === "APPROVED") counts.checked += 1;
       else if (result.status === "DIVERGENCE") counts.divergences += 1;
       else counts.reviews += 1;
       return counts;

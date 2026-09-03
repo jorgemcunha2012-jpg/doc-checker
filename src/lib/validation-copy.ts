@@ -20,6 +20,8 @@ export const validationTypeCopy: Record<ValidationType, { title: string; shortTi
 
 export const statusCopy: Record<ValidationStatus, string> = {
   MATCH: "Conferido",
+  PRESENT: "Presente",
+  ABSENT: "Ausente",
   DIVERGENCE: "Divergência",
   NOT_FOUND: "Não encontrado",
   NOT_APPLICABLE: "Não aplicável",

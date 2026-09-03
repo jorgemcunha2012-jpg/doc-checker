@@ -765,6 +765,21 @@ test("extrai razão social e CNPJ da matrícula para confronto com a minuta", ()
   assert.equal(value(output, "seller.cnpj"), "44.537.507/0001-54");
 });
 
+test("localiza cláusulas e controles do checklist da minuta com evidência", () => {
+  const text = `
+    A cláusula de dispensa de IPTU aplica-se à operação. A apresentação posterior da guia ITBI
+    deverá constar no dossiê do cliente da agência do processo. Trata-se de primeira aquisição.
+    Será providenciada a baixa da hipoteca após a última parcela. A assinatura do gerente CAIXA
+    consta na página de assinaturas. Certidão fiscal federal da vendedora juntada aos autos.
+  `;
+  const output = extractDeterministicFields(text, getChecklist("RECONCILIATION"), "MINUTA");
+  for (const fieldId of ["clause.iptuExemption", "clause.itbiLaterPresentation", "clause.clientDossier", "clause.firstAcquisition", "clause.lastInstallment", "clause.mortgageRelease", "signature.manager", "certificate.sellerFederal"]) {
+    const field = output.fields.find((item) => item.fieldId === fieldId);
+    assert.ok(field?.value, `${fieldId} deve ser encontrado`);
+    assert.ok(field?.sourceLocation?.rawText, `${fieldId} deve manter evidência`);
+  }
+});
+
 function value(output: ReturnType<typeof extractDeterministicFields>, fieldId: string) {
   return output.fields.find((field) => field.fieldId === fieldId)?.value;
 }

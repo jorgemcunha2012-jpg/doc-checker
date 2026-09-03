@@ -28,10 +28,7 @@ export type ReconciliationInput = {
 
 export class ReconciliationEngine {
   run(organizationId: string, input: ReconciliationInput): ReconciliationRun {
-    const checklist = expandParticipantFields(
-      getChecklist("RECONCILIATION").filter((field) => field.itemType === "COMPARISON"),
-      input.values,
-    );
+    const checklist = expandParticipantFields(getChecklist("RECONCILIATION"), input.values);
     const results = checklist
       .filter((field) => this.hasEvidenceForField(field, input))
       .map((field) => this.compareField(organizationId, field, input));
@@ -62,9 +59,9 @@ export class ReconciliationEngine {
       usedPdfVisionFallback: input.usedPdfVisionFallback,
       summary: {
         totalChecked: results.length,
-        matches: results.filter((result) => result.status === "MATCH").length,
+        matches: results.filter((result) => result.status === "MATCH" || result.status === "PRESENT").length,
         divergences: results.filter((result) => result.status === "DIVERGENCE").length,
-        reviewRequired: results.filter((result) => result.status === "REVIEW_REQUIRED").length,
+        reviewRequired: results.filter((result) => result.status === "REVIEW_REQUIRED" || result.status === "ABSENT").length,
         unreadable: results.filter((result) => result.status === "SOURCE_UNREADABLE").length,
         missingBySource,
         unreadableBySource,
@@ -85,6 +82,7 @@ export class ReconciliationEngine {
     field: ChecklistField,
     input: ReconciliationInput,
   ): FieldComparisonResult {
+    if (field.itemType !== "COMPARISON") return this.checkPresence(organizationId, field, input);
     const evidenceParticipants = input.participatingSources.filter((source) =>
       input.values.some((value) => matchesFieldValue(value, field) && value.source === source),
     );
@@ -228,6 +226,41 @@ export class ReconciliationEngine {
 
     addDiffTokens(comparisonParticipants, valuesBySource);
     return result(organizationId, field, valuesBySource, "DIVERGENCE", buildSourceDiagnostic(groups));
+  }
+
+  private checkPresence(
+    organizationId: string,
+    field: ChecklistField,
+    input: ReconciliationInput,
+  ): FieldComparisonResult {
+    const expectedSources = input.participatingSources.filter((source) => field.expectedSources?.includes(source));
+    const valuesBySource: Partial<Record<DocumentSource, ReconciliationSourceValue>> = {};
+    for (const source of expectedSources) {
+      const extracted = input.values.find((value) => matchesFieldValue(value, field) && value.source === source);
+      const rawValue = extracted?.value == null ? null : String(extracted.value).trim();
+      valuesBySource[source] = {
+        value: rawValue || null,
+        normalizedValue: normalizeFieldValue(rawValue ?? "", field),
+        confidence: extracted?.confidence ?? 0,
+        sourceLocation: extracted?.sourceLocation,
+      };
+    }
+
+    const unreadable = input.unreadableSources.filter((source) => expectedSources.includes(source));
+    if (unreadable.length) {
+      return result(organizationId, field, valuesBySource, "SOURCE_UNREADABLE", `Não foi possível verificar ${field.label} porque a fonte ${joinSources(unreadable)} não foi interpretada.${sourceErrorDetails(unreadable, input)}`);
+    }
+    const present = expectedSources.filter((source) => Boolean(valuesBySource[source]?.value));
+    const absent = expectedSources.filter((source) => !valuesBySource[source]?.value);
+    if (!expectedSources.length) {
+      return result(organizationId, field, valuesBySource, "REVIEW_REQUIRED", `O item ${field.label} exige o envio da fonte ${joinSources(field.expectedSources ?? ["MINUTA"])} para ser verificado.`);
+    }
+    if (absent.length) {
+      const found = present.length ? ` Evidência encontrada na fonte ${joinSources(present)}.` : "";
+      return result(organizationId, field, valuesBySource, "ABSENT", `${field.label} não foi localizado na fonte ${joinSources(absent)}.${found}`);
+    }
+    const descriptor = field.itemType === "VALIDITY_CHECK" ? "foi localizado; revise a data indicada na evidência" : "foi localizado";
+    return result(organizationId, field, valuesBySource, "PRESENT", `${field.label} ${descriptor} na fonte ${joinSources(present)}.`);
   }
 }
 

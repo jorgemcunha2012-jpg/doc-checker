@@ -8,8 +8,9 @@ function field(
   validationType: ValidationType,
   fieldType: FieldType,
   options: Pick<ChecklistField, "scopeCondition" | "allowMultiple" | "expectedSources"> = {},
+  itemType: ChecklistField["itemType"] = "COMPARISON",
 ): ChecklistField {
-  return { id, category, label, required, validationType, fieldType, itemType: "COMPARISON", ...options };
+  return { id, category, label, required, validationType, fieldType, itemType, ...options };
 }
 
 const minutaFields: ChecklistField[] = [
@@ -49,6 +50,21 @@ const minutaFields: ChecklistField[] = [
   field("financial.appraisalValue", "Dados financeiros", "Valor da avaliação do imóvel", true, "MINUTA", "valor_monetario"),
   field("financial.housingEntry", "Dados financeiros", "Entrada Moradia", false, "MINUTA", "valor_monetario"),
   field("signature.city", "Página de assinaturas", "Cidade conforme local da agência do cliente", true, "MINUTA", "texto"),
+  field("buyer.rgIssuer", "Dados do comprador", "Órgão emissor do RG", true, "MINUTA", "texto", { allowMultiple: true }, "COMPARISON"),
+  field("buyer.propertyRegime", "Dados do comprador", "Regime de bens", false, "MINUTA", "texto", { allowMultiple: true }, "COMPARISON"),
+  field("property.mortgageRegistration", "Dados do imóvel", "Registro da hipoteca junto à matrícula", false, "MINUTA", "texto", {}, "COMPARISON"),
+  field("clause.iptuExemption", "Informações adicionais / ressalvas", "Cláusula de dispensa de IPTU", false, "MINUTA", "texto", { expectedSources: ["MINUTA"] }, "CLAUSE_PRESENCE"),
+  field("clause.itbiLaterPresentation", "Informações adicionais / ressalvas", "Cláusula de apresentação posterior do ITBI", false, "MINUTA", "texto", { expectedSources: ["MINUTA"] }, "CLAUSE_PRESENCE"),
+  field("clause.clientDossier", "Informações adicionais / ressalvas", "Cláusula de dossiê do cliente/agência", false, "MINUTA", "texto", { expectedSources: ["MINUTA"] }, "CLAUSE_PRESENCE"),
+  field("clause.firstAcquisition", "Informações adicionais / ressalvas", "Cláusula de primeira aquisição", false, "MINUTA", "texto", { expectedSources: ["MINUTA"] }, "CLAUSE_PRESENCE"),
+  field("clause.lastInstallment", "Informações adicionais / ressalvas", "Cláusula da última parcela", false, "MINUTA", "texto", { expectedSources: ["MINUTA"] }, "CLAUSE_PRESENCE"),
+  field("clause.mortgageRelease", "Informações adicionais / ressalvas", "Cláusula de baixa de hipoteca", false, "MINUTA", "texto", { expectedSources: ["MINUTA"] }, "CLAUSE_PRESENCE"),
+  field("certificate.sellerFederal", "Documentação e validade", "Certidão fiscal federal da vendedora", false, "MINUTA", "texto", { expectedSources: ["MINUTA"] }, "VALIDITY_CHECK"),
+  field("certificate.sellerLabor", "Documentação e validade", "Certidão trabalhista da vendedora", false, "MINUTA", "texto", { expectedSources: ["MINUTA"] }, "VALIDITY_CHECK"),
+  field("certificate.buyerLabor", "Documentação e validade", "Certidão trabalhista do comprador", false, "MINUTA", "texto", { expectedSources: ["MINUTA"] }, "VALIDITY_CHECK"),
+  field("property.registrationOnus", "Documentação e validade", "Matrícula positiva de ônus", false, "MINUTA", "texto", { expectedSources: ["MINUTA"] }, "VALIDITY_CHECK"),
+  field("signature.afterIssueDate", "Página de assinaturas", "Assinaturas posteriores à emissão", false, "MINUTA", "data", { expectedSources: ["MINUTA"] }, "VALIDITY_CHECK"),
+  field("signature.manager", "Página de assinaturas", "Assinatura do gerente", false, "MINUTA", "texto", { expectedSources: ["MINUTA"] }, "CLAUSE_PRESENCE"),
 ];
 
 const itbiFields: ChecklistField[] = [
@@ -93,10 +109,12 @@ const sourceMap: Record<string, DocumentSource[]> = {
   "buyer.name": ["SIOPI", "MINUTA", "ITBI", "DADOS_RESERVA"],
   "buyer.cpf": ["SIOPI", "MINUTA", "ITBI"],
   "buyer.rg": ["SIOPI", "MINUTA"],
+  "buyer.rgIssuer": ["SIOPI", "MINUTA"],
   "buyer.nationality": ["SIOPI", "MINUTA"],
   "buyer.profession": ["SIOPI", "MINUTA"],
   "buyer.parentage": ["SIOPI", "MINUTA"],
   "buyer.maritalStatus": ["SIOPI", "MINUTA"],
+  "buyer.propertyRegime": ["SIOPI", "MINUTA"],
   "buyer.birthDate": ["SIOPI", "MINUTA"],
   "buyer.address": ["SIOPI", "MINUTA", "ITBI"],
   "buyer.spouseName": ["SIOPI", "MINUTA"],
@@ -114,6 +132,8 @@ const sourceMap: Record<string, DocumentSource[]> = {
   "property.development": ["SIOPI", "MINUTA", "ITBI", "DADOS_RESERVA", "CADASTRO_EMPREENDIMENTO"],
   "property.registration": ["SIOPI", "MINUTA", "ITBI", "DADOS_RESERVA", "CADASTRO_EMPREENDIMENTO"],
   "property.registryOffice": ["MINUTA", "MATRICULA", "FRACOES"],
+  "property.mortgageRegistration": ["MINUTA", "MATRICULA"],
+  "property.registrationOnus": ["MINUTA", "MATRICULA"],
   "property.iptu": ["MINUTA", "ITBI", "FRACOES", "IPTU", "CADASTRO_EMPREENDIMENTO"],
   "property.address": ["SIOPI", "MINUTA", "ITBI"],
   "property.unit": ["SIOPI", "MINUTA", "ITBI", "DADOS_RESERVA", "CADASTRO_EMPREENDIMENTO"],
@@ -138,6 +158,17 @@ const sourceMap: Record<string, DocumentSource[]> = {
   "financial.housingEntry": ["SIOPI", "MINUTA", "DADOS_RESERVA"],
   "financial.declaredTotal": ["SIOPI", "MINUTA", "ITBI"],
   "signature.city": ["SIOPI", "MINUTA"],
+  "signature.afterIssueDate": ["MINUTA"],
+  "signature.manager": ["MINUTA"],
+  "clause.iptuExemption": ["MINUTA"],
+  "clause.itbiLaterPresentation": ["MINUTA"],
+  "clause.clientDossier": ["MINUTA"],
+  "clause.firstAcquisition": ["MINUTA"],
+  "clause.lastInstallment": ["MINUTA"],
+  "clause.mortgageRelease": ["MINUTA"],
+  "certificate.sellerFederal": ["MINUTA"],
+  "certificate.sellerLabor": ["MINUTA"],
+  "certificate.buyerLabor": ["MINUTA"],
   "fortaleza.guideNumber": ["ITBI"],
   "fortaleza.assessmentValue": ["ITBI"],
 };

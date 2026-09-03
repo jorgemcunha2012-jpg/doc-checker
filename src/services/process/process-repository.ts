@@ -187,7 +187,7 @@ async function refreshFinalStatus(processId: string) {
   if (reviewsError) throw new Error(`Falha ao consultar revisões: ${reviewsError.message}`);
   if (!results?.length) throw new Error("O processo não possui resultados persistidos para revisão.");
   const approved = new Set((reviews ?? []).filter((review) => review.status === "APPROVED").map((review) => review.field_id));
-  const pending = (results ?? []).some((result) => result.automatic_status !== "MATCH" && !approved.has(result.field_id));
+  const pending = (results ?? []).some((result) => !["MATCH", "PRESENT"].includes(result.automatic_status) && !approved.has(result.field_id));
   const { error } = await supabase.from("validation_processes").update({
     final_status: pending ? "PENDING_REVIEW" : "FULLY_CHECKED",
     updated_at: new Date().toISOString(),
@@ -203,7 +203,7 @@ function finalStatus(process: ValidationProcess) {
       ? "PENDING_REVIEW"
       : "FULLY_CHECKED";
   }
-  return process.result.results.some((result) => result.status !== "MATCH")
+  return process.result.results.some((result) => result.status !== "MATCH" && result.status !== "PRESENT")
     ? "PENDING_REVIEW"
     : "FULLY_CHECKED";
 }

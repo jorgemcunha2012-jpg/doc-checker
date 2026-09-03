@@ -39,12 +39,12 @@ function ValidationReportDocument({ run, filter }: { run: ValidationRun; filter:
     ? run.results.filter((result) => matchesReportFilter(result, run.validationType, filter))
     : [];
   const results = run.validationType === "RECONCILIATION" ? reconciliationResults : legacyResults;
-  const matches = results.filter((result) => result.status === "MATCH").length;
+  const matches = results.filter((result) => result.status === "MATCH" || result.status === "PRESENT").length;
   const manuallyApproved = run.validationType === "RECONCILIATION"
     ? reconciliationResults.filter((result) => result.humanReview?.status === "APPROVED").length
     : 0;
   const divergences = results.filter((result) => result.status === "DIVERGENCE" && !("humanReview" in result && result.humanReview?.status === "APPROVED")).length;
-  const reviewRequired = results.filter((result) => result.status !== "MATCH" && result.status !== "DIVERGENCE" && !("humanReview" in result && result.humanReview?.status === "APPROVED")).length;
+  const reviewRequired = results.filter((result) => result.status !== "MATCH" && result.status !== "PRESENT" && result.status !== "DIVERGENCE" && !("humanReview" in result && result.humanReview?.status === "APPROVED")).length;
 
   return (
     <Document>
@@ -149,7 +149,7 @@ function matchesReportFilter(
 ) {
   if (filter === "ALL") return true;
   const approved = validationType === "RECONCILIATION" && "humanReview" in result && result.humanReview?.status === "APPROVED";
-  const checked = result.status === "MATCH" || approved;
+  const checked = result.status === "MATCH" || result.status === "PRESENT" || approved;
   if (filter === "CHECKED") return checked;
   if (filter === "DIVERGENCES") return result.status === "DIVERGENCE" && !approved;
   return !checked;

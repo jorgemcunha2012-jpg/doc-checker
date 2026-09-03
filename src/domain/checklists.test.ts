@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getChecklist } from "./checklists";
 
-test("mantém os itens comparáveis dos checklists oficiais como fonte do motor", () => {
+test("mantém os itens comparáveis e controles documentais dos checklists oficiais como fonte do motor", () => {
   const minuta = getChecklist("RECONCILIATION");
   const itbi = getChecklist("ITBI");
   const ids = new Set(minuta.map((field) => field.id));
@@ -25,6 +25,8 @@ test("mantém os itens comparáveis dos checklists oficiais como fonte do motor"
     "property.type",
   ]) assert.ok(itbi.some((field) => field.id === fieldId), `Checklist oficial de ITBI deve conter ${fieldId}`);
 
-  assert.ok(minuta.every((field) => field.itemType === "COMPARISON"));
+  assert.ok(minuta.some((field) => field.id === "clause.iptuExemption" && field.itemType === "CLAUSE_PRESENCE"));
+  assert.ok(minuta.some((field) => field.id === "certificate.sellerFederal" && field.itemType === "VALIDITY_CHECK"));
+  assert.ok(minuta.some((field) => field.id === "signature.manager" && field.itemType === "CLAUSE_PRESENCE"));
   assert.ok(itbi.every((field) => field.itemType === "COMPARISON"));
 });

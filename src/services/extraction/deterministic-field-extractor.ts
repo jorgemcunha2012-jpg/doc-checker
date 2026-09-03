@@ -301,7 +301,7 @@ export function extractDeterministicFields(
   const output = source === "DADOS_RESERVA"
     ? { fields: recoverReservationGridFields(recoverReservationOcrLabelTypos(fields, text), text) }
     : source === "MINUTA"
-      ? { fields: recoverMinutaParticipants(recoverMinutaPropertyDescription(recoverMinutaCompositionTable(fields, text), text), text) }
+      ? { fields: recoverMinutaChecklistControls(recoverMinutaParticipants(recoverMinutaPropertyDescription(recoverMinutaCompositionTable(fields, text), text), text), text) }
       : source === "SIOPI"
         ? { fields: recoverSiopiFields(fields, text) }
       : { fields };
@@ -406,7 +406,7 @@ function recoverMinutaParticipants(fields: ExtractedField[], text: string) {
   const matches = [...block.matchAll(/([A-ZÀ-Ú][A-ZÀ-Ú\s]{5,}),\s*nacionalidade\b([\s\S]*?)(?=\.\s*(?:e\s+)?[A-ZÀ-Ú][A-ZÀ-Ú\s]{5,},\s*nacionalidade\b|$)/gi)];
   if (!matches.length) return fields;
 
-  const participantFields = new Set(["buyer.name", "buyer.cpf", "buyer.rg", "buyer.maritalStatus", "buyer.address", "buyer.email", "buyer.phone"]);
+  const participantFields = new Set(["buyer.name", "buyer.cpf", "buyer.rg", "buyer.rgIssuer", "buyer.maritalStatus", "buyer.propertyRegime", "buyer.address", "buyer.email", "buyer.phone"]);
   const recovered: ExtractedField[] = [];
   matches.forEach((match, index) => {
     const name = match[1].replace(/^e\s+/i, "").replace(/\s+/g, " ").trim();
@@ -417,10 +417,16 @@ function recoverMinutaParticipants(fields: ExtractedField[], text: string) {
 
     const cpf = details.match(/\bCPF\s*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i)?.[1];
     if (cpf) recovered.push(participantField("buyer.cpf", cpf, participantId, evidence));
+    const rg = details.match(/\bRG\s*(?:n[ºo.]*)?\s*([A-Z0-9.-]{4,30})/i)?.[1];
+    if (rg) recovered.push(participantField("buyer.rg", rg, participantId, evidence));
+    const rgIssuer = details.match(/\b(?:SSP|DETRAN|PC|IFP|SDS|SESP|SEGUP)[/-]?[A-Z]{0,3}\b/i)?.[0];
+    if (rgIssuer) recovered.push(participantField("buyer.rgIssuer", rgIssuer, participantId, evidence));
     const email = details.match(/e-?mail\s*:\s*([\w.+-]+@[\w.-]+\.[A-Z]{2,})/i)?.[1];
     if (email) recovered.push(participantField("buyer.email", email, participantId, evidence));
     const maritalStatus = details.match(/\b(solteir[oa](?:\(a\))?|casad[oa](?:\(a\))?|divorciad[oa](?:\(a\))?|vi[úu]v[oa](?:\(a\))?)\b/i)?.[1];
     if (maritalStatus) recovered.push(participantField("buyer.maritalStatus", maritalStatus, participantId, evidence));
+    const propertyRegime = details.match(/\b(?:comunh[aã]o\s+(?:parcial|universal)\s+de\s+bens|separa[cç][aã]o\s+(?:total|convencional)\s+de\s+bens|participa[cç][aã]o\s+final\s+nos\s+aq[uü]estos)\b/i)?.[0];
+    if (propertyRegime) recovered.push(participantField("buyer.propertyRegime", propertyRegime, participantId, evidence));
     const address = details.match(/residente\s+e\s+domiciliado\(a\)\s+em\s+([^\.\r\n]+)/i)?.[1]?.trim();
     if (address) recovered.push(participantField("buyer.address", address, participantId, evidence));
   });
@@ -539,6 +545,35 @@ function recoverMinutaPropertyDescription(fields: ExtractedField[], text: string
         rawText: evidenceExcerpt(description, value),
       },
     };
+  });
+}
+
+function recoverMinutaChecklistControls(fields: ExtractedField[], text: string) {
+  const controls: Array<{ fieldId: string; section: string; patterns: RegExp[] }> = [
+    { fieldId: "property.mortgageRegistration", section: "Matrícula e hipoteca", patterns: [/R\.?(?:\s*[-ºn°]*)?\s*(\d+[A-Z0-9./-]*)\s*(?:da\s+)?hipoteca/i, /registro\s+(?:da\s+)?hipoteca\s*(?:n[ºo.°]*)?\s*([A-Z0-9./-]+)/i] },
+    { fieldId: "clause.iptuExemption", section: "Ressalvas", patterns: [/dispensa(?:do|r)?\s+(?:de\s+)?IPTU/i] },
+    { fieldId: "clause.itbiLaterPresentation", section: "Ressalvas", patterns: [/(?:apresenta[cç][aã]o|entrega)\s+posterior\s+(?:da\s+)?(?:guia\s+)?ITBI/i] },
+    { fieldId: "clause.clientDossier", section: "Ressalvas", patterns: [/(?:dossi[êe]\s+(?:do\s+)?cliente|ag[êe]ncia\s+do\s+processo)/i] },
+    { fieldId: "clause.firstAcquisition", section: "Ressalvas", patterns: [/(?:primeira|1ª|1a)\s+aquisi[cç][aã]o/i] },
+    { fieldId: "clause.lastInstallment", section: "Ressalvas", patterns: [/(?:[úu]ltima|final)\s+parcela/i] },
+    { fieldId: "clause.mortgageRelease", section: "Ressalvas", patterns: [/baixa\s+(?:da\s+)?hipoteca/i] },
+    { fieldId: "certificate.sellerFederal", section: "Certidões", patterns: [/certid[aã]o\s+(?:fiscal\s+)?federal[\s\S]{0,90}(?:vendedora|transmitente)|(?:vendedora|transmitente)[\s\S]{0,90}certid[aã]o\s+(?:fiscal\s+)?federal/i] },
+    { fieldId: "certificate.sellerLabor", section: "Certidões", patterns: [/certid[aã]o\s+trabalhista[\s\S]{0,90}(?:vendedora|transmitente)|(?:vendedora|transmitente)[\s\S]{0,90}certid[aã]o\s+trabalhista/i] },
+    { fieldId: "certificate.buyerLabor", section: "Certidões", patterns: [/certid[aã]o\s+trabalhista[\s\S]{0,90}(?:comprador|adquirente)|(?:comprador|adquirente)[\s\S]{0,90}certid[aã]o\s+trabalhista/i] },
+    { fieldId: "property.registrationOnus", section: "Matrícula", patterns: [/(?:matr[ií]cula[\s\S]{0,120}positiva\s+de\s+[ôo]nus|positiva\s+de\s+[ôo]nus[\s\S]{0,120}matr[ií]cula)/i] },
+    { fieldId: "signature.afterIssueDate", section: "Página de assinaturas", patterns: [/assinaturas?[\s\S]{0,90}(?:posterior(?:es)?|ap[oó]s)[\s\S]{0,90}(?:emiss[aã]o|data\s+de\s+emiss[aã]o)/i] },
+    { fieldId: "signature.manager", section: "Página de assinaturas", patterns: [/(?:assinatura|gerente)[\s\S]{0,80}gerente|gerente[\s\S]{0,80}(?:assinatura|CAIXA)/i] },
+  ];
+  const detected = new Map<string, { value: string; section: string; rawText: string }>();
+  for (const control of controls) {
+    const match = control.patterns.map((pattern) => text.match(pattern)).find(Boolean);
+    if (!match) continue;
+    const excerpt = evidenceExcerpt(text, match[0]);
+    detected.set(control.fieldId, { value: match[0].replace(/\s+/g, " ").trim(), section: control.section, rawText: excerpt });
+  }
+  return fields.map((field) => {
+    const value = detected.get(field.fieldId);
+    return value ? { ...field, value: value.value, confidence: 96, sourceLocation: { section: value.section, rawText: value.rawText } } : field;
   });
 }
 
