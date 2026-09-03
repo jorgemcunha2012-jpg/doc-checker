@@ -15,3 +15,8 @@ test("reconhece o último separador como decimal quando há ponto e vírgula", (
   assert.equal(normalizeValue("1.234,56", "valor_monetario"), "1234.56");
   assert.equal(normalizeValue("1,234.56", "valor_monetario"), "1234.56");
 });
+
+test("equivale matrícula mascarada e áreas apresentadas com precisões diferentes", () => {
+  assert.equal(normalizeValue("113.632", "identificador_imovel"), normalizeValue("113632", "identificador_imovel"));
+  assert.equal(normalizeValue("37,352316 m²", "area"), normalizeValue("37,35 m²", "area"));
+});

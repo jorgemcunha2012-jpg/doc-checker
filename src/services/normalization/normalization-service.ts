@@ -56,7 +56,10 @@ function normalizeArea(value: string) {
   const match = value.replace(/\s/g, "").replace(",", ".").match(/\d+(?:\.\d+)?/);
   if (!match) return normalizeText(value);
   const numeric = Number.parseFloat(match[0]);
-  return Number.isFinite(numeric) ? numeric.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") : normalizeText(value);
+  // Contratos podem guardar a área com seis casas, enquanto SIOPI, ITBI e
+  // cadastros exibem duas. A precisão operacional de centésimos evita que uma
+  // diferença meramente de apresentação seja tratada como divergência.
+  return Number.isFinite(numeric) ? numeric.toFixed(2) : normalizeText(value);
 }
 
 function onlyDigits(value: string) {
