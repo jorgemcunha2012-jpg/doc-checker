@@ -1,6 +1,7 @@
 import type { ChecklistField, ProviderExtractionOutput } from "@/domain/validation";
 import type { DocumentExtractionProvider } from "./types";
 import { enrichStandardFinancialFields, focusDocumentText } from "./deepseek-provider";
+import { parseJsonResponse } from "./openai-compatible-client";
 import { checklistPrompt, coerceExtractionOutput } from "./provider-utils";
 
 type AnthropicResponse = {
@@ -13,7 +14,7 @@ export class HaikuProvider implements DocumentExtractionProvider {
   async structureText(text: string, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
     const focusedText = focusDocumentText(text, checklist);
     const content = await this.request(focusedText, checklist);
-    return enrichStandardFinancialFields(coerceExtractionOutput(parseJson(content), checklist), text, checklist);
+    return enrichStandardFinancialFields(coerceExtractionOutput(parseJsonResponse(content), checklist), text, checklist);
   }
 
   private async request(text: string, checklist: ChecklistField[]) {
@@ -52,9 +53,4 @@ export class HaikuProvider implements DocumentExtractionProvider {
       clearTimeout(timeout);
     }
   }
-}
-
-function parseJson(content: string) {
-  const value = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  return JSON.parse(value) as unknown;
 }
