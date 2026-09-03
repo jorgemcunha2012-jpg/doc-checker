@@ -99,7 +99,7 @@ export class OpenAICompatibleClient {
   }
 }
 
-function parseJsonResponse(content: string): unknown {
+export function parseJsonResponse(content: string): unknown {
   const json = stripCodeFence(content);
 
   try {

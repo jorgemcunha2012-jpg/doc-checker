@@ -108,6 +108,8 @@ export class ValidationEngine {
   private buildObservation(status: ValidationStatus) {
     const observations: Record<ValidationStatus, string> = {
       MATCH: "Campo conferido automaticamente após normalização.",
+      PRESENT: "Campo localizado em uma única fonte participante.",
+      ABSENT: "Campo ausente nas fontes participantes.",
       DIVERGENCE: "Valores normalizados diferentes entre origem e destino.",
       NOT_FOUND: "Informação ausente em uma das fontes.",
       NOT_APPLICABLE: "Campo opcional ausente nas duas fontes.",

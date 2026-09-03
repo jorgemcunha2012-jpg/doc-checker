@@ -110,6 +110,21 @@ test("bloqueia valor financeiro que não aparece na evidência", () => {
   assert.deepEqual(validated.evidenceIssues, ["financial.subsidy"]);
 });
 
+test("bloqueia bônus da reserva quando o provider o classifica como subsídio", () => {
+  const checklist = getChecklist("RECONCILIATION");
+  const validated = validateCriticalEvidence("DADOS_RESERVA", {
+    fields: [{
+      fieldId: "financial.subsidy",
+      value: "R$ 4.679,99",
+      confidence: 95,
+      sourceLocation: { rawText: "Bonus Adimplência | Fixa | 1 | R$ 4.679,99" },
+    }],
+  }, checklist);
+
+  assert.equal(validated.output.fields[0].value, null);
+  assert.deepEqual(validated.evidenceIssues, ["financial.subsidy"]);
+});
+
 test("bloqueia financiamento da minuta quando a evidência se refere à compra do terreno", () => {
   const checklist = getChecklist("RECONCILIATION");
   const validated = validateCriticalEvidence("MINUTA", {
