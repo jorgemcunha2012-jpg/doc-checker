@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { DocumentSource, ExtractedFieldValue, ProviderExtractionOutput } from "@/domain/validation";
 import { normalizeValue } from "@/services/normalization/normalization-service";
 import { DeepSeekProvider } from "./deepseek-provider";
+import { HaikuProvider } from "./haiku-provider";
 import { KimiProvider } from "./kimi-provider";
 import { enrichReservationFinancialComposition } from "./reservation-financial-composition";
 import type { ExtractionRequest, ExtractionResult, ReconciliationExtractionResult, UploadedDocumentPayload } from "./types";
@@ -13,6 +14,7 @@ export class DocumentExtractionService {
   constructor(
     private readonly kimiProvider = new KimiProvider(),
     private readonly deepSeekProvider = new DeepSeekProvider(),
+    private readonly haikuProvider = new HaikuProvider(),
   ) {}
 
   async extract(request: ExtractionRequest): Promise<ExtractionResult> {
@@ -28,7 +30,7 @@ export class DocumentExtractionService {
     ]);
 
     return {
-      provider: targetExtraction.usedPdfVisionFallback ? "MIXED" : "DEEPSEEK",
+      provider: targetExtraction.usedPdfVisionFallback ? "MIXED" : this.textProvider().provider,
       sourceData,
       targetData: targetExtraction.data,
       usedPdfVisionFallback: targetExtraction.usedPdfVisionFallback,
@@ -325,7 +327,7 @@ export class DocumentExtractionService {
     let providerOutput: ProviderExtractionOutput = { fields: [] };
     let providerFailed = false;
     try {
-      providerOutput = await this.deepSeekProvider.structureText(text, checklist);
+      providerOutput = await this.textProvider().structureText(text, checklist);
     } catch (error) {
       providerFailed = true;
       console.warn("[ConferIA] Provider textual indisponível; preservando extração determinística", {
@@ -339,7 +341,7 @@ export class DocumentExtractionService {
     if (!missing.length || providerFailed) return { output: initial, recoveredFields: [], deterministicFields };
 
     try {
-      const recovery = await this.deepSeekProvider.structureText(text, missing);
+      const recovery = await this.textProvider().structureText(text, missing);
       const recoveredFields = missing
         .filter((field) => recovery.fields.some((value) => value.fieldId === field.id && value.value != null && String(value.value).trim()))
         .map((field) => field.id);
@@ -362,6 +364,10 @@ export class DocumentExtractionService {
       });
       return { output: initial, recoveredFields: [], deterministicFields };
     }
+  }
+
+  private textProvider() {
+    return process.env.TEXT_EXTRACTION_PROVIDER === "HAIKU" ? this.haikuProvider : this.deepSeekProvider;
   }
 
   private async extractVisualDocument(
