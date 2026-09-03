@@ -71,6 +71,17 @@ test("trata pequena diferença textual e conflito interno como revisão", () => 
   assert.match(field(conflict, "buyer.cpf").observation, /conflitantes/);
 });
 
+test("encaminha código interno de tipo do SIOPI para revisão em vez de marcar divergência", () => {
+  const result = run([
+    value("property.type", "SIOPI", "YY"),
+    value("property.type", "MINUTA", "Tipo Padrão"),
+  ], ["SIOPI", "MINUTA"]);
+
+  const propertyType = field(result, "property.type");
+  assert.equal(propertyType.status, "REVIEW_REQUIRED");
+  assert.match(propertyType.observation, /código interno de tipologia/i);
+});
+
 test("mantém processo utilizável quando uma fonte está ilegível e preserva evidência", () => {
   const result = run(
     [

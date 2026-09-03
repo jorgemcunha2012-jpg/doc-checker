@@ -205,6 +205,16 @@ export class ReconciliationEngine {
       return result(organizationId, field, valuesBySource, "MATCH", acceptedObservation);
     }
 
+    if (isUnmappedPropertyTypeCode(field, comparisonParticipants, valuesBySource)) {
+      return result(
+        organizationId,
+        field,
+        valuesBySource,
+        "REVIEW_REQUIRED",
+        "O Espelho SIOPI apresenta um código interno de tipologia, enquanto a Minuta traz a descrição do tipo. Confirme o mapeamento do empreendimento antes de considerar divergência.",
+      );
+    }
+
     if (isTextual(field) && allDifferencesAreSmall(comparisonParticipants, valuesBySource)) {
       addDiffTokens(comparisonParticipants, valuesBySource);
       return result(
@@ -219,6 +229,20 @@ export class ReconciliationEngine {
     addDiffTokens(comparisonParticipants, valuesBySource);
     return result(organizationId, field, valuesBySource, "DIVERGENCE", buildSourceDiagnostic(groups));
   }
+}
+
+function isUnmappedPropertyTypeCode(
+  field: ChecklistField,
+  sources: DocumentSource[],
+  valuesBySource: Partial<Record<DocumentSource, ReconciliationSourceValue>>,
+) {
+  if ((field.baseFieldId ?? field.id) !== "property.type") return false;
+  const siopiValue = valuesBySource.SIOPI?.value?.trim() ?? "";
+  const otherValues = sources
+    .filter((source) => source !== "SIOPI")
+    .map((source) => valuesBySource[source]?.value?.trim() ?? "")
+    .filter(Boolean);
+  return /^[A-Z0-9]{1,3}$/i.test(siopiValue) && otherValues.some((value) => /\btipo\b/i.test(value));
 }
 
 function isOptionalPaymentPrintResourceField(field: ChecklistField, input: ReconciliationInput) {
