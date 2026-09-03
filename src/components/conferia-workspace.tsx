@@ -11,6 +11,7 @@ import { LogoutButton } from "./logout-button";
 import Link from "next/link";
 import type { Development, DevelopmentUnit } from "@/domain/development";
 import { ExtractionQualityPanel } from "./extraction-quality-panel";
+import { ChecklistOutcomeSummary } from "./checklist-outcome-summary";
 import { InfoTooltip } from "./info-tooltip";
 import { processCode } from "@/lib/process-code";
 
@@ -446,6 +447,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
               <OperationReference processId={run.id} />
               {run.validationType === "RECONCILIATION" ? <ReviewProgress run={run} /> : null}
               {run.validationType === "RECONCILIATION" ? <ParticipantSummary run={run} /> : null}
+              {run.validationType === "RECONCILIATION" ? <ChecklistOutcomeSummary run={run} /> : null}
               {run.usedPdfVisionFallback ? (
                 <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />

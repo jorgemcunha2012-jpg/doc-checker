@@ -46,21 +46,6 @@ export function extractionAlert(process: ExtractionAlertProcess): ExtractionAler
     };
   }
 
-  const partialReports = reports.filter(
-    (report) =>
-      report.status === "PARTIAL" ||
-      report.missingCriticalFields.length > 0 ||
-      report.lowConfidenceCriticalFields.length > 0 ||
-      report.ambiguousCriticalFields.length > 0,
-  );
-  if (partialReports.length) {
-    return {
-      label: `Extração parcial em ${sourceList(partialReports)}`,
-      detail: alertDetail(partialReports),
-      severity: "warning",
-    };
-  }
-
   return null;
 }
 
