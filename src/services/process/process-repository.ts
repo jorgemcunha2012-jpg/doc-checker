@@ -15,14 +15,14 @@ export async function persistProcess(process: ValidationProcess) {
     validation_type: process.validationType,
     processing_status: process.status,
     final_status: finalStatus(process),
-    result: process.result ?? null,
+    result: sanitizeJsonForPostgres(process.result) ?? null,
     summary: process.result
-      ? {
+      ? sanitizeJsonForPostgres({
           ...process.result.summary,
           ...(process.result.validationType === "RECONCILIATION"
             ? { extractionQualityBySource: process.result.extractionQualityBySource }
             : {}),
-        }
+        })
       : null,
     error: process.error ?? null,
     started_at: process.createdAt,
@@ -105,12 +105,29 @@ export async function persistResults(processId: string, run: ReconciliationRun) 
       field_label: result.field.label,
       field_category: result.field.category,
       automatic_status: result.status,
-      observation: result.observation,
-      values_by_source: result.valuesBySource,
+      observation: sanitizeTextForPostgres(result.observation),
+      values_by_source: sanitizeJsonForPostgres(result.valuesBySource),
     })),
     { onConflict: "process_id,field_id" },
   );
   if (error) throw new Error(`Falha ao persistir resultados: ${error.message}`);
+}
+
+function sanitizeJsonForPostgres<T>(value: T): T {
+  if (typeof value === "string") return sanitizeTextForPostgres(value) as T;
+  if (Array.isArray(value)) return value.map((item) => sanitizeJsonForPostgres(item)) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeJsonForPostgres(item)])) as T;
+  }
+  return value;
+}
+
+function sanitizeTextForPostgres(value: string | undefined) {
+  if (!value) return value;
+  let sanitized = value.replace(/\u0000/g, "");
+  // PostgreSQL JSON rejects isolated UTF-16 surrogate code units often produced by malformed RTF escapes.
+  sanitized = sanitized.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
+  return sanitized;
 }
 
 export async function saveHumanReview(
