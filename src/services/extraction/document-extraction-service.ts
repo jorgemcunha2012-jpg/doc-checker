@@ -265,14 +265,14 @@ export class DocumentExtractionService {
       const imageDocuments = documents.filter((document) => document.mimeType.includes("image") || isTiff(document));
       const recoveries: Array<Promise<ProviderExtractionOutput | null>> = [];
       if (hasMissingReservationFinancials(consolidated.values)) {
-        recoveries.push(...imageDocuments.map((document) => this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist)
+        recoveries.push(...imageDocuments.map((document) => this.visionProvider().extractReservationFinancialComponentsFromImage(document, checklist)
           .catch((recoveryError) => {
             console.warn("[ConferIA] Recuperação financeira da fonte Reserva falhou", { documentName: document.name, error: sanitizeExtractionError(recoveryError) });
             return null;
           })));
       }
       if (hasMissingReservationIdentity(consolidated.values)) {
-        recoveries.push(...imageDocuments.map((document) => this.kimiProvider.extractReservationIdentityFromImage(document, checklist)
+        recoveries.push(...imageDocuments.map((document) => this.visionProvider().extractReservationIdentityFromImage(document, checklist)
           .catch((recoveryError) => {
             console.warn("[ConferIA] Recuperação de identidade da fonte Reserva falhou", { documentName: document.name, error: sanitizeExtractionError(recoveryError) });
             return null;
@@ -370,6 +370,10 @@ export class DocumentExtractionService {
     return process.env.TEXT_EXTRACTION_PROVIDER === "HAIKU" ? this.haikuProvider : this.deepSeekProvider;
   }
 
+  private visionProvider() {
+    return process.env.VISION_EXTRACTION_PROVIDER === "HAIKU" ? this.haikuProvider : this.kimiProvider;
+  }
+
   private async extractVisualDocument(
     document: UploadedDocumentPayload,
     checklist: ExtractionRequest["checklist"],
@@ -426,14 +430,14 @@ export class DocumentExtractionService {
         });
       }
     }
-    if (source !== "DADOS_RESERVA") return this.kimiProvider.extractFromImage(document, checklist);
+    if (source !== "DADOS_RESERVA") return this.visionProvider().extractFromImage(document, checklist);
 
     const localOcrPromise = process.env.CONFERIA_SKIP_LOCAL_OCR === "true"
       ? Promise.reject(new Error("OCR local desabilitado para esta execução."))
       : readImageOcrText(document.buffer);
     const [focusedAttempt, ocrAttempt, localOcrAttempt] = await Promise.allSettled([
-      this.kimiProvider.extractReservationFromImage(document, checklist),
-      this.kimiProvider.transcribeReservationImage(document).then((text) => ({
+      this.visionProvider().extractReservationFromImage(document, checklist),
+      this.visionProvider().transcribeReservationImage(document).then((text) => ({
         output: extractDeterministicFields(text, checklist, "DADOS_RESERVA"),
         text,
       })),
@@ -468,7 +472,7 @@ export class DocumentExtractionService {
     // Executá-las na mesma etapa mantém as camadas de conferência sem encadear seus tempos máximos.
     const [financialAttempt, preRegistrationAttempt, ...targetedAttempts] = await Promise.all([
       hasReservationPaymentTable(ocrText) && !focusedPaymentIsComplete
-        ? this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
+        ? this.visionProvider().extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
           console.warn("[ConferIA] Leitura especializada da condição de pagamento falhou", {
             documentName: document.name,
             error: sanitizeExtractionError(error),
@@ -477,7 +481,7 @@ export class DocumentExtractionService {
         })
         : Promise.resolve(null),
       hasReservationPreRegistrationSummary(ocrText) && !focusedPreRegistrationIsComplete
-        ? this.kimiProvider.extractReservationPreRegistrationFinancials(document, checklist).catch((error) => {
+        ? this.visionProvider().extractReservationPreRegistrationFinancials(document, checklist).catch((error) => {
           console.warn("[ConferIA] Leitura especializada do pré-cadastro falhou", {
             documentName: document.name,
             error: sanitizeExtractionError(error),
@@ -486,19 +490,19 @@ export class DocumentExtractionService {
         })
         : Promise.resolve(null),
       recoveryTargets.has("identity")
-        ? this.kimiProvider.extractReservationIdentityFromImage(document, checklist).catch((error) => {
+        ? this.visionProvider().extractReservationIdentityFromImage(document, checklist).catch((error) => {
           console.warn("[ConferIA] Revisão dirigida de dados pessoais falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
           return null;
         })
         : Promise.resolve(null),
       recoveryTargets.has("unit")
-        ? this.kimiProvider.extractReservationUnitFromImage(document, checklist).catch((error) => {
+        ? this.visionProvider().extractReservationUnitFromImage(document, checklist).catch((error) => {
           console.warn("[ConferIA] Revisão dirigida da unidade falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
           return null;
         })
         : Promise.resolve(null),
       recoveryTargets.has("payment") && !hasReservationPaymentTable(ocrText)
-        ? this.kimiProvider.extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
+        ? this.visionProvider().extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
           console.warn("[ConferIA] Revisão dirigida financeira falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
           return null;
         })
@@ -543,7 +547,7 @@ export class DocumentExtractionService {
     }
 
     try {
-      const genericOutput = await this.kimiProvider.extractFromImage(document, checklist);
+      const genericOutput = await this.visionProvider().extractFromImage(document, checklist);
       merged = enrichReservationFinancialComposition(mergeReservationOutputs([...firstPassOutputs, ...sanitizeReservationOutputs([genericOutput], checklist)], checklist), checklist, ocrText);
       if (!reservationRecoveryTargets(merged, ocrText).length) {
         console.info("[ConferIA] Dados da Reserva recuperados com extração visual genérica", {

@@ -95,7 +95,7 @@ export function validateCriticalEvidence(source: DocumentSource, output: Provide
       const rawText = field.sourceLocation?.rawText?.trim();
       return !definition || !rawText ||
         !evidenceContainsValue(String(field.value), rawText, definition.fieldType) ||
-        !hasExpectedMinutaFinancialEvidence(source, field.fieldId, rawText);
+        !hasExpectedFinancialEvidence(source, field.fieldId, rawText);
     })
     .map((field) => field.participantId ? `${field.fieldId}::${field.participantId}` : field.fieldId);
   const invalid = new Set(evidenceIssues);
@@ -110,7 +110,16 @@ export function validateCriticalEvidence(source: DocumentSource, output: Provide
   };
 }
 
-function hasExpectedMinutaFinancialEvidence(source: DocumentSource, fieldId: string, rawText: string) {
+function hasExpectedFinancialEvidence(source: DocumentSource, fieldId: string, rawText: string) {
+  if (source === "DADOS_RESERVA") {
+    const compact = rawText.replace(/\s+/g, " ");
+    if (fieldId === "financial.financing") return /\bfinanciamento\b|valor\s+financiado/i.test(compact);
+    if (fieldId === "financial.fgts") return /\bfgts\b/i.test(compact);
+    if (fieldId === "financial.subsidy") return /\bsubs[ií]dio\b|\bdesconto\b/i.test(compact);
+    if (fieldId === "financial.totalValue") return /valor\s+do\s+contrato|vp\s+da\s+reserva/i.test(compact);
+    return true;
+  }
+
   if (source !== "MINUTA") return true;
 
   const compact = rawText.replace(/\s+/g, " ");
