@@ -15,11 +15,14 @@ export async function POST(request: Request) {
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.updateUser({ password });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-    await createSupabaseAdminClient().from("profiles").update({
+    const { error: profileError } = await createSupabaseAdminClient().from("profiles").update({
       must_change_password: false,
       password_changed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq("id", user.id);
+    if (profileError) {
+      return NextResponse.json({ error: "A senha foi atualizada, mas não foi possível concluir a liberação do acesso." }, { status: 500 });
+    }
     await audit(user, "PASSWORD_CHANGED", "profile", user.id);
     return NextResponse.json({ ok: true });
   } catch (error) {
