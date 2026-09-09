@@ -4,6 +4,8 @@ import { OpenAICompatibleClient } from "./openai-compatible-client";
 
 test("aproveita campos quando o provider retorna JSON de fields truncado", async () => {
   const originalFetch = globalThis.fetch;
+  const originalAllowedHosts = process.env.CONFERIA_PROVIDER_ALLOWED_HOSTS;
+  process.env.CONFERIA_PROVIDER_ALLOWED_HOSTS = "provider.test";
   globalThis.fetch = async () => new Response(JSON.stringify({
     choices: [{
       message: {
@@ -31,11 +33,15 @@ test("aproveita campos quando o provider retorna JSON de fields truncado", async
     }]);
   } finally {
     globalThis.fetch = originalFetch;
+    if (originalAllowedHosts === undefined) delete process.env.CONFERIA_PROVIDER_ALLOWED_HOSTS;
+    else process.env.CONFERIA_PROVIDER_ALLOWED_HOSTS = originalAllowedHosts;
   }
 });
 
 test("interrompe uma resposta de provider que não conclui", async () => {
   const originalFetch = globalThis.fetch;
+  const originalAllowedHosts = process.env.CONFERIA_PROVIDER_ALLOWED_HOSTS;
+  process.env.CONFERIA_PROVIDER_ALLOWED_HOSTS = "provider.test";
   globalThis.fetch = async (_input, init) => new Promise<Response>((_resolve, reject) => {
     const signal = init?.signal;
     signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
@@ -54,5 +60,7 @@ test("interrompe uma resposta de provider que não conclui", async () => {
     );
   } finally {
     globalThis.fetch = originalFetch;
+    if (originalAllowedHosts === undefined) delete process.env.CONFERIA_PROVIDER_ALLOWED_HOSTS;
+    else process.env.CONFERIA_PROVIDER_ALLOWED_HOSTS = originalAllowedHosts;
   }
 });
