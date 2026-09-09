@@ -43,7 +43,7 @@ export function AppShell({ user, children }: { user: User; children: ReactNode }
         <Link href="/validation" onClick={() => setOpen(false)} className="mt-8 flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#2f64d6] px-3 text-sm font-semibold text-white transition hover:bg-[#3d73e8]">
           <FilePlus2 className="h-4 w-4" /> Nova conferência
         </Link>
-        <div className="mb-2 mt-8 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Workspace</div>
+        <div className="mb-2 mt-8 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Área de trabalho</div>
         <nav className="space-y-1">
           {items.map((item) => {
             const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);

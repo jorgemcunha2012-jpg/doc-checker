@@ -72,7 +72,7 @@ export function FileDropZone({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+      <div className="mt-5 grid gap-2.5 sm:grid-cols-2">
         <SourceUpload icon={MonitorUp} title="Dados da reserva" description="Prints, telas e propostas" count={documents.filter((item) => item.source === "DADOS_RESERVA" || item.source === "SIOPI").length} onFiles={(files) => handleFiles(files, "DADOS_RESERVA")} />
         <SourceUpload icon={ScrollText} title="Minuta ou contrato" description="PDF, DOCX ou RTF" count={documents.filter((item) => item.source === "MINUTA").length} onFiles={(files) => handleFiles(files, "MINUTA")} />
         <SourceUpload icon={Landmark} title="ITBI e imóvel" description="ITBI, matrícula, IPTU e certidões" count={documents.filter((item) => ["ITBI", "MATRICULA", "IPTU", "CERTIDAO"].includes(item.source ?? "")).length} onFiles={(files) => handleFiles(files, "ITBI")} />
@@ -82,9 +82,9 @@ export function FileDropZone({
 
       <div className="mt-4 space-y-2">
         {documents.map((document) => (
-          <div key={document.id} className="flex flex-col gap-2 rounded-xl bg-[var(--surface-subtle)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div key={document.id} className="flex flex-col gap-2 border border-[var(--border)] bg-[var(--surface-subtle)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--primary)] shadow-sm">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-[var(--primary)] shadow-sm">
                 {document.mimeType.includes("image") ? <ImageIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
               </span>
               <span className="min-w-0"><span className="block truncate text-sm font-medium text-[var(--foreground)]">{document.name}</span><span className="block text-[11px] text-[var(--muted)]">{formatFileSize(document.sizeBytes)}</span></span>
@@ -125,9 +125,9 @@ export function FileDropZone({
 
 function SourceUpload({ icon: Icon, title, description, count, onFiles }: { icon: typeof MonitorUp; title: string; description: string; count: number; onFiles: (files: FileList | null) => void }) {
   return (
-    <label className="group flex min-h-28 cursor-pointer items-center gap-4 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-subtle)] p-4 transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]">
+    <label className="group flex min-h-24 cursor-pointer items-center gap-4 rounded-[var(--radius-card)] border border-dashed border-[var(--border)] bg-[var(--surface-subtle)] p-4 transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]">
       <input className="sr-only" type="file" multiple accept=".pdf,.docx,.rtf,.xlsx,.tif,.tiff,.jpg,.jpeg,.png,image/jpeg,image/png,image/tiff,application/pdf,application/rtf,text/rtf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => { onFiles(event.target.files); event.target.value = ""; }} />
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--primary)] shadow-sm"><Icon className="h-5 w-5" /></span>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white text-[var(--primary)] shadow-sm"><Icon className="h-5 w-5" /></span>
       <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[var(--foreground)]">{title}</span><span className="mt-1 block text-xs text-[var(--muted)]">{description}</span><span className="mt-2 block text-xs font-medium text-[var(--primary)]">{count ? `${count} arquivo(s) · adicionar mais` : "Adicionar arquivo"}</span></span>
       <Paperclip className="h-4 w-4 text-slate-400 group-hover:text-[var(--primary)]" />
     </label>

@@ -48,10 +48,10 @@ export function OperationsDashboard({ user }: { user: User }) {
 
   return (
     <div className="mx-auto max-w-[1360px] space-y-7">
-      <section className="max-w-2xl">
+      <section className="app-section-heading flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-[var(--primary)]">Operação documental</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-[-0.035em] text-[var(--foreground)]">Acompanhe as conferências da sua equipe.</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">Acompanhe as conferências da sua equipe.</h1>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Priorize o que precisa de revisão e consulte as operações recentes.</p>
         </div>
       </section>
@@ -61,12 +61,12 @@ export function OperationsDashboard({ user }: { user: User }) {
       ) : (
         <>
           <section className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)]">
-            <div className="app-card overflow-hidden border-[#d5e1f5] bg-[#10233d] text-white">
-              <div className="flex h-full flex-col justify-between gap-8 p-6 sm:p-7">
+            <div className="app-card overflow-hidden border-[var(--navy)] bg-[var(--navy)] text-white">
+              <div className="flex h-full flex-col justify-between gap-6 p-5 sm:p-6">
                 <div className="flex items-start justify-between gap-5">
                   <div>
                     <div className="text-sm font-medium text-[#aec7fa]">Fila de revisão</div>
-                    <div className="mt-2 text-4xl font-semibold tracking-[-0.04em]">{metrics.pending}</div>
+                    <div className="mt-2 text-3xl font-semibold tracking-[-0.04em]">{metrics.pending}</div>
                     <p className="mt-2 max-w-md text-sm leading-6 text-slate-300">{metrics.pending === 1 ? "operação aguarda validação humana" : "operações aguardam validação humana"}</p>
                   </div>
                   <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-white/10 text-[#8eb4ff]"><AlertCircle className="h-6 w-6" /></span>
@@ -75,7 +75,7 @@ export function OperationsDashboard({ user }: { user: User }) {
               </div>
             </div>
             <div className="app-card p-6">
-              <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]"><Timer className="h-5 w-5" /></span><span className="text-sm font-medium text-[var(--muted)]">Tempo médio de conclusão</span></div>
+              <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]"><Timer className="h-4 w-4" /></span><span className="text-sm font-medium text-[var(--muted)]">Tempo médio de conclusão</span></div>
               <div className="mt-6 text-4xl font-semibold tracking-[-0.04em] text-[var(--foreground)]">{formatDuration(metrics.averageMs)}</div>
               <p className="mt-2 text-sm leading-6 text-[var(--muted)]">considerando as operações já finalizadas</p>
             </div>
@@ -115,7 +115,7 @@ function DashboardSkeleton() {
 }
 
 function Metric({ icon: Icon, label, value }: { icon: typeof Clock3; label: string; value: number | string }) {
-  return <div className="rounded-xl border border-[var(--border)] bg-white/70 p-4"><div className="flex items-center gap-2 text-[var(--muted)]"><Icon className="h-4 w-4 text-[var(--primary)]" /><span className="text-xs font-medium">{label}</span></div><div className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">{value}</div></div>;
+  return <div className="border border-[var(--border)] bg-white p-4"><div className="flex items-center gap-2 text-[var(--muted)]"><Icon className="h-4 w-4 text-[var(--primary)]" /><span className="text-xs font-medium">{label}</span></div><div className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">{value}</div></div>;
 }
 
 function Status({ value }: { value: string }) {
