@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Check, CheckCircle2, Clock3, Copy, Download, FileCheck2, FilePlus2, FileSearch, Layers3, Loader2, ScanText, Search, ShieldCheck, Sparkles, UploadCloud, UsersRound } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Clock3, Copy, Download, FileCheck2, FilePlus2, FileSearch, Layers3, Loader2, ScanText, Search, ShieldCheck, UploadCloud, UsersRound } from "lucide-react";
 import type { HumanReview, ReconciliationRun, User, ValidationProcess, ValidationRun } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
@@ -336,23 +336,20 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
         </div>
       </header> : null}
 
-      <section className={embedded ? "mb-7" : "border-b border-[var(--border)] bg-[var(--canvas)]"}>
-        <div className="mx-auto max-w-7xl px-5 py-9 sm:py-12">
-          <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">
-            <Sparkles className="h-4 w-4" />
-            Checklist inteligente com IA
-          </div>
-          <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-[-0.04em] text-[var(--foreground)] sm:text-4xl">Prepare uma nova conferência</h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--muted)]">Escolha a referência do imóvel e organize os documentos por origem. A ConferIA identifica, extrai e compara os dados automaticamente.</p>
+      <section className={embedded ? "mb-6" : "border-b border-[var(--border)] bg-white"}>
+        <div className="mx-auto max-w-7xl px-5 py-6 sm:py-7">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">Nova conferência</div>
+          <h1 className="mt-2 max-w-3xl text-2xl font-semibold tracking-[-0.03em] text-[var(--foreground)] sm:text-3xl">Prepare os documentos para conferência</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">Selecione a referência do imóvel e envie os documentos que deseja comparar.</p>
         </div>
       </section>
 
       <div className={`mx-auto max-w-7xl ${embedded ? "" : "px-5 py-8"}`}>
         <section className="space-y-5">
-          <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="app-section-heading flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-[var(--foreground)]">Dados para comparação</h2>
+                <h2 className="text-lg font-semibold text-[var(--foreground)]">Dados para comparação</h2>
                 <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--muted)]">Conclua as duas etapas abaixo. Sem cadastro mestre, adicione documentos de pelo menos duas fontes.</p>
               </div>
             </div>
@@ -658,7 +655,7 @@ function ProcessingPanel({
   const progress = Math.min(92, 12 + elapsedSeconds * 0.55);
 
   return (
-    <section className="border border-blue-200 bg-blue-50/50 p-5">
+    <section className="app-card border-l-4 border-l-[var(--primary)] p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
@@ -670,7 +667,7 @@ function ProcessingPanel({
         </div>
         <span className="text-xs font-semibold text-slate-500">Não feche esta página</span>
       </div>
-      <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-blue-100">
+      <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-slate-200">
         <div className="h-full rounded-full bg-[#2563eb] transition-all duration-1000" style={{ width: `${progress}%` }} />
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-4">

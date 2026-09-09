@@ -23,7 +23,7 @@ export function AppShell({ user, children }: { user: User; children: ReactNode }
     : navigation;
 
   return (
-    <div className="min-h-screen bg-[var(--canvas)] lg:grid lg:grid-cols-[224px_minmax(0,1fr)]">
+    <div className="min-h-screen bg-[var(--canvas)] lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
       <button
         className="fixed left-4 top-3 z-40 flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--navy)] text-white shadow-lg lg:hidden"
         onClick={() => setOpen(true)}
@@ -32,7 +32,7 @@ export function AppShell({ user, children }: { user: User; children: ReactNode }
         <Menu className="h-5 w-5" />
       </button>
       {open ? <button className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden" onClick={() => setOpen(false)} aria-label="Fechar menu" /> : null}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[236px] flex-col border-r border-white/5 bg-[var(--navy-deep)] px-3 py-5 text-white transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[240px] flex-col border-r border-white/5 bg-[var(--navy-deep)] px-4 py-5 text-white transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex items-start justify-between px-2">
           <Link href="/" className="block" onClick={() => setOpen(false)}>
             <div className="text-[22px] font-semibold tracking-[-0.03em]">Confer<span className="text-[#7ea9ff]">IA</span></div>
@@ -43,7 +43,7 @@ export function AppShell({ user, children }: { user: User; children: ReactNode }
         <Link href="/validation" onClick={() => setOpen(false)} className="mt-8 flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#2f64d6] px-3 text-sm font-semibold text-white transition hover:bg-[#3d73e8]">
           <FilePlus2 className="h-4 w-4" /> Nova conferência
         </Link>
-        <div className="mb-2 mt-8 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Área de trabalho</div>
+        <div className="mb-2 mt-8 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Workspace</div>
         <nav className="space-y-1">
           {items.map((item) => {
             const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -74,12 +74,13 @@ export function AppShell({ user, children }: { user: User; children: ReactNode }
         </div>
       </aside>
       <div className="min-w-0">
-        <header className="flex min-h-16 items-center border-b border-[var(--border)] bg-white px-5 pl-16 lg:px-8">
+        <header className="flex min-h-16 items-center justify-between border-b border-[var(--border)] bg-white px-5 pl-16 lg:px-9">
           <div className="text-sm font-semibold text-[var(--foreground)]">
             {navigation.find((item) => item.href === (pathname === "/" ? "/" : `/${pathname.split("/")[1]}`))?.label ?? "ConferIA"}
           </div>
+          <div className="hidden text-xs font-medium text-[var(--muted)] sm:block">Conferência documental imobiliária</div>
         </header>
-        <div className="px-4 py-6 sm:px-6 lg:px-9 lg:py-9">{children}</div>
+        <div className="px-4 py-6 sm:px-6 lg:px-9 lg:py-8">{children}</div>
       </div>
     </div>
   );

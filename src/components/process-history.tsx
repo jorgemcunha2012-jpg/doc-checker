@@ -54,26 +54,27 @@ export function ProcessHistory({ showAnalyst, status }: { showAnalyst: boolean; 
     : processes;
 
   return (
-    <div className="divide-y divide-slate-100 border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 bg-slate-50 p-4">
+    <div className="app-card overflow-hidden">
+      <div className="border-b border-[var(--border)] bg-[var(--surface-subtle)] p-3">
         <label className="block text-xs font-bold uppercase tracking-wide text-slate-500" htmlFor="history-search">Pesquisar conferência</label>
         <input
           id="history-search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="ID, nome, documento, contrato ou processo"
-          className="mt-2 min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none focus:border-[#0faaa2] focus:ring-2 focus:ring-[#0faaa2]/20"
+          className="app-input mt-2 min-h-9 w-full bg-white px-3 text-sm outline-none"
         />
       </div>
+      {visibleProcesses.length ? <div className="hidden grid-cols-[180px_minmax(0,1fr)_180px_110px] gap-4 border-b border-[var(--border)] bg-[var(--navy-deep)] px-5 py-2.5 text-[10px] font-bold uppercase tracking-[0.1em] text-slate-300 lg:grid"><span>Operação</span><span>Documentos</span><span>Status</span><span>Ação</span></div> : null}
       {visibleProcesses.map((process) => {
         const alert = showAnalyst ? extractionAlert(process) : null;
         return (
-          <article key={process.id} className={`grid gap-4 p-5 lg:grid-cols-[180px_1fr_220px_120px] lg:items-center ${alert?.severity === "critical" ? "bg-rose-50/50" : alert ? "bg-amber-50/50" : ""}`}>
+          <article key={process.id} className={`grid gap-3 border-b border-slate-100 p-4 last:border-b-0 lg:grid-cols-[180px_minmax(0,1fr)_180px_110px] lg:items-center ${alert?.severity === "critical" ? "bg-rose-50/50" : alert ? "bg-amber-50/50" : ""}`}>
             <div>
               <button
                 type="button"
                 onClick={() => void navigator.clipboard.writeText(processCode(process.id))}
-                className="mb-2 inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                className="mb-2 inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700"
                 title="Copiar ID da conferência"
               >
                 {processCode(process.id)}
@@ -84,7 +85,7 @@ export function ProcessHistory({ showAnalyst, status }: { showAnalyst: boolean; 
               {showAnalyst ? <div className="mt-2 text-xs font-semibold text-blue-700">{process.profiles?.name ?? "Analista"}</div> : null}
             </div>
             <div className="space-y-1">
-              {process.process_documents.map((document) => <div key={document.id} className="truncate text-sm text-slate-700">{document.name}</div>)}
+              {process.process_documents.map((document) => <div key={document.id} className="truncate text-[13px] text-slate-700">{document.name}</div>)}
               {alert ? (
                 <div className={`mt-3 flex items-start gap-2 rounded-md border p-2 text-xs ${alert.severity === "critical" ? "border-rose-200 bg-white text-rose-800" : "border-amber-200 bg-white text-amber-800"}`}>
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -96,13 +97,13 @@ export function ProcessHistory({ showAnalyst, status }: { showAnalyst: boolean; 
               ) : null}
             </div>
             <div>
-              <div className="text-sm font-bold text-slate-700">{statusLabel(process.final_status)}</div>
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><span className={`app-status-dot ${statusDotClass(process.final_status)}`} />{statusLabel(process.final_status)}</div>
               <div className="mt-1 flex items-center gap-1 text-xs text-slate-500"><Clock3 className="h-3.5 w-3.5" />{durationLabel(process.started_at, process.completed_at)}</div>
             </div>
             {process.final_status === "IN_PROGRESS" || process.final_status === "FAILED" ? (
               <span className="text-center text-xs font-semibold text-slate-400">Resultado indisponível</span>
             ) : (
-              <Link href={{ pathname: `/history/${process.id}` }} className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:border-blue-500 hover:text-blue-700">
+              <Link href={{ pathname: `/history/${process.id}` }} className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-slate-300 px-2.5 text-xs font-bold text-slate-700 hover:border-blue-500 hover:text-blue-700">
                 <Eye className="h-4 w-4" /> Abrir
               </Link>
             )}
@@ -132,6 +133,15 @@ function normalizeSearch(value: string) {
 
 function statusLabel(status: string) {
   return ({ IN_PROGRESS: "Em andamento", PENDING_REVIEW: "Com pendências", FULLY_CHECKED: "Conferido", FAILED: "Falhou" } as Record<string, string>)[status] ?? status;
+}
+
+function statusDotClass(status: string) {
+  return ({
+    IN_PROGRESS: "text-blue-500",
+    PENDING_REVIEW: "text-amber-500",
+    FULLY_CHECKED: "text-emerald-500",
+    FAILED: "text-rose-500",
+  } as Record<string, string>)[status] ?? "text-slate-400";
 }
 
 function durationLabel(startedAt: string, completedAt: string | null) {

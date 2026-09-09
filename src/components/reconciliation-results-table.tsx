@@ -64,14 +64,14 @@ export function ReconciliationResultsTable({
   const sharedResults = useMemo(() => filteredResults.filter((result) => !result.field.participantId), [filteredResults]);
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 p-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-2">
+    <section className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-white shadow-[var(--shadow-card)]">
+      <div className="flex flex-col gap-3 border-b border-[var(--border)] bg-[var(--surface-subtle)] p-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-1">
           {filters.map((item) => (
             <button
               key={item.id}
-              className={`rounded-md border px-3 py-2 text-sm font-bold transition ${
-                filter === item.id ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+              className={`rounded-md border px-2.5 py-1.5 text-xs font-bold transition ${
+                filter === item.id ? "border-[var(--navy-deep)] bg-[var(--navy-deep)] text-white" : "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white"
               }`}
               onClick={() => setFilter(item.id)}
             >
@@ -79,10 +79,10 @@ export function ReconciliationResultsTable({
             </button>
           ))}
         </div>
-        <label className="flex min-h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 shadow-sm">
+        <label className="flex min-h-9 items-center gap-2 rounded-md border border-[var(--border)] bg-white px-3">
           <Search className="h-4 w-4 text-slate-400" />
           <input
-            className="w-full bg-transparent text-sm outline-none lg:w-64"
+            className="w-full bg-transparent text-xs outline-none lg:w-64"
             placeholder="Buscar campo ou valor"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -154,14 +154,14 @@ function ResultGroup({
           {pending ? `${pending} pendência${pending === 1 ? "" : "s"}` : "Tudo conferido"}
         </span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
+      <div className="app-table-wrap border-0 border-t-0">
+        <table className="app-table w-full min-w-[1180px] text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-900 text-xs uppercase text-slate-200">
-              <th className="px-4 py-3 font-semibold">Campo</th>
-              {sources.map((source) => <th key={source} className="px-4 py-3 font-semibold">{documentSourceLabels[source]}</th>)}
-              <th className="px-4 py-3 font-semibold">Status</th>
-              <th className="px-4 py-3 font-semibold">Diagnóstico e revisão</th>
+              <th className="font-semibold">Campo</th>
+              {sources.map((source) => <th key={source} className="font-semibold">{documentSourceLabels[source]}</th>)}
+              <th className="font-semibold">Status</th>
+              <th className="font-semibold">Diagnóstico e revisão</th>
             </tr>
           </thead>
           <tbody>
@@ -187,13 +187,13 @@ function ResultRow({
   onOpenReview: (result: FieldComparisonResult) => void;
 }) {
   return (
-    <tr className="border-b border-slate-100 align-top hover:bg-slate-50">
-      <td className="px-4 py-4">
+    <tr className="align-top">
+      <td>
         <div className="font-semibold text-slate-950">{result.field.baseFieldId ? result.field.label.slice(0, result.field.label.lastIndexOf(" · ")) : result.field.label}</div>
         <div className="mt-1 text-xs text-slate-500">{result.field.category}</div>
       </td>
-      {sources.map((source) => <td key={source} className="max-w-64 px-4 py-4 text-slate-700"><SourceValueCell source={source} result={result} /></td>)}
-      <td className="px-4 py-4">
+      {sources.map((source) => <td key={source} className="max-w-64 text-slate-700"><SourceValueCell source={source} result={result} /></td>)}
+      <td>
         {result.humanReview?.status === "APPROVED" ? (
           <div>
             <span className="inline-flex min-w-32 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">Verificado</span>
@@ -201,7 +201,7 @@ function ResultRow({
           </div>
         ) : <StatusBadge status={result.status} />}
       </td>
-      <td className="max-w-80 px-4 py-4">
+      <td className="max-w-80">
         <div className={`text-xs leading-5 ${result.status === "DIVERGENCE" ? "font-semibold text-rose-700" : "text-slate-600"}`}>{result.observation}</div>
         {result.humanReview ? (
           <div className="mt-3 border-l-2 border-emerald-500 pl-3">
@@ -306,7 +306,7 @@ function SourceValueCell({ source, result }: { source: DocumentSource; result: F
             <FileSearch className="h-3.5 w-3.5" />
             Ver evidência <InfoTooltip text="Mostra a localização e o trecho original usado para extrair este valor. A evidência permite conferir de onde o dado veio." />
           </summary>
-          <div className="mt-2 rounded-md border border-slate-200 bg-white p-2 text-xs leading-5 text-slate-600">
+          <div className="mt-2 rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-2 text-xs leading-5 text-slate-600">
             {location.page ? <div>Página {location.page}</div> : null}
             {location.section ? <div>Seção: {location.section}</div> : null}
             {location.rawText ? <blockquote className="mt-1 border-l-2 border-[var(--primary)] pl-2">{location.rawText}</blockquote> : null}

@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --canvas: #f5f7fb;
+  --canvas: #f6f8fb;
   --surface: #ffffff;
-  --surface-subtle: #f0f4fa;
-  --surface-strong: #e5edf8;
-  --navy: #10233d;
-  --navy-deep: #09172b;
-  --primary: #2458c6;
-  --primary-hover: #1b46a4;
-  --primary-soft: #e9f0ff;
-  --border: #dbe4f0;
-  --foreground: #142238;
-  --muted: #64748b;
-  --radius-card: 10px;
-  --shadow-card: 0 1px 2px rgb(15 35 64 / 0.04), 0 14px 32px rgb(15 35 64 / 0.06);
+  --surface-subtle: #f8fafc;
+  --surface-strong: #edf2f7;
+  --navy: #10243f;
+  --navy-deep: #08182d;
+  --primary: #1e5bb8;
+  --primary-hover: #174a98;
+  --primary-soft: #eaf2ff;
+  --border: #d9e2ec;
+  --foreground: #15263c;
+  --muted: #65758a;
+  --radius-card: 8px;
+  --shadow-card: 0 1px 2px rgb(15 35 64 / 0.04), 0 8px 24px rgb(15 35 64 / 0.045);
   --background: var(--canvas);
 }
 
@@ -45,6 +45,56 @@ body {
   border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--shadow-card);
+}
+
+.app-section-heading {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1rem;
+}
+
+.app-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.app-table {
+  border-collapse: collapse;
+  color: var(--foreground);
+}
+
+.app-table th {
+  background: var(--navy-deep);
+  color: #dce7f5;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.app-table td,
+.app-table th {
+  border-bottom: 1px solid #e8eef5;
+  padding: 0.75rem 0.875rem;
+  vertical-align: top;
+}
+
+.app-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.app-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.app-status-dot {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: currentColor;
+  vertical-align: middle;
 }
 
 .app-input {
