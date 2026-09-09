@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Building2, Check, CheckCircle2, Clock3, Copy, Download, FileCheck2, FilePlus2, FileSearch, Layers3, Loader2, ScanText, Search, ShieldCheck, Sparkles, UploadCloud, UsersRound } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Clock3, Copy, Download, FileCheck2, FilePlus2, FileSearch, Layers3, Loader2, ScanText, Search, ShieldCheck, Sparkles, UploadCloud, UsersRound } from "lucide-react";
 import type { HumanReview, ReconciliationRun, User, ValidationProcess, ValidationRun } from "@/domain/validation";
 import { documentSourceLabels } from "@/domain/validation";
 import { defaultOrganization } from "@/domain/tenant";
@@ -320,14 +320,9 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
     <main className={embedded ? "" : "min-h-screen"}>
       {!embedded ? <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2563eb] text-white">
-              <Building2 className="h-5 w-5" aria-hidden="true" />
-            </div>
-            <div>
+          <div>
               <div className="text-lg font-bold text-slate-950">ConferIA</div>
               <div className="text-xs font-medium text-slate-500">Conferência documental imobiliária</div>
-            </div>
           </div>
           {!publicAccess ? <div className="hidden items-center gap-2 text-xs font-semibold text-slate-500 sm:flex">
             {currentUser.role === "ADMIN" ? <Link href="/admin" className="text-blue-600">Painel administrativo</Link> : null}
