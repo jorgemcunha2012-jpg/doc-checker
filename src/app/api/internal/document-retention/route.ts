@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { purgeExpiredProcessDocuments } from "@/services/security/document-retention";
 import { logOperationalError } from "@/lib/security/operational-logger";
+import { timingSafeEqual } from "node:crypto";
 
 export const maxDuration = 60;
 
@@ -9,7 +10,10 @@ export async function GET(request: Request) {
   if (!secret) {
     return NextResponse.json({ error: "Rotina de retenção não configurada." }, { status: 503 });
   }
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+  const authorization = request.headers.get("authorization") ?? "";
+  const provided = Buffer.from(authorization.replace(/^Bearer\s+/i, ""));
+  const expected = Buffer.from(secret);
+  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 

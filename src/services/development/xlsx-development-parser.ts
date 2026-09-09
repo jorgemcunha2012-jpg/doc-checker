@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { DOMParser, type Element as XmlElement } from "@xmldom/xmldom";
+import { DOMParser } from "@xmldom/xmldom";
 import type { DevelopmentExtraction } from "@/domain/development";
 
 const NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -134,7 +134,7 @@ function readWorksheet(xml: string, sharedStrings: string[]) {
   return Array.from(document.getElementsByTagNameNS(NS, "row")).map((row) => readRow(row, sharedStrings));
 }
 
-function readRow(row: XmlElement, sharedStrings: string[]) {
+function readRow(row: Element, sharedStrings: string[]) {
   const values: string[] = [];
   for (const cell of Array.from(row.getElementsByTagNameNS(NS, "c"))) {
     const reference = cell.getAttribute("r") ?? "";

@@ -8,6 +8,7 @@ import { requireUser, AuthError } from "@/lib/auth";
 import { developmentUnitValues } from "@/domain/development";
 import { getDevelopmentUnit } from "@/services/development/development-repository";
 import { ACCEPTED_UPLOAD_MIME_TYPES, inspectUpload } from "@/lib/security/upload-validation";
+import { consumeRateLimit, requestRateLimitKey } from "@/lib/security/rate-limit";
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 const MAX_TOTAL_SIZE_BYTES = 60 * 1024 * 1024;
@@ -24,6 +25,10 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     throw error;
+  }
+  const uploadLimit = consumeRateLimit(requestRateLimitKey(request, "process-upload"), 20, 15 * 60 * 1000);
+  if (!uploadLimit.allowed) {
+    return NextResponse.json({ error: "Muitas tentativas de upload. Aguarde alguns minutos antes de tentar novamente." }, { status: 429 });
   }
   if (CONFERIA_CREDITS_PAUSED) {
     return NextResponse.json({ error: CREDITS_MESSAGE }, { status: 402 });

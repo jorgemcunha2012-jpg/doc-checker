@@ -1,5 +1,7 @@
 import JSZip from "jszip";
-import { DOMParser, type Node as XmlNode } from "@xmldom/xmldom";
+import { DOMParser } from "@xmldom/xmldom";
+
+type XmlNode = Node;
 
 export async function extractDocxText(buffer: Buffer) {
   try {

@@ -4,12 +4,17 @@ import { AuthError, requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { logOperationalError } from "@/lib/security/operational-logger";
 import { inspectUpload } from "@/lib/security/upload-validation";
+import { consumeRateLimit, requestRateLimitKey } from "@/lib/security/rate-limit";
 
 const MAX_SIZE = 20 * 1024 * 1024;
 
 export async function POST(request: Request) {
   try {
     const user = await requireUser();
+    const uploadLimit = consumeRateLimit(requestRateLimitKey(request, "development-upload"), 40, 15 * 60 * 1000);
+    if (!uploadLimit.allowed) {
+      return NextResponse.json({ error: "Muitas tentativas de upload. Aguarde alguns minutos antes de tentar novamente." }, { status: 429 });
+    }
     if (request.headers.get("content-type")?.includes("multipart/form-data")) {
       const form = await request.formData();
       const file = form.get("page");

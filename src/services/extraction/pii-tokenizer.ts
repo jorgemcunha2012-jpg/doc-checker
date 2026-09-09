@@ -34,8 +34,8 @@ export function tokenizeSensitiveText(text: string) {
 
 export function restoreTokenizedOutput(output: ProviderExtractionOutput, replacements: TokenMap): ProviderExtractionOutput {
   if (!replacements.size) return output;
-  const restore = (value: string | null | undefined) => {
-    if (!value) return value;
+  const restore = (value: string | null | undefined): string | null => {
+    if (!value) return value ?? null;
     return [...replacements.entries()].reduce((result, [token, original]) => result.split(token).join(original), value);
   };
   return {
@@ -43,7 +43,10 @@ export function restoreTokenizedOutput(output: ProviderExtractionOutput, replace
       ...field,
       value: restore(field.value),
       sourceLocation: field.sourceLocation
-        ? { ...field.sourceLocation, rawText: restore(field.sourceLocation.rawText) }
+        ? {
+            ...field.sourceLocation,
+            ...(field.sourceLocation.rawText ? { rawText: restore(field.sourceLocation.rawText) ?? undefined } : {}),
+          }
         : field.sourceLocation,
     })),
   };

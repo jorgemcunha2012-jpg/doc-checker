@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
 import { logOperationalError } from "@/lib/security/operational-logger";
+import { consumeRateLimit, requestRateLimitKey } from "@/lib/security/rate-limit";
 
 export async function POST(request: Request) {
   const isFormSubmission = request.headers.get("content-type")?.includes("application/x-www-form-urlencoded") ?? false;
   try {
+    const ipLimit = consumeRateLimit(requestRateLimitKey(request, "login"), 12, 15 * 60 * 1000);
+    if (!ipLimit.allowed) {
+      return loginFailure(request, isFormSubmission, "Muitas tentativas de acesso. Aguarde alguns minutos antes de tentar novamente.", 429);
+    }
     const credentials = isFormSubmission
       ? Object.fromEntries(await request.formData())
       : await request.json();
