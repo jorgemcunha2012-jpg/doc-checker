@@ -16,6 +16,8 @@ type ChatCompletionResponse = {
   }>;
 };
 
+import { fetchProvider } from "./provider-gateway";
+
 export type OpenAICompatibleConfig = {
   apiKey?: string;
   baseUrl?: string;
@@ -70,9 +72,8 @@ export class OpenAICompatibleClient {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+      const response = await fetchProvider(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
         method: "POST",
-        signal: controller.signal,
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
@@ -84,7 +85,7 @@ export class OpenAICompatibleClient {
           ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
           ...(options.responseFormat === false ? {} : { response_format: { type: "json_object" } }),
         }),
-      });
+      }, { provider: providerName, timeoutMs });
       // Keep the timeout active while reading the response body as well. A provider
       // may send headers and still stall before returning the JSON payload.
       const body = await response.text();

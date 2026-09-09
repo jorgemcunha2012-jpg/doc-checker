@@ -4,6 +4,7 @@ import { enrichStandardFinancialFields, focusDocumentText } from "./deepseek-pro
 import { parseJsonResponse } from "./openai-compatible-client";
 import { checklistPrompt, coerceExtractionOutput } from "./provider-utils";
 import { restoreTokenizedOutput, tokenizeSensitiveText } from "./pii-tokenizer";
+import { fetchProvider } from "./provider-gateway";
 
 type AnthropicResponse = {
   content?: Array<{ type?: string; text?: string }>;
@@ -125,9 +126,8 @@ export class HaikuProvider implements DocumentExtractionProvider {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 60_000);
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetchProvider("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        signal: controller.signal,
         headers: {
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
@@ -139,7 +139,7 @@ export class HaikuProvider implements DocumentExtractionProvider {
           system: system ?? "Você estrutura texto bruto de documentos imobiliários. Identifique todos os compradores/adquirentes separadamente. Para campos repetíveis, retorne uma entrada por pessoa e use participantId buyer_1, buyer_2 etc. de forma consistente em todos os campos da mesma pessoa. Diferencie rigorosamente endereço residencial, endereço do imóvel e endereço do vendedor. Se não houver evidência suficiente, retorne null e confiança 0. Responda somente JSON válido no formato {\"fields\":[{\"fieldId\":string,\"participantId\":string|null,\"value\":string|null,\"confidence\":number,\"sourceLocation\":{\"page\":number|null,\"section\":string|null,\"rawText\":string|null}}]}. rawText deve conter somente o pequeno trecho que sustenta o valor. Não compare campos.",
           messages: [{ role: "user", content: typeof content === "string" ? `Texto bruto:\n${content}\n\nCampos esperados:\n${checklistPrompt(checklist)}` : content }],
         }),
-      });
+      }, { provider: "Haiku", timeoutMs: 60_000 });
       const body = await response.text();
       if (!response.ok) throw new Error(`Haiku retornou ${response.status}: ${body}`);
       const parsed = JSON.parse(body) as AnthropicResponse;
