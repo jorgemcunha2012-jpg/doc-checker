@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Enrollment = {
@@ -14,7 +13,6 @@ type Enrollment = {
 };
 
 export function MfaForm() {
-  const router = useRouter();
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -80,16 +78,11 @@ export function MfaForm() {
       setVerifying(false);
       return;
     }
-    router.push("/");
-    router.refresh();
+    window.location.assign("/");
   }
 
   return (
-    <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-7 shadow-sm">
-      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#0f8f88] text-white">
-        <KeyRound className="h-5 w-5" />
-      </div>
-      <h1 className="mt-5 text-2xl font-bold text-slate-950">Verificação em duas etapas</h1>
+    <div className="mt-8">
       {loading ? (
         <div className="flex items-center gap-2 py-8 text-sm text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" /> Preparando acesso seguro...
@@ -122,7 +115,7 @@ export function MfaForm() {
             <label className="block text-sm font-bold text-slate-700">
               Código de 6 dígitos
               <input
-                className="mt-2 min-h-11 w-full rounded-md border border-slate-300 px-3 text-center text-lg tracking-[0.3em] outline-none focus:border-[#0f8f88]"
+                className="app-input mt-2 w-full px-3 text-center text-lg tracking-[0.3em]"
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 maxLength={6}
@@ -132,13 +125,13 @@ export function MfaForm() {
               />
             </label>
             {error ? <p className="text-sm font-semibold text-rose-700">{error}</p> : null}
-            <button className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[#0f8f88] px-4 text-sm font-bold text-white disabled:bg-slate-300" disabled={verifying || !enrollment}>
+            <button className="app-button-primary flex min-h-12 w-full items-center justify-center gap-2 px-4 text-sm font-bold disabled:bg-slate-300" disabled={verifying || !enrollment}>
               {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Confirmar e entrar
             </button>
           </form>
         </>
       )}
-    </section>
+    </div>
   );
 }

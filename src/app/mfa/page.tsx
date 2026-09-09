@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AuthShell } from "@/components/auth-shell";
 import { MfaForm } from "@/components/mfa-form";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -10,8 +11,8 @@ export default async function MfaPage() {
   if (assurance?.currentLevel === "aal2") redirect("/");
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-5 py-10">
+    <AuthShell eyebrow="Proteção da conta" title="Verificação em duas etapas" description="Confirme o código do seu aplicativo autenticador para continuar.">
       <MfaForm />
-    </main>
+    </AuthShell>
   );
 }
