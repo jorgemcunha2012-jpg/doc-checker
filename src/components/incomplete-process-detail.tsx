@@ -26,9 +26,10 @@ export function IncompleteProcessDetail({
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="app-section-heading flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-950">Diagnóstico do processo</h1>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-blue-700">Acompanhamento operacional</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Diagnóstico do processo</h1>
           <p className="mt-1 text-sm text-slate-500">
             {processCode(process.id)} · {process.profiles?.name ?? "Usuário"} · iniciado em {new Date(process.started_at).toLocaleString("pt-BR")}
           </p>
@@ -39,7 +40,7 @@ export function IncompleteProcessDetail({
         </a>
       </div>
 
-      <section className={`border p-5 ${orphanWithoutDocuments || stalled || process.final_status === "FAILED" ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
+      <section className={`app-card p-4 ${orphanWithoutDocuments || stalled || process.final_status === "FAILED" ? "border-amber-300 bg-amber-50" : ""}`}>
         <div className="flex items-start gap-3">
           <AlertTriangle className={`mt-0.5 h-5 w-5 shrink-0 ${orphanWithoutDocuments || stalled || process.final_status === "FAILED" ? "text-amber-700" : "text-slate-500"}`} />
           <div>
@@ -64,13 +65,13 @@ export function IncompleteProcessDetail({
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="grid gap-2 sm:grid-cols-3">
         <Metric label="Etapa registrada" value={processingStatusLabel(process.processing_status)} />
         <Metric label="Situação" value={finalStatusLabel(process.final_status)} />
         <Metric label="Tempo decorrido" value={duration} icon />
       </section>
 
-      <section className="border border-slate-200 bg-white p-5">
+      <section className="app-card p-4">
         <div className="flex items-center gap-2">
           <FileText className="h-5 w-5 text-slate-500" />
           <h2 className="font-bold text-slate-950">Documentos enviados</h2>
@@ -85,7 +86,7 @@ export function IncompleteProcessDetail({
 
 function Metric({ label, value, icon = false }: { label: string; value: string; icon?: boolean }) {
   return (
-    <div className="border border-slate-200 bg-white p-4">
+    <div className="app-card p-4">
       <div className="text-xs font-bold uppercase text-slate-500">{label}</div>
       <div className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-900">
         {icon ? <Clock3 className="h-4 w-4 text-slate-400" /> : null}

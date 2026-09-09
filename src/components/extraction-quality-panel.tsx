@@ -18,10 +18,10 @@ export function ExtractionQualityPanel({
   const label = (fieldId: string) => humanFieldLabel(fieldId, checklist);
 
   return (
-    <details className="group border border-slate-200 bg-white">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 outline-none focus-visible:ring-2 focus-visible:ring-[#0faaa2] focus-visible:ring-inset group-open:border-b group-open:border-slate-200 [&::-webkit-details-marker]:hidden">
+    <details className="app-card group overflow-hidden">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-[#0faaa2] focus-visible:ring-inset group-open:border-b group-open:border-slate-200 [&::-webkit-details-marker]:hidden">
         <div>
-          <h2 className="font-bold text-slate-950">Qualidade da extração</h2>
+          <h2 className="font-bold tracking-tight text-slate-950">Qualidade da extração</h2>
           <p className="mt-1 text-sm text-slate-500">Cobertura dos campos críticos antes da comparação documental.</p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
@@ -31,7 +31,7 @@ export function ExtractionQualityPanel({
       </summary>
       <div className="grid divide-y divide-slate-100 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
         {assessed.map((report) => (
-          <div key={report.source} className="p-5">
+          <div key={report.source} className="p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 {report.status === "COMPLETE"
