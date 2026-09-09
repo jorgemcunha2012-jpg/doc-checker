@@ -147,7 +147,7 @@ export class DocumentExtractionService {
             if (!hasEnoughText(text)) {
               console.info("[ConferIA] PDF sem texto extraível suficiente; iniciando OCR", {
                 source,
-                documentName: document.name,
+                documentId: document.id,
                 extractedTextCharacters: text.length,
                 pageSelection,
               });
@@ -165,7 +165,7 @@ export class DocumentExtractionService {
               const extraction = await this.extractTextWithRecovery(ocrText, sourceChecklist, source);
               console.info("[ConferIA] Extração OCR concluída", {
                 source,
-                documentName: document.name,
+                documentId: document.id,
                 durationMs: Date.now() - startedAt,
                 extractedTextCharacters: ocrText.length,
                 requestedFields: sourceChecklist.length,
@@ -182,7 +182,7 @@ export class DocumentExtractionService {
             const extraction = await this.extractTextWithRecovery(text, sourceChecklist, source);
             console.info("[ConferIA] Extração concluída", {
               source,
-              documentName: document.name,
+              documentId: document.id,
               durationMs: Date.now() - startedAt,
               extractedTextCharacters: text.length,
               requestedFields: sourceChecklist.length,
@@ -202,7 +202,7 @@ export class DocumentExtractionService {
             const extraction = await this.extractTextWithRecovery(text, sourceChecklist, source);
             console.info("[ConferIA] Extração concluída", {
               source,
-              documentName: document.name,
+              documentId: document.id,
               durationMs: Date.now() - startedAt,
               extractedTextCharacters: text.length,
               requestedFields: sourceChecklist.length,
@@ -224,7 +224,7 @@ export class DocumentExtractionService {
               : [];
             console.info("[ConferIA] Extração concluída", {
               source,
-              documentName: document.name,
+              documentId: document.id,
               durationMs: Date.now() - startedAt,
               requestedFields: sourceChecklist.length,
               deterministicFields,
@@ -242,7 +242,7 @@ export class DocumentExtractionService {
           const errorMessage = sanitizeExtractionError(error);
           console.error("[ConferIA] Falha de extração por documento", {
             source,
-            documentName: document.name,
+            documentId: document.id,
             error: errorMessage,
           });
           return { output: null, recoveredFields: [], deterministicFields: [], usedPdfVisionFallback: false, error: explainExtractionError(errorMessage, document) };
@@ -267,14 +267,14 @@ export class DocumentExtractionService {
       if (hasMissingReservationFinancials(consolidated.values)) {
         recoveries.push(...imageDocuments.map((document) => this.visionProvider().extractReservationFinancialComponentsFromImage(document, checklist)
           .catch((recoveryError) => {
-            console.warn("[ConferIA] Recuperação financeira da fonte Reserva falhou", { documentName: document.name, error: sanitizeExtractionError(recoveryError) });
+            console.warn("[ConferIA] Recuperação financeira da fonte Reserva falhou", { documentId: document.id, error: sanitizeExtractionError(recoveryError) });
             return null;
           })));
       }
       if (hasMissingReservationIdentity(consolidated.values)) {
         recoveries.push(...imageDocuments.map((document) => this.visionProvider().extractReservationIdentityFromImage(document, checklist)
           .catch((recoveryError) => {
-            console.warn("[ConferIA] Recuperação de identidade da fonte Reserva falhou", { documentName: document.name, error: sanitizeExtractionError(recoveryError) });
+            console.warn("[ConferIA] Recuperação de identidade da fonte Reserva falhou", { documentId: document.id, error: sanitizeExtractionError(recoveryError) });
             return null;
           })));
       }
@@ -425,7 +425,7 @@ export class DocumentExtractionService {
         }
       } catch (error) {
         console.warn("[ConferIA] OCR local do documento complementar indisponível", {
-          documentName: document.name,
+          documentId: document.id,
           error: sanitizeExtractionError(error),
         });
       }
@@ -474,7 +474,7 @@ export class DocumentExtractionService {
       hasReservationPaymentTable(ocrText) && !focusedPaymentIsComplete
         ? this.visionProvider().extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
           console.warn("[ConferIA] Leitura especializada da condição de pagamento falhou", {
-            documentName: document.name,
+            documentId: document.id,
             error: sanitizeExtractionError(error),
           });
           return null;
@@ -483,7 +483,7 @@ export class DocumentExtractionService {
       hasReservationPreRegistrationSummary(ocrText) && !focusedPreRegistrationIsComplete
         ? this.visionProvider().extractReservationPreRegistrationFinancials(document, checklist).catch((error) => {
           console.warn("[ConferIA] Leitura especializada do pré-cadastro falhou", {
-            documentName: document.name,
+            documentId: document.id,
             error: sanitizeExtractionError(error),
           });
           return null;
@@ -491,19 +491,19 @@ export class DocumentExtractionService {
         : Promise.resolve(null),
       recoveryTargets.has("identity")
         ? this.visionProvider().extractReservationIdentityFromImage(document, checklist).catch((error) => {
-          console.warn("[ConferIA] Revisão dirigida de dados pessoais falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
+          console.warn("[ConferIA] Revisão dirigida de dados pessoais falhou", { documentId: document.id, error: sanitizeExtractionError(error) });
           return null;
         })
         : Promise.resolve(null),
       recoveryTargets.has("unit")
         ? this.visionProvider().extractReservationUnitFromImage(document, checklist).catch((error) => {
-          console.warn("[ConferIA] Revisão dirigida da unidade falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
+          console.warn("[ConferIA] Revisão dirigida da unidade falhou", { documentId: document.id, error: sanitizeExtractionError(error) });
           return null;
         })
         : Promise.resolve(null),
       recoveryTargets.has("payment") && !hasReservationPaymentTable(ocrText)
         ? this.visionProvider().extractReservationFinancialComponentsFromImage(document, checklist).catch((error) => {
-          console.warn("[ConferIA] Revisão dirigida financeira falhou", { documentName: document.name, error: sanitizeExtractionError(error) });
+          console.warn("[ConferIA] Revisão dirigida financeira falhou", { documentId: document.id, error: sanitizeExtractionError(error) });
           return null;
         })
         : Promise.resolve(null),
@@ -517,7 +517,7 @@ export class DocumentExtractionService {
     if (!recoveryTargets.size) {
         if (ocrOutput || localOcrOutput) {
           console.info("[ConferIA] Dados da Reserva extraídos com camadas OCR determinísticas", {
-            documentName: document.name,
+            documentId: document.id,
             extractedTextCharacters: ocrAttempt.status === "fulfilled" ? ocrAttempt.value.text.length : 0,
             localOcrTextCharacters: localOcrAttempt.status === "fulfilled" ? localOcrAttempt.value.text.length : 0,
           });
@@ -529,19 +529,19 @@ export class DocumentExtractionService {
 
     if (focusedAttempt.status === "rejected") {
       console.warn("[ConferIA] Extração focada de Dados da Reserva falhou", {
-        documentName: document.name,
+        documentId: document.id,
         error: sanitizeExtractionError(focusedAttempt.reason),
       });
     }
     if (ocrAttempt.status === "rejected") {
       console.warn("[ConferIA] OCR textual de Dados da Reserva falhou", {
-        documentName: document.name,
+        documentId: document.id,
         error: sanitizeExtractionError(ocrAttempt.reason),
       });
     }
     if (localOcrAttempt.status === "rejected") {
       console.warn("[ConferIA] OCR local de Dados da Reserva falhou", {
-        documentName: document.name,
+        documentId: document.id,
         error: sanitizeExtractionError(localOcrAttempt.reason),
       });
     }
@@ -551,13 +551,13 @@ export class DocumentExtractionService {
       merged = enrichReservationFinancialComposition(mergeReservationOutputs([...firstPassOutputs, ...sanitizeReservationOutputs([genericOutput], checklist)], checklist), checklist, ocrText);
       if (!reservationRecoveryTargets(merged, ocrText).length) {
         console.info("[ConferIA] Dados da Reserva recuperados com extração visual genérica", {
-          documentName: document.name,
+          documentId: document.id,
         });
       }
       return merged;
     } catch (error) {
       console.warn("[ConferIA] Todas as camadas visuais de Dados da Reserva falharam", {
-        documentName: document.name,
+        documentId: document.id,
         error: sanitizeExtractionError(error),
       });
       return firstPassOutputs.length ? merged : emptyOutput(checklist);
