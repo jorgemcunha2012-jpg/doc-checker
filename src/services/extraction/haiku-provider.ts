@@ -3,6 +3,7 @@ import type { DocumentExtractionProvider, UploadedDocumentPayload } from "./type
 import { enrichStandardFinancialFields, focusDocumentText } from "./deepseek-provider";
 import { parseJsonResponse } from "./openai-compatible-client";
 import { checklistPrompt, coerceExtractionOutput } from "./provider-utils";
+import { restoreTokenizedOutput, tokenizeSensitiveText } from "./pii-tokenizer";
 
 type AnthropicResponse = {
   content?: Array<{ type?: string; text?: string }>;
@@ -23,8 +24,9 @@ export class HaikuProvider implements DocumentExtractionProvider {
 
   async structureText(text: string, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
     const focusedText = focusDocumentText(text, checklist);
-    const content = await this.request(focusedText, checklist);
-    return enrichStandardFinancialFields(coerceExtractionOutput(parseJsonResponse(content), checklist), text, checklist);
+    const tokenized = tokenizeSensitiveText(focusedText);
+    const content = await this.request(tokenized.text, checklist);
+    return enrichStandardFinancialFields(restoreTokenizedOutput(coerceExtractionOutput(parseJsonResponse(content), checklist), tokenized.replacements), text, checklist);
   }
 
   async extractFromImage(document: UploadedDocumentPayload, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {

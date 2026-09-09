@@ -2,6 +2,7 @@ import type { ChecklistField, ProviderExtractionOutput } from "@/domain/validati
 import type { DocumentExtractionProvider } from "./types";
 import { OpenAICompatibleClient } from "./openai-compatible-client";
 import { checklistPrompt, coerceExtractionOutput } from "./provider-utils";
+import { restoreTokenizedOutput, tokenizeSensitiveText } from "./pii-tokenizer";
 
 export class DeepSeekProvider implements DocumentExtractionProvider {
   provider = "DEEPSEEK" as const;
@@ -15,6 +16,7 @@ export class DeepSeekProvider implements DocumentExtractionProvider {
 
   async structureText(text: string, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
     const focusedText = focusDocumentText(text, checklist);
+    const tokenized = tokenizeSensitiveText(focusedText);
     const result = await this.client.completeJson([
       {
         role: "system",
@@ -23,12 +25,13 @@ export class DeepSeekProvider implements DocumentExtractionProvider {
       },
       {
         role: "user",
-        content: `Texto bruto:\n${focusedText}\n\nCampos esperados:\n${checklistPrompt(checklist)}`,
+          content: `Texto bruto:\n${tokenized.text}\n\nCampos esperados:\n${checklistPrompt(checklist)}`,
       },
     ], { timeoutMs: 75_000 });
 
-    const output = enrichStandardFinancialFields(coerceExtractionOutput(result, checklist), text, checklist);
+    const output = enrichStandardFinancialFields(restoreTokenizedOutput(coerceExtractionOutput(result, checklist), tokenized.replacements), text, checklist);
     if (focusedText.length < text.length && shouldRetryWithBroaderContext(output, checklist)) {
+      const broaderText = tokenizeSensitiveText(compactDocumentText(text));
       const broaderResult = await this.client.completeJson([
         {
           role: "system",
@@ -37,11 +40,11 @@ export class DeepSeekProvider implements DocumentExtractionProvider {
         },
         {
           role: "user",
-          content: `Texto bruto:\n${compactDocumentText(text)}\n\nCampos esperados:\n${checklistPrompt(checklist)}`,
+          content: `Texto bruto:\n${broaderText.text}\n\nCampos esperados:\n${checklistPrompt(checklist)}`,
         },
       ], { timeoutMs: 95_000 });
 
-      return enrichStandardFinancialFields(coerceExtractionOutput(broaderResult, checklist), text, checklist);
+      return enrichStandardFinancialFields(restoreTokenizedOutput(coerceExtractionOutput(broaderResult, checklist), broaderText.replacements), text, checklist);
     }
 
     return output;
