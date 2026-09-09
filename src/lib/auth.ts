@@ -1,7 +1,7 @@
 import type { User } from "@/domain/validation";
 import { isSupabaseConfigured } from "./supabase/config";
 import { createSupabaseServerClient } from "./supabase/server";
-export { canAccessProcess, isMasterAdmin, isOrganizationAdmin } from "./authorization";
+export { canAccessProcess, canAccessProcessDocument, isMasterAdmin, isOrganizationAdmin } from "./authorization";
 import { isMasterAdmin } from "./authorization";
 
 export type AuthenticatedUser = User & {

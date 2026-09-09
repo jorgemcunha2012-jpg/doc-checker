@@ -23,3 +23,11 @@ export function canAccessProcess(
   if (process.organizationId !== user.organizationId) return false;
   return isOrganizationAdmin(user) || process.userId === user.id;
 }
+
+export function canAccessProcessDocument(
+  user: AuthorizationUser,
+  process: { userId: string; organizationId: string },
+  documentOrganizationId: string,
+) {
+  return process.organizationId === documentOrganizationId && canAccessProcess(user, process);
+}

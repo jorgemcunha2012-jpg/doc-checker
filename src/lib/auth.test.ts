@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canAccessProcess, isMasterAdmin, isOrganizationAdmin, type AuthorizationUser } from "./authorization";
+import { canAccessProcess, canAccessProcessDocument, isMasterAdmin, isOrganizationAdmin, type AuthorizationUser } from "./authorization";
 
 const analyst: AuthorizationUser = {
   id: "analyst-1",
@@ -36,4 +36,11 @@ test("admin acessa a equipe da própria organização, mas não outra empresa", 
 test("master possui acesso global sem depender de email configurado", () => {
   assert.equal(isMasterAdmin(master), true);
   assert.equal(canAccessProcess(master, { userId: "other", organizationId: "other-org" }), true);
+});
+
+test("documento sempre precisa pertencer à organização do processo", () => {
+  const process = { userId: "other", organizationId: "victa" };
+  assert.equal(canAccessProcessDocument(admin, process, "victa"), true);
+  assert.equal(canAccessProcessDocument(master, process, "victa"), true);
+  assert.equal(canAccessProcessDocument(master, process, "other-org"), false);
 });

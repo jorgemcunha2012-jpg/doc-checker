@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AuthError, isMasterAdmin, isOrganizationAdmin, requireUser } from "@/lib/auth";
+import { AuthError, canAccessProcessDocument, requireUser } from "@/lib/auth";
+import { getAccessibleProcessScope } from "@/lib/process-access";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
 
@@ -8,22 +9,18 @@ export async function GET(_request: Request, context: { params: Promise<{ proces
     const user = await requireUser();
     const { processId, documentId } = await context.params;
     const supabase = createSupabaseAdminClient();
-    let processQuery = supabase
-      .from("validation_processes")
-      .select("id")
-      .eq("id", processId);
-    if (!isMasterAdmin(user)) processQuery = processQuery.eq("organization_id", user.organizationId);
-    if (!isOrganizationAdmin(user)) processQuery = processQuery.eq("user_id", user.id);
-    const { data: process } = await processQuery.maybeSingle();
+    const process = await getAccessibleProcessScope(user, processId);
     if (!process) return NextResponse.json({ error: "Processo não encontrado." }, { status: 404 });
 
     const { data: document } = await supabase
       .from("process_documents")
-      .select("storage_path, purged_at")
+      .select("storage_path, purged_at, organization_id")
       .eq("id", documentId)
       .eq("process_id", processId)
-      .eq("organization_id", user.organizationId)
       .maybeSingle();
+    if (document && !canAccessProcessDocument(user, process, document.organization_id)) {
+      return NextResponse.json({ error: "Processo não encontrado." }, { status: 404 });
+    }
     if (!document?.storage_path) {
       return NextResponse.json({
         error: document?.purged_at
@@ -37,7 +34,9 @@ export async function GET(_request: Request, context: { params: Promise<{ proces
       .createSignedUrl(document.storage_path, 60);
     if (error || !data?.signedUrl) throw error ?? new Error("URL temporária não gerada.");
     await audit(user, "DOCUMENT_VIEWED", "process_document", documentId, { processId });
-    return NextResponse.redirect(data.signedUrl);
+    const response = NextResponse.redirect(data.signedUrl);
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error(error);

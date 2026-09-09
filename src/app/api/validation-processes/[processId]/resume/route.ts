@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { AuthError, isMasterAdmin, isOrganizationAdmin, requireUser } from "@/lib/auth";
+import { AuthError, requireUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { getAccessibleProcessScope } from "@/lib/process-access";
 import { resumePersistedValidationProcess } from "@/services/process/process-validation";
 
 export const maxDuration = 300;
@@ -15,13 +16,15 @@ export async function POST(_request: Request, context: { params: Promise<{ proce
     const { processId } = await context.params;
     const user = await requireUser();
     const supabase = createSupabaseAdminClient();
-    let query = supabase
+    const processScope = await getAccessibleProcessScope(user, processId);
+    if (!processScope) return NextResponse.json({ error: "Processo não encontrado." }, { status: 404 });
+    const { data: process, error } = await supabase
       .from("validation_processes")
       .select("id, user_id, processing_status, updated_at")
-      .eq("id", processId);
-    if (!isMasterAdmin(user)) query = query.eq("organization_id", user.organizationId);
-    if (!isOrganizationAdmin(user)) query = query.eq("user_id", user.id);
-    const { data: process, error } = await query.single();
+      .eq("id", processScope.id)
+      .eq("organization_id", processScope.organizationId)
+      .eq("user_id", processScope.userId)
+      .single();
     if (error || !process) return NextResponse.json({ error: "Processo não encontrado." }, { status: 404 });
 
     if (process.processing_status === "DONE" || process.processing_status === "FAILED") {
