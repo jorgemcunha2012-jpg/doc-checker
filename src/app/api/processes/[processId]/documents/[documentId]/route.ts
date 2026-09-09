@@ -3,6 +3,7 @@ import { AuthError, canAccessProcessDocument, requireUser } from "@/lib/auth";
 import { getAccessibleProcessScope } from "@/lib/process-access";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
+import { logOperationalError } from "@/lib/security/operational-logger";
 
 export async function GET(_request: Request, context: { params: Promise<{ processId: string; documentId: string }> }) {
   try {
@@ -39,7 +40,7 @@ export async function GET(_request: Request, context: { params: Promise<{ proces
     return response;
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error(error);
+    logOperationalError("DOCUMENT_VIEW_UNEXPECTED", error);
     return NextResponse.json({ error: "Não foi possível abrir o documento." }, { status: 500 });
   }
 }

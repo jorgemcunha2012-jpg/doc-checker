@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { purgeExpiredProcessDocuments } from "@/services/security/document-retention";
+import { logOperationalError } from "@/lib/security/operational-logger";
 
 export const maxDuration = 60;
 
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
   try {
     return NextResponse.json(await purgeExpiredProcessDocuments());
   } catch (error) {
-    console.error("[ConferIA] Falha na retenção documental", error);
+    logOperationalError("DOCUMENT_RETENTION_UNEXPECTED", error);
     return NextResponse.json({ error: "Falha ao executar retenção documental." }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { AuthError, isMasterAdmin, requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
+import { logOperationalError } from "@/lib/security/operational-logger";
 
 export async function PATCH(request: Request, context: { params: Promise<{ userId: string }> }) {
   try {
@@ -56,7 +57,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     return NextResponse.json({ error: "Ação inválida." }, { status: 400 });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error(error);
+    logOperationalError("ADMIN_USER_UPDATE_UNEXPECTED", error);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
 }

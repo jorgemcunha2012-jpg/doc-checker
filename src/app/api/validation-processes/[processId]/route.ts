@@ -4,6 +4,7 @@ import { getAccessibleProcessScope } from "@/lib/process-access";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { getValidationProcess } from "@/services/process/validation-process-store";
+import { logOperationalError } from "@/lib/security/operational-logger";
 
 export async function GET(_request: Request, context: { params: Promise<{ processId: string }> }) {
   const { processId } = await context.params;
@@ -44,7 +45,7 @@ export async function GET(_request: Request, context: { params: Promise<{ proces
       });
     } catch (error) {
       if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-      console.error(error);
+      logOperationalError("PROCESS_READ_UNEXPECTED", error);
       return NextResponse.json({ error: "Erro interno." }, { status: 500 });
     }
   }

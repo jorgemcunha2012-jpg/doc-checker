@@ -3,6 +3,7 @@ import { AuthError, requireUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { getAccessibleProcessScope } from "@/lib/process-access";
+import { logOperationalError } from "@/lib/security/operational-logger";
 import { resumePersistedValidationProcess } from "@/services/process/process-validation";
 
 export const maxDuration = 300;
@@ -40,7 +41,7 @@ export async function POST(_request: Request, context: { params: Promise<{ proce
     return NextResponse.json({ resumed: true, process: resumed });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error("[ConferIA] Falha ao retomar processo", error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Não foi possível retomar o processo." }, { status: 500 });
+    logOperationalError("PROCESS_RESUME_UNEXPECTED", error);
+    return NextResponse.json({ error: "Não foi possível retomar o processo." }, { status: 500 });
   }
 }

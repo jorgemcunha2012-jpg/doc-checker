@@ -4,6 +4,7 @@ import { getAccessibleProcessScope } from "@/lib/process-access";
 import type { HumanReview } from "@/domain/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { saveHumanReview } from "@/services/process/process-repository";
+import { logOperationalError } from "@/lib/security/operational-logger";
 
 export async function PUT(request: Request, context: { params: Promise<{ processId: string }> }) {
   try {
@@ -42,7 +43,7 @@ export async function PUT(request: Request, context: { params: Promise<{ process
     return NextResponse.json({ review });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error(error);
+    logOperationalError("PROCESS_REVIEW_UNEXPECTED", error);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
 }

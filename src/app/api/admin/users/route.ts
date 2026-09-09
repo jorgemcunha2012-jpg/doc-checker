@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { AuthError, requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
+import { logOperationalError } from "@/lib/security/operational-logger";
 
 export async function GET() {
   try {
@@ -31,7 +32,10 @@ export async function POST(request: Request) {
       email_confirm: true,
       user_metadata: { name: name.trim() },
     });
-    if (error || !data.user) return NextResponse.json({ error: error?.message ?? "Falha ao criar usuário." }, { status: 400 });
+    if (error || !data.user) {
+      logOperationalError("ADMIN_USER_CREATE_FAILED", error ?? new Error("Usuário não criado"), { adminId: admin.id });
+      return NextResponse.json({ error: "Não foi possível criar o usuário." }, { status: 400 });
+    }
     const { error: profileError } = await supabase.from("profiles").insert({
       id: data.user.id,
       organization_id: admin.organizationId,
@@ -60,6 +64,6 @@ function temporaryPassword() {
 
 function authResponse(error: unknown) {
   if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-  console.error(error);
+  logOperationalError("ADMIN_USERS_UNEXPECTED", error);
   return NextResponse.json({ error: "Erro interno." }, { status: 500 });
 }
