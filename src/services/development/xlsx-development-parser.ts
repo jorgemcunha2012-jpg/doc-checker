@@ -2,6 +2,12 @@ import JSZip from "jszip";
 import { DOMParser } from "@xmldom/xmldom";
 import type { DevelopmentExtraction } from "@/domain/development";
 
+type XmlElement = {
+  textContent: string | null;
+  getAttribute(name: string): string | null;
+  getElementsByTagNameNS(namespace: string, localName: string): ArrayLike<XmlElement>;
+};
+
 const NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const HEADER_SCAN_LIMIT = 50;
 
@@ -134,7 +140,7 @@ function readWorksheet(xml: string, sharedStrings: string[]) {
   return Array.from(document.getElementsByTagNameNS(NS, "row")).map((row) => readRow(row, sharedStrings));
 }
 
-function readRow(row: Element, sharedStrings: string[]) {
+function readRow(row: XmlElement, sharedStrings: string[]) {
   const values: string[] = [];
   for (const cell of Array.from(row.getElementsByTagNameNS(NS, "c"))) {
     const reference = cell.getAttribute("r") ?? "";
