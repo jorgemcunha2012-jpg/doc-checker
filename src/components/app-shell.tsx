@@ -76,7 +76,7 @@ export function AppShell({ user, children }: { user: User; children: ReactNode }
       <div className="min-w-0">
         <header className="flex min-h-16 items-center justify-between border-b border-[var(--border)] bg-white px-5 pl-16 lg:px-9">
           <div className="text-sm font-semibold text-[var(--foreground)]">
-            {navigation.find((item) => item.href === (pathname === "/" ? "/" : `/${pathname.split("/")[1]}`))?.label ?? "ConferIA"}
+            {pathname.startsWith("/admin") ? "Usuários e operação" : navigation.find((item) => item.href === (pathname === "/" ? "/" : `/${pathname.split("/")[1]}`))?.label ?? "ConferIA"}
           </div>
           <div className="hidden text-xs font-medium text-[var(--muted)] sm:block">Conferência documental imobiliária</div>
         </header>

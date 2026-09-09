@@ -64,9 +64,19 @@ export function ReconciliationResultsTable({
   const sharedResults = useMemo(() => filteredResults.filter((result) => !result.field.participantId), [filteredResults]);
 
   return (
-    <section className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-white shadow-[var(--shadow-card)]">
-      <div className="flex flex-col gap-3 border-b border-[var(--border)] bg-[var(--surface-subtle)] p-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-1">
+    <section className="app-card overflow-hidden">
+      <div className="border-b border-[var(--border)] bg-[var(--surface-subtle)] p-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-[0.1em] text-slate-500">Checklist consolidado</div>
+            <p className="mt-1 text-xs text-slate-500">Compare os valores por fonte e abra a evidência quando precisar revisar.</p>
+          </div>
+          <label className="flex min-h-9 items-center gap-2 rounded-md border border-[var(--border)] bg-white px-3">
+            <Search className="h-4 w-4 text-slate-400" />
+            <input aria-label="Buscar campo ou valor" className="w-full bg-transparent text-xs outline-none lg:w-64" placeholder="Buscar campo ou valor" value={query} onChange={(event) => setQuery(event.target.value)} />
+          </label>
+        </div>
+        <div className="mt-3 flex gap-1 overflow-x-auto pb-1">
           {filters.map((item) => (
             <button
               key={item.id}
@@ -79,15 +89,6 @@ export function ReconciliationResultsTable({
             </button>
           ))}
         </div>
-        <label className="flex min-h-9 items-center gap-2 rounded-md border border-[var(--border)] bg-white px-3">
-          <Search className="h-4 w-4 text-slate-400" />
-          <input
-            className="w-full bg-transparent text-xs outline-none lg:w-64"
-            placeholder="Buscar campo ou valor"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
       </div>
 
       {participantGroups.map((group) => (
@@ -158,10 +159,10 @@ function ResultGroup({
         <table className="app-table w-full min-w-[1180px] text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-900 text-xs uppercase text-slate-200">
-              <th className="font-semibold">Campo</th>
-              {sources.map((source) => <th key={source} className="font-semibold">{documentSourceLabels[source]}</th>)}
-              <th className="font-semibold">Status</th>
-              <th className="font-semibold">Diagnóstico e revisão</th>
+              <th className="w-48 font-semibold">Campo</th>
+              {sources.map((source) => <th key={source} className="min-w-52 font-semibold">{documentSourceLabels[source]}</th>)}
+              <th className="w-40 font-semibold">Status</th>
+              <th className="min-w-72 font-semibold">Diagnóstico e revisão</th>
             </tr>
           </thead>
           <tbody>

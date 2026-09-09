@@ -454,7 +454,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
                 </div>
               ) : null}
 
-              <div className={`grid gap-3 ${run.validationType === "RECONCILIATION" ? "md:grid-cols-5" : "md:grid-cols-4"}`}>
+              <div className={`grid gap-2 ${run.validationType === "RECONCILIATION" ? "md:grid-cols-5" : "md:grid-cols-4"}`}>
                 <SummaryCard label="Total de campos conferidos" value={run.summary.totalChecked} tone="neutral" hint="Quantidade de linhas do checklist que entraram na comparação entre as fontes participantes." />
                 <SummaryCard label="Campos conferidos" value={finalResultCounts(run).checked} tone="success" hint="Campos com valores equivalentes ou aprovados manualmente por um usuário." />
                 <SummaryCard label="Divergências pendentes" value={finalResultCounts(run).divergences} tone="danger" hint="Campos em que a engine encontrou uma diferença relevante e ainda não houve validação humana." />
@@ -466,7 +466,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
               {run.validationType === "RECONCILIATION" ? (
                 <div className="grid gap-3 md:grid-cols-3">
                   {run.participatingSources.map((source) => (
-                    <div key={source} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                    <div key={source} className="app-card p-3">
                       <div className="flex items-center gap-1 text-xs font-bold uppercase text-slate-500">{documentSourceLabels[source]} <InfoTooltip text="Fonte documental usada na reconciliação. Os números abaixo se referem somente aos campos esperados nesta fonte." /></div>
                       <div className="mt-2 text-sm text-slate-700">
                         {run.summary.missingBySource[source] ?? 0} ausentes · {run.summary.unreadableBySource[source] ?? 0} ilegíveis
@@ -572,7 +572,7 @@ function SummaryCard({ label, value, tone, hint }: { label: string; value: numbe
   };
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="app-card p-4">
       <div className={`inline-flex h-9 min-w-12 items-center justify-center rounded-md px-3 text-lg font-bold ${toneClasses[tone]}`}>{value}</div>
       <div className="mt-3 flex items-center gap-1 text-sm font-semibold text-slate-700">{label} <InfoTooltip text={hint} /></div>
     </div>
@@ -589,7 +589,7 @@ function ReviewProgress({ run }: { run: ReconciliationRun }) {
     : 0;
 
   return (
-    <section className={`border p-5 ${unresolved === 0 ? "border-emerald-200 bg-emerald-50/60" : "border-slate-200 bg-white"}`}>
+    <section className={`app-card p-4 ${unresolved === 0 ? "border-emerald-200 bg-emerald-50/60" : ""}`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -609,7 +609,7 @@ function ReviewProgress({ run }: { run: ReconciliationRun }) {
           <div className="text-xs font-semibold text-slate-500">conferido</div>
         </div>
       </div>
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200">
+      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-200">
         <div className={`h-full rounded-full ${unresolved === 0 ? "bg-emerald-500" : "bg-[#2563eb]"}`} style={{ width: `${progress}%` }} />
       </div>
     </section>
@@ -655,7 +655,7 @@ function ProcessingPanel({
   const progress = Math.min(92, 12 + elapsedSeconds * 0.55);
 
   return (
-    <section className="app-card border-l-4 border-l-[var(--primary)] p-5">
+    <section className="app-card border-l-4 border-l-[var(--primary)] p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
@@ -670,13 +670,13 @@ function ProcessingPanel({
       <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-slate-200">
         <div className="h-full rounded-full bg-[#2563eb] transition-all duration-1000" style={{ width: `${progress}%` }} />
       </div>
-      <div className="mt-5 grid gap-3 sm:grid-cols-4">
+      <div className="mt-4 grid gap-2 sm:grid-cols-4">
         {steps.map((step, index) => {
           const isComplete = index < activeIndex;
           const isActive = index === activeIndex;
           return (
             <div key={step.label} className="flex items-center gap-2">
-              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isComplete || isActive ? "bg-[#2563eb] text-white" : "bg-white text-slate-400"}`}>
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${isComplete || isActive ? "bg-[#2563eb] text-white" : "border border-slate-200 bg-white text-slate-400"}`}>
                 {isComplete ? <Check className="h-4 w-4" /> : <step.icon className={`h-4 w-4 ${isActive ? "animate-pulse" : ""}`} />}
               </span>
               <span className={`text-xs font-semibold leading-4 ${isActive ? "text-slate-950" : "text-slate-500"}`}>{step.label}</span>
