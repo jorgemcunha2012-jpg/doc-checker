@@ -7,6 +7,7 @@ import type { UploadedDocumentPayload } from "@/services/extraction/types";
 import { requireUser, AuthError } from "@/lib/auth";
 import { developmentUnitValues } from "@/domain/development";
 import { getDevelopmentUnit } from "@/services/development/development-repository";
+import { ACCEPTED_UPLOAD_MIME_TYPES, inspectUpload } from "@/lib/security/upload-validation";
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 const MAX_TOTAL_SIZE_BYTES = 60 * 1024 * 1024;
@@ -14,16 +15,7 @@ const MAX_FILES = 20;
 const CONFERIA_CREDITS_PAUSED = false;
 const CREDITS_MESSAGE = "Créditos insuficientes para iniciar a conferência.";
 export const maxDuration = 300;
-const ACCEPTED_MIME_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/tiff",
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/rtf",
-  "text/rtf",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-]);
+const ACCEPTED_MIME_TYPES = ACCEPTED_UPLOAD_MIME_TYPES;
 
 export async function POST(request: Request) {
   let currentUser;
@@ -107,36 +99,8 @@ export async function POST(request: Request) {
 }
 
 async function isAcceptedFile(file: File) {
-  const name = file.name.toLowerCase();
-  if (file.size <= 0 || file.size > MAX_FILE_SIZE_BYTES) return false;
-  const bytes = new Uint8Array(await file.slice(0, 32).arrayBuffer());
-  const signatures = {
-    pdf: bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46,
-    png: bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47,
-    jpeg: bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
-    zip: bytes[0] === 0x50 && bytes[1] === 0x4b && [0x03, 0x05, 0x07].includes(bytes[2]),
-    rtf: isRtfHeader(bytes),
-    tiff:
-      (bytes[0] === 0x49 && bytes[1] === 0x49 && bytes[2] === 0x2a && bytes[3] === 0x00) ||
-      (bytes[0] === 0x4d && bytes[1] === 0x4d && bytes[2] === 0x00 && bytes[3] === 0x2a),
-  };
-  const validContent =
-    (name.endsWith(".pdf") && signatures.pdf) ||
-    (name.endsWith(".png") && signatures.png) ||
-    ((name.endsWith(".jpg") || name.endsWith(".jpeg")) && signatures.jpeg) ||
-    (name.endsWith(".docx") && signatures.zip) ||
-    (name.endsWith(".xlsx") && signatures.zip) ||
-    (name.endsWith(".rtf") && signatures.rtf) ||
-    ((name.endsWith(".tif") || name.endsWith(".tiff")) && signatures.tiff);
-
-  return validContent;
-}
-
-function isRtfHeader(bytes: Uint8Array) {
-  // RTF files may include a UTF-8 BOM or whitespace before the control word.
-  const withoutBom = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? bytes.slice(3) : bytes;
-  const header = new TextDecoder("latin1").decode(withoutBom);
-  return /^\uFEFF?\s*\{\\rtf/i.test(header);
+  const bytes = new Uint8Array(await file.slice(0, 64).arrayBuffer());
+  return inspectUpload(file.name, canonicalMimeType(file), file.size, bytes, MAX_FILE_SIZE_BYTES).ok;
 }
 
 function validateComparisonSides(documents: UploadedDocumentPayload[]) {

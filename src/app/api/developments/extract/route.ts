@@ -187,7 +187,7 @@ async function readPdfPayload(request: Request, organizationId: string) {
         size: downloads.reduce((total, image) => total + image.length, 0),
       };
     }
-    if (!body.storagePath || !body.sourceDocumentName || !body.storagePath.startsWith(`${organizationId}/development-extractions/`)) {
+    if (!body.storagePath || !body.sourceDocumentName || !body.storagePath.startsWith(`quarantine/${organizationId}/development-extractions/`)) {
       return null;
     }
     const supabase = createSupabaseAdminClient();

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { AuthError, requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { logOperationalError } from "@/lib/security/operational-logger";
+import { inspectUpload } from "@/lib/security/upload-validation";
 
 const MAX_SIZE = 20 * 1024 * 1024;
 
@@ -13,10 +14,10 @@ export async function POST(request: Request) {
       const form = await request.formData();
       const file = form.get("page");
       const fileName = form.get("fileName");
-      if (!(file instanceof File) || typeof fileName !== "string" || file.type !== "image/jpeg" || file.size <= 0 || file.size > MAX_SIZE) {
+      if (!(file instanceof File) || typeof fileName !== "string" || !inspectUpload(file.name, "image/jpeg", file.size, new Uint8Array(await file.slice(0, 64).arrayBuffer()), MAX_SIZE).ok) {
         return NextResponse.json({ error: "A página renderizada é inválida ou excede 20 MB." }, { status: 400 });
       }
-      const storagePath = `${user.organizationId}/development-extractions/rendered-pages/${randomUUID()}.jpg`;
+      const storagePath = `quarantine/${user.organizationId}/development-extractions/rendered-pages/${randomUUID()}.jpg`;
       const supabase = createSupabaseAdminClient();
       const { error } = await supabase.storage.from("process-documents").upload(storagePath, Buffer.from(await file.arrayBuffer()), {
         contentType: "image/jpeg",
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Não foi possível preparar a página renderizada da matrícula." }, { status: 400 });
     }
 
-    const storagePath = `${user.organizationId}/development-extractions/rendered-pages/${randomUUID()}.jpg`;
+    const storagePath = `quarantine/${user.organizationId}/development-extractions/rendered-pages/${randomUUID()}.jpg`;
     const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase.storage
       .from("process-documents")

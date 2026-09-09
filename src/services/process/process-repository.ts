@@ -64,7 +64,7 @@ export async function persistOriginalDocuments(processId: string, documents: Upl
   const uploaded: Array<{ id: string; path: string }> = [];
   try {
     const uploads = await Promise.allSettled(documents.map(async (document) => {
-      const storagePath = `${document.organizationId}/${processId}/${document.id}`;
+      const storagePath = `quarantine/${document.organizationId}/${processId}/${document.id}`;
       const { error } = await supabase.storage.from("process-documents").upload(storagePath, document.buffer, {
         contentType: document.mimeType,
         upsert: false,
