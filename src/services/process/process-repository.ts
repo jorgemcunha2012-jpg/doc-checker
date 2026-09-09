@@ -4,6 +4,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
 import { learnFromApprovedReview } from "./learning-repository";
+import { errorCode } from "@/lib/security/operational-logger";
 
 export async function persistProcess(process: ValidationProcess) {
   if (!isSupabaseConfigured()) return;
@@ -24,7 +25,7 @@ export async function persistProcess(process: ValidationProcess) {
             : {}),
         })
       : null,
-    error: process.error ?? null,
+    error: safeProcessError(process.error),
     started_at: process.createdAt,
     completed_at: process.status === "DONE" || process.status === "FAILED" ? process.updatedAt : null,
     updated_at: process.updatedAt,
@@ -63,7 +64,7 @@ export async function persistOriginalDocuments(processId: string, documents: Upl
   const uploaded: Array<{ id: string; path: string }> = [];
   try {
     const uploads = await Promise.allSettled(documents.map(async (document) => {
-      const storagePath = `${document.organizationId}/${processId}/${document.id}-${safeFileName(document.name)}`;
+      const storagePath = `${document.organizationId}/${processId}/${document.id}`;
       const { error } = await supabase.storage.from("process-documents").upload(storagePath, document.buffer, {
         contentType: document.mimeType,
         upsert: false,
@@ -130,6 +131,13 @@ function sanitizeTextForPostgres(value: string | undefined) {
   return sanitized;
 }
 
+function safeProcessError(value: string | undefined) {
+  if (!value) return null;
+  if (/timeout|abort|demorou demais/i.test(value)) return "A conferência excedeu o tempo disponível.";
+  if (/storage|upload|armazenar/i.test(value)) return "Não foi possível armazenar um documento da conferência.";
+  return "A conferência não pôde ser concluída. Consulte o administrador com o número da operação.";
+}
+
 export async function saveHumanReview(
   processId: string,
   fieldId: string,
@@ -191,7 +199,7 @@ export async function audit(
     entity_id: entityId ?? null,
     metadata,
   });
-  if (error) console.error("[ConferIA] Falha ao registrar auditoria", error.message);
+  if (error) console.error(JSON.stringify({ event: "AUDIT_WRITE_FAILED", errorCode: errorCode(error) }));
 }
 
 async function refreshFinalStatus(processId: string) {
@@ -223,13 +231,4 @@ function finalStatus(process: ValidationProcess) {
   return process.result.results.some((result) => result.status !== "MATCH" && result.status !== "PRESENT")
     ? "PENDING_REVIEW"
     : "FULLY_CHECKED";
-}
-
-function safeFileName(name: string) {
-  return name
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 120) || "documento";
 }

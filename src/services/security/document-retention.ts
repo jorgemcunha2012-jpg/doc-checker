@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { documentRetentionCutoff, documentRetentionReason } from "./document-retention-policy";
+import { errorCode } from "@/lib/security/operational-logger";
 
 const RETENTION_BATCH_SIZE = 100;
 
@@ -29,7 +30,7 @@ export async function purgeExpiredProcessDocuments(now = new Date()): Promise<Re
     .order("created_at", { ascending: true })
     .limit(RETENTION_BATCH_SIZE);
 
-  if (error) throw new Error(`Falha ao consultar retenção: ${error.message}`);
+  if (error) throw new Error("Falha ao consultar retenção.");
   const documents = (data ?? []).filter(
     (document): document is RetentionDocument => Boolean(document.storage_path),
   );
@@ -38,7 +39,7 @@ export async function purgeExpiredProcessDocuments(now = new Date()): Promise<Re
   const paths = documents.map((document) => document.storage_path);
   const { error: storageError } = await supabase.storage.from("process-documents").remove(paths);
   if (storageError) {
-    await recordRetentionFailure(documents, storageError.message);
+    await recordRetentionFailure(documents, errorCode(storageError));
     return { cutoff, selected: documents.length, purged: 0, failed: documents.length };
   }
 
@@ -52,7 +53,7 @@ export async function purgeExpiredProcessDocuments(now = new Date()): Promise<Re
       purge_error: null,
     })
     .in("id", documents.map((document) => document.id));
-  if (updateError) throw new Error(`Arquivos removidos, mas metadados não atualizados: ${updateError.message}`);
+  if (updateError) throw new Error("Arquivos removidos, mas os metadados não foram atualizados.");
 
   await recordRetentionEvents(documents, "DOCUMENTS_PURGED", {
     count: documents.length,
@@ -62,18 +63,18 @@ export async function purgeExpiredProcessDocuments(now = new Date()): Promise<Re
   return { cutoff, selected: documents.length, purged: documents.length, failed: 0 };
 }
 
-async function recordRetentionFailure(documents: RetentionDocument[], message: string) {
+async function recordRetentionFailure(documents: RetentionDocument[], failureCode: string) {
   const supabase = createSupabaseAdminClient();
   await Promise.all(documents.map((document) => supabase
     .from("process_documents")
     .update({
       purge_attempts: document.purge_attempts + 1,
-      purge_error: message.slice(0, 1000),
+      purge_error: failureCode,
     })
     .eq("id", document.id)));
   await recordRetentionEvents(documents, "DOCUMENT_RETENTION_FAILED", {
     count: documents.length,
-    reason: message.slice(0, 1000),
+    reason: failureCode,
   });
 }
 
@@ -93,5 +94,5 @@ async function recordRetentionEvents(
       metadata,
     })),
   );
-  if (error) console.error("[ConferIA] Falha ao auditar retenção", error.message);
+  if (error) console.error(JSON.stringify({ event: "DOCUMENT_RETENTION_AUDIT_FAILED", errorCode: errorCode(error) }));
 }

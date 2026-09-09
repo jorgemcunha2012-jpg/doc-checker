@@ -7,6 +7,7 @@ import { extractDevelopmentFromOcrText } from "@/services/development/developmen
 import { KimiProvider } from "@/services/extraction/kimi-provider";
 import { reconcileDevelopmentExtractions } from "@/services/development/development-reconciliation";
 import { extractDevelopmentFromXlsx } from "@/services/development/xlsx-development-parser";
+import { errorCode, logOperationalError, publicOperationalError } from "@/lib/security/operational-logger";
 
 const MAX_SIZE = 20 * 1024 * 1024;
 const MAX_IMAGES = 40;
@@ -66,8 +67,8 @@ export async function POST(request: Request) {
         EXTRACTION_TIMEOUT_MS,
         "O OCR da matrícula demorou demais.",
       ).catch((error) => {
-        console.warn("[ConferIA] OCR da matrícula falhou", error);
-        ocrError = error instanceof Error ? error.message : "Falha desconhecida no OCR.";
+        logOperationalError("DEVELOPMENT_OCR_FAILED", error, { attemptId });
+        ocrError = errorCode(error);
         return null;
       }),
       withTimeout(
@@ -75,8 +76,8 @@ export async function POST(request: Request) {
         EXTRACTION_TIMEOUT_MS,
         "A visão da IA demorou demais.",
       ).catch((error) => {
-        console.warn("[ConferIA] Visão da IA da matrícula falhou", error);
-        visionError = error instanceof Error ? error.message : "Falha desconhecida na visão da IA.";
+        logOperationalError("DEVELOPMENT_VISION_FAILED", error, { attemptId });
+        visionError = errorCode(error);
         return null;
       }),
     ]);
@@ -124,12 +125,12 @@ export async function POST(request: Request) {
     if (user) {
       await auditExtraction(user, "DEVELOPMENT_EXTRACTION_FAILED", attemptId, startedAt, sourceDocumentName, pageNumbers, {
         stage: "UNEXPECTED",
-        reason: error instanceof Error ? error.message : "Falha inesperada na extração.",
+        reason: errorCode(error),
       });
     }
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error(error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Falha ao extrair o cadastro." }, { status: 500 });
+    logOperationalError("DEVELOPMENT_EXTRACTION_UNEXPECTED", error, { attemptId });
+    return NextResponse.json({ error: publicOperationalError(error, "Não foi possível concluir o cadastro do empreendimento.") }, { status: 500 });
   }
 }
 

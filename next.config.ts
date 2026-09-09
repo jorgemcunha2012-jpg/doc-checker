@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import { assertProductionConfiguration } from "./src/lib/security/production-environment";
+
+assertProductionConfiguration();
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
+import { logOperationalError } from "@/lib/security/operational-logger";
 
 export async function POST(request: Request) {
   const isFormSubmission = request.headers.get("content-type")?.includes("application/x-www-form-urlencoded") ?? false;
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
         organizationId: profile.organization_id,
       }, "LOGIN", "profile", data.user.id, requestMetadata(request));
     } catch (error) {
-      console.error("[ConferIA] Falha ao registrar auditoria de login", error);
+      logOperationalError("LOGIN_AUDIT_FAILED", error, { userId: data.user.id });
     }
     const { data: assurance } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     const mustChangePassword = profile.must_change_password;
@@ -54,8 +55,8 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ mustChangePassword, requiresMfa });
   } catch (error) {
-    console.error("[ConferIA] Falha inesperada no login", error);
-    return loginFailure(request, isFormSubmission, "Não foi possível concluir o login. Confira as variáveis do Supabase em produção.", 500);
+    logOperationalError("LOGIN_UNEXPECTED", error);
+    return loginFailure(request, isFormSubmission, "Não foi possível concluir o login. Tente novamente em instantes.", 500);
   }
 }
 
@@ -105,7 +106,7 @@ async function auditFailedLogin(email: string, request: Request) {
       requestMetadata(request),
     );
   } catch (error) {
-    console.error("[ConferIA] Falha ao registrar tentativa de login", error);
+    logOperationalError("LOGIN_FAILURE_AUDIT_FAILED", error);
   }
 }
 

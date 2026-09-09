@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { DOMParser } from "@xmldom/xmldom";
+import { DOMParser, type Node as XmlNode } from "@xmldom/xmldom";
 
 export async function extractDocxText(buffer: Buffer) {
   try {
@@ -150,7 +150,7 @@ export async function extractStructuredDocxText(buffer: Buffer) {
   return compactText(blocks.join("\n\n"));
 }
 
-function tableRows(table: Node) {
+function tableRows(table: XmlNode) {
   return directChildren(table, "tr").flatMap((row) => {
     const cells = directChildren(row, "tc").map((cell) =>
       descendants(cell, "p").map(paragraphText).filter(Boolean),
@@ -162,7 +162,7 @@ function tableRows(table: Node) {
   });
 }
 
-function paragraphText(paragraph: Node) {
+function paragraphText(paragraph: XmlNode) {
   const parts: string[] = [];
   walk(paragraph, (node) => {
     if (nodeLocalName(node) === "t" && node.textContent) parts.push(node.textContent);
@@ -172,8 +172,8 @@ function paragraphText(paragraph: Node) {
   return parts.join("").replace(/[ \t]+/g, " ").trim();
 }
 
-function directChildren(node: Node, localName: string) {
-  const matches: Node[] = [];
+function directChildren(node: XmlNode, localName: string) {
+  const matches: XmlNode[] = [];
   for (let index = 0; index < node.childNodes.length; index += 1) {
     const child = node.childNodes[index];
     if (child.nodeType === 1 && nodeLocalName(child) === localName) matches.push(child);
@@ -181,15 +181,15 @@ function directChildren(node: Node, localName: string) {
   return matches;
 }
 
-function descendants(node: Node, localName: string) {
-  const matches: Node[] = [];
+function descendants(node: XmlNode, localName: string) {
+  const matches: XmlNode[] = [];
   walk(node, (child) => {
     if (nodeLocalName(child) === localName) matches.push(child);
   });
   return matches;
 }
 
-function walk(node: Node, visitor: (node: Node) => void) {
+function walk(node: XmlNode, visitor: (node: XmlNode) => void) {
   if (!node.childNodes) return;
   for (let index = 0; index < node.childNodes.length; index += 1) {
     const child = node.childNodes[index];
@@ -198,7 +198,7 @@ function walk(node: Node, visitor: (node: Node) => void) {
   }
 }
 
-function nodeLocalName(node: Node) {
+function nodeLocalName(node: XmlNode) {
   return node.nodeName.split(":").at(-1);
 }
 

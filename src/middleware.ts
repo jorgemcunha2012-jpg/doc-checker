@@ -1,7 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isProductionDeployment, productionConfigurationProblems } from "@/lib/security/production-environment";
 
 export async function middleware(request: NextRequest) {
+  if (isProductionDeployment() && productionConfigurationProblems().length) {
+    return NextResponse.json({ error: "Serviço temporariamente indisponível." }, { status: 503 });
+  }
+
   if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
     const origin = request.headers.get("origin");
     if (origin && origin !== request.nextUrl.origin) {
