@@ -16,8 +16,7 @@ where id = '00000000-0000-0000-0000-000000000001'
   and name = 'ConferIA Operações';
 
 update public.profiles
-set is_master_admin = lower(email) = 'jorge@conferia.local',
-    mfa_required = active,
+set mfa_required = active,
     must_change_password = case when active then true else must_change_password end,
     updated_at = now()
 where organization_id = '00000000-0000-0000-0000-000000000001';

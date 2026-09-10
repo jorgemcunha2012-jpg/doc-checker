@@ -46,3 +46,11 @@ Por definição do produto, após 40 dias são removidos os arquivos originais e
 - A exportação inclui processos, resultados decifrados no backend, revisões, metadados documentais e eventos correlatos.
 - A exclusão remove arquivos do Storage, processos e registros dependentes, além dos eventos ligados ao processo. O evento de atendimento da solicitação é preservado com hash do CPF, nunca o CPF em claro.
 - O procedimento operacional e o prazo de resposta estão em `docs/security/data-subject-rights.md`.
+
+## Item 5 - Administrador master do comprador
+
+### Concluído no branch de segurança
+
+- Removidas as atribuições de master ligadas a `jorge@conferia.local` nas migrations e o atalho de login que completava usuários com `@conferia.local`.
+- Nova migration revoga e desativa contas internas `@conferia.local` em instalações existentes.
+- A concessão do master passa a ocorrer por procedimento operacional com service role do comprador, auditoria e sem e-mail em texto aberto. Consulte `docs/security/master-admin-handover.md`.

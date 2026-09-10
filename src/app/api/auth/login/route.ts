@@ -3,6 +3,7 @@ import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/sup
 import { audit } from "@/services/process/process-repository";
 import { logOperationalError } from "@/lib/security/operational-logger";
 import { consumeRateLimit, requestRateLimitKey } from "@/lib/security/rate-limit";
+import { normalizeLogin } from "@/lib/auth/login-identity";
 
 export async function POST(request: Request) {
   const isFormSubmission = request.headers.get("content-type")?.includes("application/x-www-form-urlencoded") ?? false;
@@ -103,10 +104,4 @@ function requestMetadata(request: Request) {
     ip: forwardedFor ?? request.headers.get("x-real-ip") ?? "unknown",
     userAgent: request.headers.get("user-agent")?.slice(0, 300) ?? "unknown",
   };
-}
-
-function normalizeLogin(value: unknown) {
-  const login = typeof value === "string" ? value.trim().toLowerCase() : "";
-  if (!login) return "";
-  return login.includes("@") ? login : `${login}@conferia.local`;
 }

@@ -1,10 +1,6 @@
 alter table public.profiles
 add column if not exists is_master_admin boolean not null default false;
 
-update public.profiles
-set is_master_admin = true
-where lower(email) = 'jorge@conferia.local';
-
 drop policy if exists "process visibility" on public.validation_processes;
 create policy "process visibility" on public.validation_processes
 for select using (
