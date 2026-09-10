@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { logOperationalError } from "@/lib/security/operational-logger";
 import { inspectUpload } from "@/lib/security/upload-validation";
 import { consumeRateLimit, requestRateLimitKey } from "@/lib/security/rate-limit";
+import { jsonBodyErrorResponse, readJsonBody, renderedPageUploadSchema } from "@/lib/security/json-body";
 
 const MAX_SIZE = 20 * 1024 * 1024;
 
@@ -34,20 +35,14 @@ export async function POST(request: Request) {
       }
       return NextResponse.json({ storagePath });
     }
-    const body = await request.json() as { fileName?: string; fileSize?: number; mimeType?: string };
-    const fileName = body.fileName?.trim();
-    const fileSize = Number(body.fileSize ?? 0);
-    const mimeType = body.mimeType || "application/pdf";
+    const body = await readJsonBody(request, renderedPageUploadSchema);
+    const mimeType = body.mimeType;
 
     if (mimeType === "application/pdf") {
       return NextResponse.json({
         error: "Atualize a página e envie a matrícula novamente. A versão atual renderiza o PDF no navegador antes da extração.",
       }, { status: 410 });
     }
-    if (!fileName || mimeType !== "image/jpeg" || fileSize <= 0 || fileSize > MAX_SIZE) {
-      return NextResponse.json({ error: "Não foi possível preparar a página renderizada da matrícula." }, { status: 400 });
-    }
-
     const storagePath = `quarantine/${user.organizationId}/development-extractions/rendered-pages/${randomUUID()}.jpg`;
     const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase.storage
@@ -66,6 +61,8 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
+    const bodyError = jsonBodyErrorResponse(error);
+    if (bodyError) return NextResponse.json({ error: bodyError }, { status: 400 });
     logOperationalError("DEVELOPMENT_UPLOAD_UNEXPECTED", error);
     return NextResponse.json({ error: "Não foi possível preparar o upload da matrícula." }, { status: 500 });
   }

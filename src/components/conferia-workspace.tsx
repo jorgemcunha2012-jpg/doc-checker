@@ -252,7 +252,7 @@ export function ConferiaWorkspace({ currentUser, publicAccess = false, embedded 
     const response = await fetch("/api/reports/validation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ run, filter: reportFilter }),
+      body: JSON.stringify({ processId: run.id, filter: reportFilter }),
     });
 
     if (!response.ok) {

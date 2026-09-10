@@ -3,13 +3,14 @@ import { requireUser, AuthError } from "@/lib/auth";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
 import { consumeRateLimit, requestRateLimitKey } from "@/lib/security/rate-limit";
+import { jsonBodyErrorResponse, passwordSchema, readJsonBody } from "@/lib/security/json-body";
 
 export async function POST(request: Request) {
   try {
     const user = await requireUser({ allowPasswordChange: true, allowMfaSetup: true });
     const limit = await consumeRateLimit(requestRateLimitKey(request, "password-change"), 8, 15 * 60 * 1000);
     if (!limit.allowed) return NextResponse.json({ error: "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente." }, { status: 429 });
-    const { password } = await request.json();
+    const { password } = await readJsonBody(request, passwordSchema);
     if (!validPassword(password)) {
       return NextResponse.json({
         error: "Use pelo menos 12 caracteres, com maiúscula, minúscula, número e símbolo.",
@@ -30,6 +31,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
+    const bodyError = jsonBodyErrorResponse(error);
+    if (bodyError) return NextResponse.json({ error: bodyError }, { status: 400 });
     throw error;
   }
 }

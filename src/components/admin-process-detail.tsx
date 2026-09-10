@@ -53,7 +53,7 @@ export function AdminProcessDetail({
       const response = await fetch("/api/reports/validation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ run, filter: reportFilter }),
+        body: JSON.stringify({ processId: process.id, filter: reportFilter }),
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => null) as { error?: string } | null;

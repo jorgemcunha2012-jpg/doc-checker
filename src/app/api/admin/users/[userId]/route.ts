@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
 import { logOperationalError } from "@/lib/security/operational-logger";
 import { consumeRateLimit, requestRateLimitKey } from "@/lib/security/rate-limit";
+import { jsonBodyErrorResponse, readJsonBody, userActionSchema } from "@/lib/security/json-body";
 
 export async function PATCH(request: Request, context: { params: Promise<{ userId: string }> }) {
   try {
@@ -11,7 +12,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     const limit = await consumeRateLimit(requestRateLimitKey(request, "admin-user-update"), 20, 15 * 60 * 1000);
     if (!limit.allowed) return NextResponse.json({ error: "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente." }, { status: 429 });
     const { userId } = await context.params;
-    const { action } = await request.json();
+    const { action } = await readJsonBody(request, userActionSchema);
     const supabase = createSupabaseAdminClient();
     const { data: target, error: targetError } = await supabase
       .from("profiles")
@@ -60,6 +61,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     return NextResponse.json({ error: "Ação inválida." }, { status: 400 });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
+    const bodyError = jsonBodyErrorResponse(error);
+    if (bodyError) return NextResponse.json({ error: bodyError }, { status: 400 });
     logOperationalError("ADMIN_USER_UPDATE_UNEXPECTED", error);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }

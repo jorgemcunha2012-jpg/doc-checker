@@ -5,18 +5,13 @@ import type { HumanReview } from "@/domain/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { saveHumanReview } from "@/services/process/process-repository";
 import { logOperationalError } from "@/lib/security/operational-logger";
+import { jsonBodyErrorResponse, readJsonBody, reviewSchema } from "@/lib/security/json-body";
 
 export async function PUT(request: Request, context: { params: Promise<{ processId: string }> }) {
   try {
     const user = await requireUser();
     const { processId } = await context.params;
-    const { fieldId, justification } = await request.json();
-    if (typeof fieldId !== "string" || !fieldId.trim()) {
-      return NextResponse.json({ error: "Campo obrigatório." }, { status: 400 });
-    }
-    if (justification != null && (typeof justification !== "string" || justification.trim().length > 1000)) {
-      return NextResponse.json({ error: "A observação deve ter no máximo 1.000 caracteres." }, { status: 400 });
-    }
+    const { fieldId, justification } = await readJsonBody(request, reviewSchema);
     const process = await getAccessibleProcessScope(user, processId);
     if (!process) {
       return NextResponse.json({ error: "Processo não encontrado." }, { status: 404 });
@@ -43,6 +38,8 @@ export async function PUT(request: Request, context: { params: Promise<{ process
     return NextResponse.json({ review });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
+    const bodyError = jsonBodyErrorResponse(error);
+    if (bodyError) return NextResponse.json({ error: bodyError }, { status: 400 });
     logOperationalError("PROCESS_REVIEW_UNEXPECTED", error);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
