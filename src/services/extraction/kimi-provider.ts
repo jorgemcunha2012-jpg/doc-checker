@@ -1,7 +1,7 @@
 import type { DevelopmentExtraction } from "@/domain/development";
 import type { ChecklistField, ExtractionProvider, ProviderExtractionOutput } from "@/domain/validation";
 import type { DocumentExtractionProvider, UploadedDocumentPayload } from "./types";
-import { OpenAICompatibleClient, type ProviderLanguageClient } from "./openai-compatible-client";
+import type { ProviderLanguageClient } from "./openai-compatible-client";
 import { checklistPrompt, coerceExtractionOutput } from "./provider-utils";
 
 export class KimiProvider implements DocumentExtractionProvider {
@@ -10,12 +10,10 @@ export class KimiProvider implements DocumentExtractionProvider {
   protected readonly client: ProviderLanguageClient;
 
   constructor(client?: ProviderLanguageClient) {
-    this.client = client ?? new OpenAICompatibleClient({
-    apiKey: process.env.KIMI_API_KEY,
-    baseUrl: process.env.KIMI_API_BASE_URL,
-    model: process.env.KIMI_MODEL,
-    providerName: "Kimi",
-    });
+    if (!client) {
+      throw new Error("Kimi não é um provedor aprovado para o ConferIA.");
+    }
+    this.client = client;
   }
 
   async extractFromImage(document: UploadedDocumentPayload, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {

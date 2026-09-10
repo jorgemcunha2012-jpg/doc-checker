@@ -7,12 +7,11 @@ import { restoreTokenizedOutput, tokenizeSensitiveText } from "./pii-tokenizer";
 export class DeepSeekProvider implements DocumentExtractionProvider {
   provider = "DEEPSEEK" as const;
 
-  private readonly client = new OpenAICompatibleClient({
-    apiKey: process.env.DEEPSEEK_API_KEY,
-    baseUrl: process.env.DEEPSEEK_API_BASE_URL,
-    model: process.env.DEEPSEEK_MODEL,
-    providerName: "DeepSeek",
-  });
+  private readonly client!: OpenAICompatibleClient;
+
+  constructor() {
+    throw new Error("DeepSeek não é um provedor aprovado para o ConferIA.");
+  }
 
   async structureText(text: string, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
     const focusedText = focusDocumentText(text, checklist);

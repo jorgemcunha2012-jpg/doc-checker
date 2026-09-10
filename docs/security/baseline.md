@@ -6,7 +6,8 @@
 - Metadados e resultados: permanecem para histórico operacional.
 - Acesso: Supabase Auth, troca obrigatória de senha e MFA configurável por perfil.
 - Isolamento: organização, administrador da organização e administrador master são avaliados no servidor antes de operações com processos e documentos.
-- Fornecedores externos: DeepSeek, Kimi e Haiku somente pelos serviços de extração no servidor.
+- Fornecedor externo aprovado para extração: Anthropic API (Haiku), somente pelo servidor.
+- Kimi e DeepSeek foram removidos da configuração operacional, bloqueados no gateway de saída e não podem ser instanciados como provedores no app.
 
 ## Controles implementados neste ciclo
 
@@ -23,6 +24,7 @@
 
 - Quarentena e antimalware requerem serviço de análise externo ou infraestrutura dedicada.
 - Tokenização textual está ativa. Mascaramento visual antes de chamadas de IA continua pendente porque exige coordenadas confiáveis de OCR; aplicar máscara genérica poderia esconder valores financeiros ou dados do imóvel.
+- A Anthropic é um fornecedor internacional: a conformidade depende de aceite comercial do DPA aplicável, registro de transferência e política de privacidade do controlador. Não há alegação de residência de processamento no Brasil.
 - A limitação de requisições distribuída ainda depende de Redis/Upstash ou RPC dedicado no Supabase; a proteção atual não deve ser tratada como substituta em escala.
 - Logs históricos anteriores à sanitização podem conter dados legados; novos logs operacionais não registram nome de arquivo, payload documental ou erro cru de fornecedor.
 - Staging isolado, aprovação de produção, proteção de branch e CODEOWNERS dependem da configuração da organização GitHub e Vercel.

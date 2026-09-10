@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { DeepSeekProvider } from "./deepseek-provider";
+import { KimiProvider } from "./kimi-provider";
 import { assertAllowedProviderUrl } from "./provider-gateway";
 
 test("gateway aceita somente endpoint HTTPS sem credenciais embutidas", () => {
@@ -30,4 +32,9 @@ test("gateway permite somente o host configurado do Azure OpenAI", () => {
 test("gateway bloqueia os hosts legados de Kimi e DeepSeek", () => {
   assert.throws(() => assertAllowedProviderUrl("https://api.moonshot.ai/v1", "Kimi"), /não autorizado/);
   assert.throws(() => assertAllowedProviderUrl("https://api.deepseek.com/v1", "DeepSeek"), /não autorizado/);
+});
+
+test("provedores legados não podem ser instanciados", () => {
+  assert.throws(() => new KimiProvider(), /não é um provedor aprovado/);
+  assert.throws(() => new DeepSeekProvider(), /não é um provedor aprovado/);
 });
