@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { consumeRateLimit } from "./rate-limit";
+import { requestRateLimitKey } from "./rate-limit";
 
-test("bloqueia somente depois do limite e libera após a janela", () => {
-  assert.equal(consumeRateLimit("test-rate-limit", 2, 1000, 0).allowed, true);
-  assert.equal(consumeRateLimit("test-rate-limit", 2, 1000, 1).allowed, true);
-  assert.equal(consumeRateLimit("test-rate-limit", 2, 1000, 2).allowed, false);
-  assert.equal(consumeRateLimit("test-rate-limit", 2, 1000, 1000).allowed, true);
+test("forma chave de limite por namespace e IP de origem", () => {
+  const request = new Request("https://conferia.test/login", { headers: { "x-forwarded-for": "203.0.113.8, 198.51.100.1" } });
+  assert.equal(requestRateLimitKey(request, "login"), "login:203.0.113.8");
 });

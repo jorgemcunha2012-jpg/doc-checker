@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     throw error;
   }
-  const uploadLimit = consumeRateLimit(requestRateLimitKey(request, "process-upload"), 20, 15 * 60 * 1000);
+  const uploadLimit = await consumeRateLimit(requestRateLimitKey(request, "process-upload"), 20, 15 * 60 * 1000);
   if (!uploadLimit.allowed) {
     return NextResponse.json({ error: "Muitas tentativas de upload. Aguarde alguns minutos antes de tentar novamente." }, { status: 429 });
   }

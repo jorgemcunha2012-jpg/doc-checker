@@ -3,10 +3,13 @@ import { AuthError, isMasterAdmin, requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
 import { logOperationalError } from "@/lib/security/operational-logger";
+import { consumeRateLimit, requestRateLimitKey } from "@/lib/security/rate-limit";
 
 export async function PATCH(request: Request, context: { params: Promise<{ userId: string }> }) {
   try {
     const admin = await requireAdmin();
+    const limit = await consumeRateLimit(requestRateLimitKey(request, "admin-user-update"), 20, 15 * 60 * 1000);
+    if (!limit.allowed) return NextResponse.json({ error: "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente." }, { status: 429 });
     const { userId } = await context.params;
     const { action } = await request.json();
     const supabase = createSupabaseAdminClient();

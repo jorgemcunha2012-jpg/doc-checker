@@ -11,7 +11,7 @@ const MAX_SIZE = 20 * 1024 * 1024;
 export async function POST(request: Request) {
   try {
     const user = await requireUser();
-    const uploadLimit = consumeRateLimit(requestRateLimitKey(request, "development-upload"), 40, 15 * 60 * 1000);
+    const uploadLimit = await consumeRateLimit(requestRateLimitKey(request, "development-upload"), 40, 15 * 60 * 1000);
     if (!uploadLimit.allowed) {
       return NextResponse.json({ error: "Muitas tentativas de upload. Aguarde alguns minutos antes de tentar novamente." }, { status: 429 });
     }

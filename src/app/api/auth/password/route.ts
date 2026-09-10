@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { requireUser, AuthError } from "@/lib/auth";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
+import { consumeRateLimit, requestRateLimitKey } from "@/lib/security/rate-limit";
 
 export async function POST(request: Request) {
   try {
     const user = await requireUser({ allowPasswordChange: true, allowMfaSetup: true });
+    const limit = await consumeRateLimit(requestRateLimitKey(request, "password-change"), 8, 15 * 60 * 1000);
+    if (!limit.allowed) return NextResponse.json({ error: "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente." }, { status: 429 });
     const { password } = await request.json();
     if (!validPassword(password)) {
       return NextResponse.json({

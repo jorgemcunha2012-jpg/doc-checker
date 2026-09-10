@@ -7,7 +7,7 @@ import { consumeRateLimit, requestRateLimitKey } from "@/lib/security/rate-limit
 export async function POST(request: Request) {
   const isFormSubmission = request.headers.get("content-type")?.includes("application/x-www-form-urlencoded") ?? false;
   try {
-    const ipLimit = consumeRateLimit(requestRateLimitKey(request, "login"), 12, 15 * 60 * 1000);
+    const ipLimit = await consumeRateLimit(requestRateLimitKey(request, "login"), 12, 15 * 60 * 1000);
     if (!ipLimit.allowed) {
       return loginFailure(request, isFormSubmission, "Muitas tentativas de acesso. Aguarde alguns minutos antes de tentar novamente.", 429);
     }
@@ -16,7 +16,8 @@ export async function POST(request: Request) {
       : await request.json();
     const { email, password } = credentials;
     const normalizedEmail = normalizeLogin(email);
-    if (await loginRateLimited(normalizedEmail)) {
+    const emailLimit = await consumeRateLimit(`login-email:${normalizedEmail || "empty"}`, 8, 15 * 60 * 1000);
+    if (!emailLimit.allowed) {
       return loginFailure(request, isFormSubmission, "Muitas tentativas de acesso. Aguarde 15 minutos antes de tentar novamente.", 429);
     }
     const supabase = await createSupabaseServerClient();
@@ -72,25 +73,6 @@ function loginFailure(request: Request, isFormSubmission: boolean, error: string
     return NextResponse.redirect(url, 303);
   }
   return NextResponse.json({ error }, { status });
-}
-
-async function loginRateLimited(email: string) {
-  if (!email) return false;
-  const supabase = createSupabaseAdminClient();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("email", email)
-    .maybeSingle();
-  if (!profile) return false;
-  const cutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-  const { count } = await supabase
-    .from("audit_events")
-    .select("id", { count: "exact", head: true })
-    .eq("event_type", "LOGIN_FAILED")
-    .eq("entity_id", profile.id)
-    .gte("created_at", cutoff);
-  return (count ?? 0) >= 8;
 }
 
 async function auditFailedLogin(email: string, request: Request) {

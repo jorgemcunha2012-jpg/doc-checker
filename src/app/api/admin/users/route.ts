@@ -3,6 +3,7 @@ import { AuthError, requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
 import { logOperationalError } from "@/lib/security/operational-logger";
+import { consumeRateLimit, requestRateLimitKey } from "@/lib/security/rate-limit";
 
 export async function GET() {
   try {
@@ -22,6 +23,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const admin = await requireAdmin();
+    const limit = await consumeRateLimit(requestRateLimitKey(request, "admin-user-create"), 12, 15 * 60 * 1000);
+    if (!limit.allowed) return NextResponse.json({ error: "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente." }, { status: 429 });
     const { name, email } = await request.json();
     if (!name?.trim() || !email?.trim()) return NextResponse.json({ error: "Nome e email são obrigatórios." }, { status: 400 });
     const password = temporaryPassword();
