@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isProductionDeployment, productionConfigurationProblems } from "@/lib/security/production-environment";
 import { contentSecurityPolicy } from "@/lib/security/content-security-policy";
+import { isAllowedMutationOrigin } from "@/lib/security/csrf";
 
 export async function middleware(request: NextRequest) {
   const nonce = btoa(crypto.randomUUID());
@@ -20,7 +21,7 @@ export async function middleware(request: NextRequest) {
 
   if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
     const origin = request.headers.get("origin");
-    if (origin && origin !== request.nextUrl.origin) {
+    if (!isAllowedMutationOrigin(origin, request.nextUrl.origin)) {
       return secureResponse(NextResponse.json({ error: "Origem da requisição não autorizada." }, { status: 403 }));
     }
   }
@@ -39,7 +40,8 @@ export async function middleware(request: NextRequest) {
         setAll: (items) => {
           items.forEach(({ name, value }) => request.cookies.set(name, value));
           response = NextResponse.next({ request: { headers: requestHeaders } });
-          items.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+          const secure = isProductionDeployment();
+          items.forEach(({ name, value, options }) => response.cookies.set(name, value, { ...options, sameSite: "lax", httpOnly: true, secure }));
         },
       },
     },

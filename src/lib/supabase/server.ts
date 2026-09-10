@@ -7,6 +7,7 @@ import { isSupabaseConfigured } from "./config";
 
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
+  const secure = process.env.VERCEL_ENV === "production" || process.env.CONFERIA_ENV === "production";
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -16,7 +17,7 @@ export async function createSupabaseServerClient() {
         setAll: (items) => {
           try {
             items.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
+              cookieStore.set(name, value, { ...options, sameSite: "lax", httpOnly: true, secure }),
             );
           } catch {
             // Server Components cannot always mutate cookies.

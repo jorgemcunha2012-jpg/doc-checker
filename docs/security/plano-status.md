@@ -81,3 +81,10 @@ Por definição do produto, após 40 dias são removidos os arquivos originais e
 
 - DOCX e XLSX são inspecionados pelo diretório central antes de serem abertos pelo JSZip.
 - Arquivos com mais de 500 entradas, mais de 50 MB descompactados, diretório inválido ou ZIP64 são recusados antes da extração.
+
+## Item 10 - CSRF e cookies de sessão
+
+### Concluído no branch de segurança
+
+- Toda mutação exige `Origin` idêntico ao domínio da aplicação; cabeçalho ausente também é recusado.
+- Cookies da sessão Supabase usam `SameSite=Lax`, `HttpOnly` e `Secure` em produção.
