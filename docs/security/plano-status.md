@@ -69,7 +69,8 @@ Por definição do produto, após 40 dias são removidos os arquivos originais e
 
 ## Itens 7 e 8 - Validação de entrada e relatórios
 
-### Em execução
+### Concluído no branch de segurança
 
-- Leitor JSON com limite de 1 MB, schemas Zod e limites de arrays já aplicado às rotas de usuários, senha, revisão e empreendimentos.
-- O relatório passou a receber somente `processId` e filtro; o resultado é carregado do banco após autorização do usuário. Falta concluir a validação das rotas restantes de extração de matrícula antes de encerrar o item 7.
+- Leitor JSON com limite de 1 MB, schemas Zod e limites de arrays aplicado às rotas de usuários, senha, revisão, empreendimentos, relatórios e extração de matrícula.
+- A extração de matrícula aceita JSON apenas com metadados, texto limitado e caminhos de páginas já enviadas ao Storage; imagens não trafegam mais dentro do JSON.
+- O relatório recebe somente `processId` e filtro; o resultado é carregado do banco após autorização do usuário.

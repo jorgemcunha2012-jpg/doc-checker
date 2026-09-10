@@ -95,3 +95,17 @@ export const validationReportSchema = z.object({
   processId: z.string().uuid(),
   filter: z.enum(["ALL", "DIVERGENCES", "PENDING", "CHECKED"]).default("ALL"),
 }).strict();
+
+const renderedPagePath = z.string().startsWith("quarantine/").max(500);
+export const developmentExtractionRequestSchema = z.union([
+  z.object({
+    sourceDocumentName: z.string().trim().min(1).max(500),
+    imagePaths: z.array(renderedPagePath).min(1).max(40),
+    pageNumbers: z.array(z.number().int().positive()).max(40).optional(),
+    text: z.string().max(500_000).optional(),
+  }).strict(),
+  z.object({
+    sourceDocumentName: z.string().trim().min(1).max(500),
+    storagePath: renderedPagePath,
+  }).strict(),
+]);

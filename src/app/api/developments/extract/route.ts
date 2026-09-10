@@ -9,6 +9,7 @@ import { AzureOpenAIProvider } from "@/services/extraction/azure-openai-provider
 import { reconcileDevelopmentExtractions } from "@/services/development/development-reconciliation";
 import { extractDevelopmentFromXlsx } from "@/services/development/xlsx-development-parser";
 import { errorCode, logOperationalError, publicOperationalError } from "@/lib/security/operational-logger";
+import { developmentExtractionRequestSchema, jsonBodyErrorResponse, readJsonBody } from "@/lib/security/json-body";
 
 const MAX_SIZE = 20 * 1024 * 1024;
 const MAX_IMAGES = 40;
@@ -130,6 +131,8 @@ export async function POST(request: Request) {
       });
     }
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
+    const bodyError = jsonBodyErrorResponse(error);
+    if (bodyError) return NextResponse.json({ error: bodyError }, { status: 400 });
     logOperationalError("DEVELOPMENT_EXTRACTION_UNEXPECTED", error, { attemptId });
     return NextResponse.json({ error: publicOperationalError(error, "Não foi possível concluir o cadastro do empreendimento.") }, { status: 500 });
   }
@@ -164,21 +167,10 @@ async function auditExtraction(
 async function readPdfPayload(request: Request, organizationId: string) {
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
-    const body = await request.json() as { storagePath?: string; sourceDocumentName?: string; images?: string[]; imagePaths?: string[]; pageNumbers?: number[]; text?: string };
-    if (Array.isArray(body.images)) {
-      const images = body.images.filter((image) => typeof image === "string" && image.startsWith("data:image/")).slice(0, MAX_IMAGES);
-      if (!body.sourceDocumentName || !images.length) return null;
-      return {
-        images,
-        pageNumbers: normalizePageNumbers(body.pageNumbers, images.length),
-        sourceDocumentName: body.sourceDocumentName,
-        text: typeof body.text === "string" ? body.text.slice(0, 500_000) : undefined,
-        size: images.reduce((total, image) => total + image.length, 0),
-      };
-    }
-    if (Array.isArray(body.imagePaths)) {
+    const body = await readJsonBody(request, developmentExtractionRequestSchema);
+    if ("imagePaths" in body) {
       const paths = body.imagePaths
-        .filter((path) => typeof path === "string" && path.startsWith(`${organizationId}/development-extractions/rendered-pages/`))
+        .filter((path) => path.startsWith(`${organizationId}/development-extractions/rendered-pages/`))
         .slice(0, MAX_IMAGES);
       if (!body.sourceDocumentName || !paths.length) return null;
       const supabase = createSupabaseAdminClient();
@@ -192,11 +184,11 @@ async function readPdfPayload(request: Request, organizationId: string) {
         images: downloads,
         pageNumbers: normalizePageNumbers(body.pageNumbers, downloads.length),
         sourceDocumentName: body.sourceDocumentName,
-        text: typeof body.text === "string" ? body.text.slice(0, 500_000) : undefined,
+        text: body.text,
         size: downloads.reduce((total, image) => total + image.length, 0),
       };
     }
-    if (!body.storagePath || !body.sourceDocumentName || !body.storagePath.startsWith(`quarantine/${organizationId}/development-extractions/`)) {
+    if (!body.storagePath.startsWith(`quarantine/${organizationId}/development-extractions/`)) {
       return null;
     }
     const supabase = createSupabaseAdminClient();
