@@ -1,18 +1,22 @@
 import type { DevelopmentExtraction } from "@/domain/development";
-import type { ChecklistField, ProviderExtractionOutput } from "@/domain/validation";
+import type { ChecklistField, ExtractionProvider, ProviderExtractionOutput } from "@/domain/validation";
 import type { DocumentExtractionProvider, UploadedDocumentPayload } from "./types";
-import { OpenAICompatibleClient } from "./openai-compatible-client";
+import { OpenAICompatibleClient, type ProviderLanguageClient } from "./openai-compatible-client";
 import { checklistPrompt, coerceExtractionOutput } from "./provider-utils";
 
 export class KimiProvider implements DocumentExtractionProvider {
-  provider = "KIMI" as const;
+  provider = "KIMI" as ExtractionProvider;
 
-  private readonly client = new OpenAICompatibleClient({
+  protected readonly client: ProviderLanguageClient;
+
+  constructor(client?: ProviderLanguageClient) {
+    this.client = client ?? new OpenAICompatibleClient({
     apiKey: process.env.KIMI_API_KEY,
     baseUrl: process.env.KIMI_API_BASE_URL,
     model: process.env.KIMI_MODEL,
     providerName: "Kimi",
-  });
+    });
+  }
 
   async extractFromImage(document: UploadedDocumentPayload, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
     const dataUrl = `data:${document.mimeType};base64,${document.buffer.toString("base64")}`;

@@ -5,6 +5,7 @@ import { normalizeValue } from "@/services/normalization/normalization-service";
 import { DeepSeekProvider } from "./deepseek-provider";
 import { HaikuProvider } from "./haiku-provider";
 import { KimiProvider } from "./kimi-provider";
+import { AzureOpenAIProvider } from "./azure-openai-provider";
 import { enrichReservationFinancialComposition } from "./reservation-financial-composition";
 import type { ExtractionRequest, ExtractionResult, ReconciliationExtractionResult, UploadedDocumentPayload } from "./types";
 import { buildExtractionQuality, missingCriticalFields, validateCriticalEvidence } from "./extraction-quality-service";
@@ -15,6 +16,7 @@ export class DocumentExtractionService {
     private readonly kimiProvider = new KimiProvider(),
     private readonly deepSeekProvider = new DeepSeekProvider(),
     private readonly haikuProvider = new HaikuProvider(),
+    private readonly azureOpenAIProvider = new AzureOpenAIProvider(),
   ) {}
 
   async extract(request: ExtractionRequest): Promise<ExtractionResult> {
@@ -367,11 +369,15 @@ export class DocumentExtractionService {
   }
 
   private textProvider() {
-    return process.env.TEXT_EXTRACTION_PROVIDER === "HAIKU" ? this.haikuProvider : this.deepSeekProvider;
+    if (process.env.TEXT_EXTRACTION_PROVIDER === "HAIKU") return this.haikuProvider;
+    if (process.env.TEXT_EXTRACTION_PROVIDER === "AZURE_OPENAI") return this.azureOpenAIProvider;
+    return this.deepSeekProvider;
   }
 
   private visionProvider() {
-    return process.env.VISION_EXTRACTION_PROVIDER === "HAIKU" ? this.haikuProvider : this.kimiProvider;
+    if (process.env.VISION_EXTRACTION_PROVIDER === "HAIKU") return this.haikuProvider;
+    if (process.env.VISION_EXTRACTION_PROVIDER === "AZURE_OPENAI") return this.azureOpenAIProvider;
+    return this.kimiProvider;
   }
 
   private async extractVisualDocument(

@@ -1,4 +1,4 @@
-type ChatMessage = {
+export type ChatMessage = {
   role: "system" | "user";
   content:
     | string
@@ -15,6 +15,8 @@ type ChatCompletionResponse = {
     };
   }>;
 };
+
+export type ProviderLanguageClient = Pick<OpenAICompatibleClient, "completeText" | "completeJson">;
 
 import { fetchProvider } from "./provider-gateway";
 

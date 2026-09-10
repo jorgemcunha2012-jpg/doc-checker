@@ -271,4 +271,4 @@ export type ValidationProcess = {
   updatedAt: string;
 };
 
-export type ExtractionProvider = "KIMI" | "DEEPSEEK" | "HAIKU";
+export type ExtractionProvider = "KIMI" | "DEEPSEEK" | "HAIKU" | "AZURE_OPENAI";

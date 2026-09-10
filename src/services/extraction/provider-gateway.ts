@@ -21,6 +21,9 @@ export function assertAllowedProviderUrl(rawUrl: string, provider: string) {
     ...(provider.toLowerCase().includes("deepseek") ? ["api.deepseek.com"] : []),
     ...(provider.toLowerCase().includes("kimi") ? ["api.moonshot.ai", "api.moonshot.cn"] : []),
     ...(provider.toLowerCase().includes("haiku") ? ["api.anthropic.com"] : []),
+    ...(provider.toLowerCase().includes("azure") && process.env.AZURE_OPENAI_ENDPOINT
+      ? [new URL(process.env.AZURE_OPENAI_ENDPOINT).hostname]
+      : []),
   ]);
   if (!allowedHosts.has(url.hostname.toLowerCase())) throw new Error(`${provider} possui destino não autorizado.`);
   return url;

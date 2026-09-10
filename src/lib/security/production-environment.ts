@@ -19,9 +19,19 @@ export function productionConfigurationProblems(environment: Environment = proce
   const textProvider = environment.TEXT_EXTRACTION_PROVIDER ?? "DEEPSEEK";
   const visionProvider = environment.VISION_EXTRACTION_PROVIDER ?? "KIMI";
   if (textProvider === "HAIKU" && !environment.ANTHROPIC_API_KEY?.trim()) missing.push("ANTHROPIC_API_KEY");
-  if (textProvider !== "HAIKU" && !environment.DEEPSEEK_API_KEY?.trim()) missing.push("DEEPSEEK_API_KEY");
+  if (textProvider === "AZURE_OPENAI") {
+    if (!environment.AZURE_OPENAI_API_KEY?.trim()) missing.push("AZURE_OPENAI_API_KEY");
+    if (!environment.AZURE_OPENAI_ENDPOINT?.trim()) missing.push("AZURE_OPENAI_ENDPOINT");
+    if (!environment.AZURE_OPENAI_DEPLOYMENT?.trim()) missing.push("AZURE_OPENAI_DEPLOYMENT");
+  }
+  if (textProvider === "DEEPSEEK" && !environment.DEEPSEEK_API_KEY?.trim()) missing.push("DEEPSEEK_API_KEY");
   if (visionProvider === "HAIKU" && !environment.ANTHROPIC_API_KEY?.trim()) missing.push("ANTHROPIC_API_KEY");
-  if (visionProvider !== "HAIKU" && !environment.KIMI_API_KEY?.trim()) missing.push("KIMI_API_KEY");
+  if (visionProvider === "AZURE_OPENAI") {
+    if (!environment.AZURE_OPENAI_API_KEY?.trim()) missing.push("AZURE_OPENAI_API_KEY");
+    if (!environment.AZURE_OPENAI_ENDPOINT?.trim()) missing.push("AZURE_OPENAI_ENDPOINT");
+    if (!environment.AZURE_OPENAI_DEPLOYMENT?.trim()) missing.push("AZURE_OPENAI_DEPLOYMENT");
+  }
+  if (visionProvider === "KIMI" && !environment.KIMI_API_KEY?.trim()) missing.push("KIMI_API_KEY");
 
   if (environment.CONFERIA_AUTH_DISABLED === "true") missing.push("CONFERIA_AUTH_DISABLED must not be true");
   return [...new Set(missing)];
