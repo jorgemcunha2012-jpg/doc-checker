@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import { assertSafeZipArchive } from "@/lib/security/zip-safety";
 import { DOMParser } from "@xmldom/xmldom";
 
 type XmlNode = {
@@ -134,6 +135,7 @@ function skipRtfFallback(input: string, start: number, count: number) {
 }
 
 export async function extractStructuredDocxText(buffer: Buffer) {
+  assertSafeZipArchive(buffer);
   const archive = await JSZip.loadAsync(buffer);
   const documentFile = archive.file("word/document.xml");
   if (!documentFile) throw new Error("Documento Word sem XML principal.");

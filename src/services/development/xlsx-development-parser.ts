@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import { assertSafeZipArchive } from "@/lib/security/zip-safety";
 import { DOMParser } from "@xmldom/xmldom";
 import type { DevelopmentExtraction } from "@/domain/development";
 
@@ -31,6 +32,7 @@ type TableCandidate = {
 };
 
 export async function extractDevelopmentFromXlsx(buffer: Buffer, sourceDocumentName: string): Promise<DevelopmentExtraction> {
+  assertSafeZipArchive(buffer);
   const zip = await JSZip.loadAsync(buffer);
   const sharedStrings = await readSharedStrings(zip);
   const candidate = await findBestTable(zip, sharedStrings);

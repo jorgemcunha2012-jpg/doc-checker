@@ -74,3 +74,10 @@ Por definição do produto, após 40 dias são removidos os arquivos originais e
 - Leitor JSON com limite de 1 MB, schemas Zod e limites de arrays aplicado às rotas de usuários, senha, revisão, empreendimentos, relatórios e extração de matrícula.
 - A extração de matrícula aceita JSON apenas com metadados, texto limitado e caminhos de páginas já enviadas ao Storage; imagens não trafegam mais dentro do JSON.
 - O relatório recebe somente `processId` e filtro; o resultado é carregado do banco após autorização do usuário.
+
+## Item 9 - Proteção contra ZIP bomb
+
+### Concluído no branch de segurança
+
+- DOCX e XLSX são inspecionados pelo diretório central antes de serem abertos pelo JSZip.
+- Arquivos com mais de 500 entradas, mais de 50 MB descompactados, diretório inválido ou ZIP64 são recusados antes da extração.

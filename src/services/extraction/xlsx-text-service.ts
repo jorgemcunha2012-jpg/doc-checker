@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import { assertSafeZipArchive } from "@/lib/security/zip-safety";
 import { DOMParser } from "@xmldom/xmldom";
 
 const NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -11,6 +12,7 @@ const MAX_TEXT_LENGTH = 500_000;
  * numbers. Every non-empty worksheet is included.
  */
 export async function extractXlsxText(buffer: Buffer) {
+  assertSafeZipArchive(buffer);
   const zip = await JSZip.loadAsync(buffer);
   const sharedStrings = await readSharedStrings(zip);
   const sheets = Object.keys(zip.files)
