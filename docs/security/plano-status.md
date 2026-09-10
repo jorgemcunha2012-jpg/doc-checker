@@ -37,3 +37,12 @@ Quando o comprador fornecer o endpoint do modelo local, a visão e a estruturaç
 ### Decisão contratual registrada
 
 Por definição do produto, após 40 dias são removidos os arquivos originais e páginas renderizadas; resultados, metadados e auditoria permanecem para histórico operacional. Isso diverge da sugestão inicial de anonimizar os resultados no mesmo prazo e deve constar na matriz de retenção e no contrato com o comprador.
+
+## Item 4 - Direitos do titular
+
+### Concluído no branch de segurança
+
+- Rota exclusiva do administrador master para exportar os dados relacionados a um CPF e atender a solicitação de exclusão.
+- A exportação inclui processos, resultados decifrados no backend, revisões, metadados documentais e eventos correlatos.
+- A exclusão remove arquivos do Storage, processos e registros dependentes, além dos eventos ligados ao processo. O evento de atendimento da solicitação é preservado com hash do CPF, nunca o CPF em claro.
+- O procedimento operacional e o prazo de resposta estão em `docs/security/data-subject-rights.md`.
