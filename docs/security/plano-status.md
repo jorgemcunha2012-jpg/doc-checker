@@ -54,3 +54,15 @@ Por definição do produto, após 40 dias são removidos os arquivos originais e
 - Removidas as atribuições de master ligadas a `jorge@conferia.local` nas migrations e o atalho de login que completava usuários com `@conferia.local`.
 - Nova migration revoga e desativa contas internas `@conferia.local` em instalações existentes.
 - A concessão do master passa a ocorrer por procedimento operacional com service role do comprador, auditoria e sem e-mail em texto aberto. Consulte `docs/security/master-admin-handover.md`.
+
+## Item 6 - Content Security Policy
+
+### Concluído no branch de segurança
+
+- CSP por requisição com nonce criptograficamente aleatório, `strict-dynamic`, `object-src 'none'`, `frame-ancestors 'none'` e conexão limitada ao Supabase configurado.
+- Pré-visualização de documentos continua autorizada somente por `blob:` e o worker PDF pelo host necessário do CDN.
+- Adicionado `Cross-Origin-Opener-Policy: same-origin` aos cabeçalhos de resposta.
+
+### Validação pendente de homologação
+
+- Testes unitários, lint e typecheck passaram. Antes de mesclar em produção, validar login e pré-visualização de PDF em uma prévia do branch, pois CSP com nonce é aplicada em tempo de requisição pelo Next.js.
