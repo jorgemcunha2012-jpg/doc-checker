@@ -8,8 +8,7 @@ const validProduction = {
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon",
   SUPABASE_SERVICE_ROLE_KEY: "service",
   CRON_SECRET: "cron",
-  DEEPSEEK_API_KEY: "deepseek",
-  KIMI_API_KEY: "kimi",
+  ANTHROPIC_API_KEY: "anthropic",
 };
 
 test("requires security-critical configuration in production", () => {
@@ -29,8 +28,6 @@ test("requires Azure credentials when Azure is selected in production", () => {
     ...validProduction,
     TEXT_EXTRACTION_PROVIDER: "AZURE_OPENAI",
     VISION_EXTRACTION_PROVIDER: "AZURE_OPENAI",
-    DEEPSEEK_API_KEY: "",
-    KIMI_API_KEY: "",
     AZURE_OPENAI_API_KEY: "",
     AZURE_OPENAI_ENDPOINT: "",
     AZURE_OPENAI_DEPLOYMENT: "",
@@ -41,4 +38,18 @@ test("requires Azure credentials when Azure is selected in production", () => {
     "AZURE_OPENAI_ENDPOINT",
     "AZURE_OPENAI_DEPLOYMENT",
   ]);
+});
+
+test("recusa provedores externos não aprovados em produção", () => {
+  assert.deepEqual(
+    productionConfigurationProblems({
+      ...validProduction,
+      TEXT_EXTRACTION_PROVIDER: "DEEPSEEK",
+      VISION_EXTRACTION_PROVIDER: "KIMI",
+    }),
+    [
+      "TEXT_EXTRACTION_PROVIDER must be HAIKU or AZURE_OPENAI",
+      "VISION_EXTRACTION_PROVIDER must be HAIKU or AZURE_OPENAI",
+    ],
+  );
 });

@@ -18,8 +18,6 @@ export function assertAllowedProviderUrl(rawUrl: string, provider: string) {
   if (url.username || url.password) throw new Error(`${provider} não aceita credenciais na URL.`);
   const allowedHosts = new Set([
     ...(process.env.CONFERIA_PROVIDER_ALLOWED_HOSTS ?? "").split(",").map((host) => host.trim().toLowerCase()).filter(Boolean),
-    ...(provider.toLowerCase().includes("deepseek") ? ["api.deepseek.com"] : []),
-    ...(provider.toLowerCase().includes("kimi") ? ["api.moonshot.ai", "api.moonshot.cn"] : []),
     ...(provider.toLowerCase().includes("haiku") ? ["api.anthropic.com"] : []),
     ...(provider.toLowerCase().includes("azure") && process.env.AZURE_OPENAI_ENDPOINT
       ? [new URL(process.env.AZURE_OPENAI_ENDPOINT).hostname]

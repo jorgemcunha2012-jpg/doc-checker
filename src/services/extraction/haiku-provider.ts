@@ -1,6 +1,8 @@
 import type { ChecklistField, ProviderExtractionOutput } from "@/domain/validation";
+import type { DevelopmentExtraction } from "@/domain/development";
 import type { DocumentExtractionProvider, UploadedDocumentPayload } from "./types";
 import { enrichStandardFinancialFields, focusDocumentText } from "./deepseek-provider";
+import { coerceDevelopmentExtraction } from "./kimi-provider";
 import { parseJsonResponse } from "./openai-compatible-client";
 import { checklistPrompt, coerceExtractionOutput } from "./provider-utils";
 import { restoreTokenizedOutput, tokenizeSensitiveText } from "./pii-tokenizer";
@@ -26,7 +28,10 @@ export class HaikuProvider implements DocumentExtractionProvider {
   async structureText(text: string, checklist: ChecklistField[]): Promise<ProviderExtractionOutput> {
     const focusedText = focusDocumentText(text, checklist);
     const tokenized = tokenizeSensitiveText(focusedText);
-    const content = await this.request(tokenized.text, checklist);
+    const content = await this.request(
+      `${tokenized.text}\n\nIMPORTANTE: marcadores entre colchetes, como [PESSOA_01], [CPF_01], [EMAIL_01], [TELEFONE_01], [RG_01] e [ENDERECO_01], representam valores reais protegidos. Quando sustentarem um campo solicitado, devolva o marcador exatamente como aparece, incluindo os colchetes. Não os trate como ausência de dado.`,
+      checklist,
+    );
     return enrichStandardFinancialFields(restoreTokenizedOutput(coerceExtractionOutput(parseJsonResponse(content), checklist), tokenized.replacements), text, checklist);
   }
 
@@ -95,9 +100,45 @@ export class HaikuProvider implements DocumentExtractionProvider {
     ], [], 2_400);
   }
 
+  async extractDevelopment(images: string[], pageNumbers = images.map((_, index) => index + 1)): Promise<DevelopmentExtraction> {
+    const attempts = await mapWithConcurrencySettled(images, 3, (image, index) => this.extractDevelopmentPage(image, pageNumbers[index] ?? index + 1));
+    const pages = attempts.flatMap((attempt) => attempt.status === "fulfilled" ? [attempt.value] : []);
+    if (!pages.length) {
+      const failure = attempts.find((attempt) => attempt.status === "rejected");
+      throw failure?.status === "rejected" ? failure.reason : new Error("Nenhuma página pôde ser interpretada.");
+    }
+    const firstNamed = pages.find((page) => page.name !== "Empreendimento sem nome");
+    const units = new Map<string, DevelopmentExtraction["units"][number]>();
+    pages.flatMap((page) => page.units).forEach((unit) => {
+      const key = `${unit.typology?.toUpperCase() ?? "TIPO"}::${unit.privateArea}::${unit.commonArea ?? ""}::${unit.totalArea ?? ""}::${unit.idealFraction ?? ""}`;
+      const current = units.get(key);
+      if (!current || unit.confidence > current.confidence) units.set(key, { ...unit, tower: "", unit: "" });
+    });
+    return {
+      name: firstNamed?.name ?? "Empreendimento sem nome",
+      city: pages.find((page) => page.city)?.city,
+      registration: pages.find((page) => page.registration)?.registration,
+      sellerLegalName: pages.find((page) => page.sellerLegalName)?.sellerLegalName,
+      sellerCnpj: pages.find((page) => page.sellerCnpj)?.sellerCnpj,
+      units: [...units.values()],
+    };
+  }
+
   private async extractReservationSection(document: UploadedDocumentPayload, checklist: ChecklistField[], fieldIds: string[], instruction: string) {
     const fields = checklist.filter((field) => fieldIds.includes(field.id));
     return this.extractImageFields(document, fields, "Você revisa uma tela imobiliária recorrente. Extraia apenas valores explicitamente visíveis, com evidência curta. Não invente valores.", `${instruction}\n\n${checklistPrompt(fields)}`, 2_400, checklist);
+  }
+
+  private async extractDevelopmentPage(image: string, page: number) {
+    const content = await this.request([
+      {
+        type: "text",
+        text:
+          `Esta é a página ${page}. Extraia o empreendimento, razão social e CNPJ da proprietária ou incorporadora quando aparecerem, além de todas as regras explícitas e legíveis de tipo de unidade, área privativa, área comum, área total, fração ideal e inscrição imobiliária/IPTU associada. Torre e apartamento são opcionais e não devem impedir o registro do tipo. Responda no formato compacto {"name":string|null,"city":string|null,"registration":string|null,"sellerLegalName":string|null,"sellerCnpj":string|null,"groups":[{"towers":[string],"units":[string],"privateArea":string,"commonArea":string|null,"totalArea":string|null,"idealFraction":string|null,"iptuRegistration":string|null,"typology":string|null,"registration":string|null,"confidence":number}]}. Não invente dados nem expanda combinações. Ignore regras cortadas ou incompletas nas margens.`,
+      },
+      imageFromDataUrl(image),
+    ], [], 2_500, "Você estrutura cadastros mestres de empreendimentos imobiliários a partir de matrículas e memoriais. Responda somente JSON válido. Não invente unidades. Preserve números e casas decimais exatamente como aparecem.");
+    return coerceDevelopmentExtraction(parseJsonResponse(content));
   }
 
   private async extractImageFields(
@@ -164,4 +205,37 @@ function imageContent(document: UploadedDocumentPayload) {
       data: document.buffer.toString("base64"),
     },
   };
+}
+
+function imageFromDataUrl(image: string): Extract<HaikuContent[number], { type: "image" }> {
+  const match = /^data:([^;]+);base64,([A-Za-z0-9+/=\r\n]+)$/.exec(image);
+  if (!match) throw new Error("Página visual da matrícula inválida.");
+  return {
+    type: "image",
+    source: { type: "base64", media_type: match[1], data: match[2].replace(/[\r\n]/g, "") },
+  };
+}
+
+async function mapWithConcurrencySettled<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  const results = new Array<PromiseSettledResult<R>>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      try {
+        results[currentIndex] = { status: "fulfilled", value: await mapper(items[currentIndex], currentIndex) };
+      } catch (reason) {
+        results[currentIndex] = { status: "rejected", reason };
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
+  return results;
 }

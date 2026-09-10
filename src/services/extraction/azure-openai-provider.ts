@@ -85,7 +85,11 @@ export class AzureOpenAIProvider extends KimiProvider {
           "{\"fields\":[{\"fieldId\":string,\"participantId\":string|null,\"value\":string|null,\"confidence\":number,\"sourceLocation\":{\"page\":number|null,\"section\":string|null,\"rawText\":string|null}}]}. " +
           "rawText deve ser apenas o pequeno trecho que sustenta o valor. Não compare campos.",
       },
-      { role: "user", content: `Texto bruto:\n${tokenized.text}\n\nCampos esperados:\n${checklistPrompt(checklist)}` },
+      {
+        role: "user",
+        content:
+          `Texto bruto:\n${tokenized.text}\n\nIMPORTANTE: marcadores entre colchetes, como [PESSOA_01], [CPF_01], [EMAIL_01], [TELEFONE_01], [RG_01] e [ENDERECO_01], representam valores reais protegidos. Quando sustentarem um campo solicitado, devolva o marcador exatamente como aparece, incluindo os colchetes. Não os trate como ausência de dado.\n\nCampos esperados:\n${checklistPrompt(checklist)}`,
+      },
     ], { timeoutMs: 75_000 });
     return enrichStandardFinancialFields(
       restoreTokenizedOutput(coerceExtractionOutput(result, checklist), tokenized.replacements),

@@ -2,9 +2,7 @@ import { getChecklist } from "@/domain/checklists";
 import { createHash } from "node:crypto";
 import type { DocumentSource, ExtractedFieldValue, ProviderExtractionOutput } from "@/domain/validation";
 import { normalizeValue } from "@/services/normalization/normalization-service";
-import { DeepSeekProvider } from "./deepseek-provider";
 import { HaikuProvider } from "./haiku-provider";
-import { KimiProvider } from "./kimi-provider";
 import { AzureOpenAIProvider } from "./azure-openai-provider";
 import { enrichReservationFinancialComposition } from "./reservation-financial-composition";
 import type { ExtractionRequest, ExtractionResult, ReconciliationExtractionResult, UploadedDocumentPayload } from "./types";
@@ -13,8 +11,6 @@ import { extractDeterministicFields } from "./deterministic-field-extractor";
 
 export class DocumentExtractionService {
   constructor(
-    private readonly kimiProvider = new KimiProvider(),
-    private readonly deepSeekProvider = new DeepSeekProvider(),
     private readonly haikuProvider = new HaikuProvider(),
     private readonly azureOpenAIProvider = new AzureOpenAIProvider(),
   ) {}
@@ -111,14 +107,14 @@ export class DocumentExtractionService {
         const text = await tryExtractPdfText(document.buffer);
 
         if (hasEnoughText(text)) {
-          outputs.push(await this.deepSeekProvider.structureText(text, checklist));
+          outputs.push(await this.textProvider().structureText(text, checklist));
         } else {
           usedPdfVisionFallback = true;
           outputs.push(emptyOutput(checklist));
         }
       } else if (isDocx(document) || isRtf(document) || isXlsx(document)) {
         const text = await extractTextDocument(document);
-        outputs.push(await this.deepSeekProvider.structureText(text, checklist));
+        outputs.push(await this.textProvider().structureText(text, checklist));
       } else if (document.mimeType.includes("image")) {
         outputs.push(await this.extractVisualDocument(document, checklist));
       }
@@ -369,15 +365,13 @@ export class DocumentExtractionService {
   }
 
   private textProvider() {
-    if (process.env.TEXT_EXTRACTION_PROVIDER === "HAIKU") return this.haikuProvider;
     if (process.env.TEXT_EXTRACTION_PROVIDER === "AZURE_OPENAI") return this.azureOpenAIProvider;
-    return this.deepSeekProvider;
+    return this.haikuProvider;
   }
 
   private visionProvider() {
-    if (process.env.VISION_EXTRACTION_PROVIDER === "HAIKU") return this.haikuProvider;
     if (process.env.VISION_EXTRACTION_PROVIDER === "AZURE_OPENAI") return this.azureOpenAIProvider;
-    return this.kimiProvider;
+    return this.haikuProvider;
   }
 
   private async extractVisualDocument(

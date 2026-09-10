@@ -4,10 +4,7 @@ import { getChecklist } from "@/domain/checklists";
 import { DocumentExtractionService } from "./document-extraction-service";
 
 test("preserva a extração determinística do DTI quando o provider demora ou falha", async () => {
-  const service = new DocumentExtractionService(
-    {} as never,
-    { structureText: async () => { throw new Error("timeout"); } } as never,
-  );
+  const service = new DocumentExtractionService({ structureText: async () => { throw new Error("timeout"); } } as never);
 
   const result = await (service as unknown as {
     extractTextWithRecovery: (text: string, checklist: ReturnType<typeof getChecklist>, source: "ITBI") => Promise<{ output: { fields: Array<{ fieldId: string; value: string | null }> } }>;
@@ -64,7 +61,7 @@ test("revisa todos os dados pessoais visíveis da tela de Reserva antes de aceit
     extractReservationUnitFromImage: async () => output([]),
     extractReservationFinancialComponentsFromImage: async () => output([]),
     extractFromImage: async () => { genericCalls += 1; return output([]); },
-  } as never, {} as never);
+  } as never);
 
   try {
     const result = await extractReservationVisual(service);
@@ -96,7 +93,7 @@ test("revisa valor total e financiamento da tela financeira de Reserva antes de 
       ]);
     },
     extractFromImage: async () => { genericCalls += 1; return output([]); },
-  } as never, {} as never);
+  } as never);
 
   try {
     const result = await extractReservationVisual(service);
@@ -127,7 +124,7 @@ test("força a revisão financeira quando uma tela de Reserva não produz evidê
       ]);
     },
     extractFromImage: async () => output([]),
-  } as never, {} as never);
+  } as never);
 
   try {
     const result = await extractReservationVisual(service);
@@ -161,7 +158,7 @@ test("recupera valores financeiros depois de consolidar duas telas de Reserva", 
         : output([]);
     },
     extractFromImage: async () => output([]),
-  } as never, {} as never);
+  } as never);
 
   try {
     const result = await service.extractReconciliation({
@@ -195,7 +192,7 @@ test("não repete a leitura financeira quando a extração focada já tem evidê
     extractReservationUnitFromImage: async () => output([]),
     extractReservationFinancialComponentsFromImage: async () => { financialCalls += 1; return output([]); },
     extractFromImage: async () => output([]),
-  } as never, {} as never);
+  } as never);
 
   try {
     const result = await extractReservationVisual(service);

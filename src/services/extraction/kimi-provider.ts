@@ -362,7 +362,7 @@ const reservationFieldIds = new Set([
   "financial.subsidy",
 ]);
 
-function coerceDevelopmentExtraction(value: unknown): DevelopmentExtraction {
+export function coerceDevelopmentExtraction(value: unknown): DevelopmentExtraction {
   const data = value && typeof value === "object" ? value as Record<string, unknown> : {};
   const rawGroups = Array.isArray(data.groups) ? data.groups : [];
   const units = rawGroups.flatMap((item) => {

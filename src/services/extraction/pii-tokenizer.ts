@@ -29,6 +29,12 @@ export function tokenizeSensitiveText(text: string) {
   tokenized = tokenized.replace(/((?:NOME\s+DO\s+CLIENTE|NOME\s+DO\s+COMPRADOR|CLIENTE|COMPRADOR|ADQUIRENTE)\s*[:\-]\s*)([^\n|;]{2,120})/gi, (_, label: string, value: string) => `${label}${tokenFor("PESSOA", value)}`);
   tokenized = tokenized.replace(/((?:ENDEREÇO|ENDERECO|DOMICÍLIO|DOMICILIO)\s*(?:RESIDENCIAL|DO\s+COMPRADOR|DO\s+CLIENTE)?\s*[:\-]\s*)([^\n|;]{5,220})/gi, (_, label: string, value: string) => `${label}${tokenFor("ENDERECO", value)}`);
 
+  // Contratos frequentemente descrevem a parte em narrativa, sem o rótulo
+  // "comprador". Esses padrões alcançam esse formato sem mascarar valores
+  // financeiros ou referências do imóvel.
+  tokenized = tokenized.replace(/\b([A-ZÀ-Ý][A-ZÀ-Ý' -]{4,100}),\s*(?=(?:brasileir[oa]|portugues[ea]|solteir[oa]|casad[oa]|divorciad[oa]|vi[uú]v[oa]|maior|menor)\b)/g, (_, value: string) => tokenFor("PESSOA", value));
+  tokenized = tokenized.replace(/\b((?:RUA|AVENIDA|AV\.?|TRAVESSA|ALAMEDA|ESTRADA|RODOVIA|LARGO|PRAÇA|PRACA)\s+[^\n;]{4,180})(?=(?:\n|;|\.|$))/gi, (_, value: string) => tokenFor("ENDERECO", value));
+
   return { text: tokenized, replacements };
 }
 

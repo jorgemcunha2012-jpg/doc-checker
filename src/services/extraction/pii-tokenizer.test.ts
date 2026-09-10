@@ -11,3 +11,12 @@ test("remove identificadores pessoais do texto e restaura a resposta estruturada
   assert.equal(restored.fields[0].value, "080.061.353-80");
   assert.equal(restored.fields[0].sourceLocation?.rawText, "CPF: 080.061.353-80");
 });
+
+test("tokeniza nomes e endereços descritos em narrativa contratual", () => {
+  const input = "JOSE WILLIAM ALMEIDA DA SILVA, brasileiro, solteiro, residente na Rua das Flores, 123, Fortaleza/CE.";
+  const tokenized = tokenizeSensitiveText(input);
+
+  assert.doesNotMatch(tokenized.text, /JOSE WILLIAM ALMEIDA DA SILVA|Rua das Flores, 123/i);
+  assert.match(tokenized.text, /\[PESSOA_01\]/);
+  assert.match(tokenized.text, /\[ENDERECO_01\]/);
+});

@@ -26,3 +26,8 @@ test("gateway permite somente o host configurado do Azure OpenAI", () => {
     else process.env.AZURE_OPENAI_ENDPOINT = previous;
   }
 });
+
+test("gateway bloqueia os hosts legados de Kimi e DeepSeek", () => {
+  assert.throws(() => assertAllowedProviderUrl("https://api.moonshot.ai/v1", "Kimi"), /não autorizado/);
+  assert.throws(() => assertAllowedProviderUrl("https://api.deepseek.com/v1", "DeepSeek"), /não autorizado/);
+});

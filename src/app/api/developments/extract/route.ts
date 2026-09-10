@@ -4,7 +4,8 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { audit } from "@/services/process/process-repository";
 import { extractDevelopmentFromImagesWithOcr } from "@/services/development/development-ocr-service";
 import { extractDevelopmentFromOcrText } from "@/services/development/development-ocr-parser";
-import { KimiProvider } from "@/services/extraction/kimi-provider";
+import { HaikuProvider } from "@/services/extraction/haiku-provider";
+import { AzureOpenAIProvider } from "@/services/extraction/azure-openai-provider";
 import { reconcileDevelopmentExtractions } from "@/services/development/development-reconciliation";
 import { extractDevelopmentFromXlsx } from "@/services/development/xlsx-development-parser";
 import { errorCode, logOperationalError, publicOperationalError } from "@/lib/security/operational-logger";
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
         return null;
       }),
       withTimeout(
-        new KimiProvider().extractDevelopment(payload.images, payload.pageNumbers),
+        developmentVisionProvider().extractDevelopment(payload.images, payload.pageNumbers),
         EXTRACTION_TIMEOUT_MS,
         "A visão da IA demorou demais.",
       ).catch((error) => {
@@ -132,6 +133,14 @@ export async function POST(request: Request) {
     logOperationalError("DEVELOPMENT_EXTRACTION_UNEXPECTED", error, { attemptId });
     return NextResponse.json({ error: publicOperationalError(error, "Não foi possível concluir o cadastro do empreendimento.") }, { status: 500 });
   }
+}
+
+function developmentVisionProvider() {
+  if (process.env.VISION_EXTRACTION_PROVIDER === "AZURE_OPENAI") return new AzureOpenAIProvider();
+  if (process.env.VISION_EXTRACTION_PROVIDER && process.env.VISION_EXTRACTION_PROVIDER !== "HAIKU") {
+    throw new Error("O provedor visual configurado não é aprovado para processamento de matrículas.");
+  }
+  return new HaikuProvider();
 }
 
 async function auditExtraction(
