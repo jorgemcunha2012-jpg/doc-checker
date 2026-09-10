@@ -19,3 +19,21 @@
 ### Encerramento futuro
 
 Quando o comprador fornecer o endpoint do modelo local, a visão e a estruturação podem ser encaminhadas à infraestrutura dele. Isso elimina a transferência internacional para esses fluxos, sem alterar o motor de extração determinística ou de conferência.
+
+## Item 3 - Retenção e criptografia dos dados extraídos
+
+### Concluído no branch de segurança
+
+- `validation_processes.result`, `validation_processes.summary` e `validation_results.values_by_source` passam a usar AES-256-GCM com uma chave exclusiva (`CONFERIA_FIELD_ENCRYPTION_KEY`) antes da persistência.
+- A leitura é decifrada somente no backend, depois da autorização já aplicada para a operação e a organização.
+- Dados existentes sem envelope criptográfico continuam legíveis durante a transição; novos dados de produção exigem a chave configurada.
+- O job de retenção mantém o descarte dos arquivos originais após 40 dias e agora também elimina páginas renderizadas de matrículas que tenham ficado órfãs no Storage, gerando eventos de auditoria de sucesso ou falha.
+
+### Evidências verificadas
+
+- Teste controlado no Supabase em 10/09/2026: um processo temporário com CPF e e-mail sintéticos foi gravado e lido diretamente com `result` e `summary` em envelope AES-GCM; a serialização retornada não continha nenhum dos valores em claro. O processo foi removido após a verificação.
+- Suíte automatizada: criptografia, compatibilidade com dados legados, configuração obrigatória de produção e cálculo da retenção foram executados sem falhas, além de lint e typecheck de toda a aplicação.
+
+### Decisão contratual registrada
+
+Por definição do produto, após 40 dias são removidos os arquivos originais e páginas renderizadas; resultados, metadados e auditoria permanecem para histórico operacional. Isso diverge da sugestão inicial de anonimizar os resultados no mesmo prazo e deve constar na matriz de retenção e no contrato com o comprador.

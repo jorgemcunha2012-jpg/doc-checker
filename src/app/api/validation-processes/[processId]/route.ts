@@ -5,6 +5,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { getValidationProcess } from "@/services/process/validation-process-store";
 import { logOperationalError } from "@/lib/security/operational-logger";
+import { decryptStoredJson } from "@/lib/security/field-encryption";
 
 export async function GET(_request: Request, context: { params: Promise<{ processId: string }> }) {
   const { processId } = await context.params;
@@ -29,7 +30,7 @@ export async function GET(_request: Request, context: { params: Promise<{ proces
         userId: data.user_id,
         validationType: data.validation_type,
         status: data.processing_status,
-        result: data.result,
+        result: decryptStoredJson(data.result),
         error: data.error,
         documents: (data.process_documents ?? []).map((document) => ({
           id: document.id,

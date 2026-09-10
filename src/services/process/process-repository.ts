@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { UploadedDocumentPayload } from "@/services/extraction/types";
 import { learnFromApprovedReview } from "./learning-repository";
 import { errorCode } from "@/lib/security/operational-logger";
+import { decryptStoredJson, encryptStoredJson } from "@/lib/security/field-encryption";
 
 export async function persistProcess(process: ValidationProcess) {
   if (!isSupabaseConfigured()) return;
@@ -16,14 +17,14 @@ export async function persistProcess(process: ValidationProcess) {
     validation_type: process.validationType,
     processing_status: process.status,
     final_status: finalStatus(process),
-    result: sanitizeJsonForPostgres(process.result) ?? null,
+    result: encryptStoredJson(sanitizeJsonForPostgres(process.result)) ?? null,
     summary: process.result
-      ? sanitizeJsonForPostgres({
+      ? encryptStoredJson(sanitizeJsonForPostgres({
           ...process.result.summary,
           ...(process.result.validationType === "RECONCILIATION"
             ? { extractionQualityBySource: process.result.extractionQualityBySource }
             : {}),
-        })
+        }))
       : null,
     error: safeProcessError(process.error),
     started_at: process.createdAt,
@@ -107,7 +108,7 @@ export async function persistResults(processId: string, run: ReconciliationRun) 
       field_category: result.field.category,
       automatic_status: result.status,
       observation: sanitizeTextForPostgres(result.observation),
-      values_by_source: sanitizeJsonForPostgres(result.valuesBySource),
+      values_by_source: encryptStoredJson(sanitizeJsonForPostgres(result.valuesBySource)),
     })),
     { onConflict: "process_id,field_id" },
   );
@@ -178,7 +179,8 @@ async function learnApprovedPattern(processId: string, fieldId: string, actor: A
     .eq("id", processId)
     .single();
   if (error) throw new Error(`Falha ao consultar processo para aprendizado: ${error.message}`);
-  const result = process?.result?.results?.find((item: ReconciliationRun["results"][number]) => item.field.id === fieldId);
+  const decrypted = decryptStoredJson<ReconciliationRun>(process?.result);
+  const result = decrypted?.results?.find((item: ReconciliationRun["results"][number]) => item.field.id === fieldId);
   if (!result) return;
   await learnFromApprovedReview(processId, result, actor);
 }

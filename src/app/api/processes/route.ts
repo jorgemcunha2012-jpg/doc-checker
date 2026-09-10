@@ -3,6 +3,7 @@ import { AuthError, isMasterAdmin, isOrganizationAdmin, requireUser } from "@/li
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { listValidationProcesses } from "@/services/process/validation-process-store";
+import { decryptStoredJson } from "@/lib/security/field-encryption";
 
 export async function GET(request: Request) {
   try {
@@ -84,21 +85,25 @@ export async function GET(request: Request) {
       }));
     }
     return NextResponse.json({
-      processes: processes.map((process) => ({
-        ...process,
-        result: showTechnicalExtractionDetails || !process.result
-          ? process.result
-          : { ...process.result, extractionQualityBySource: undefined },
-        summary: showTechnicalExtractionDetails || !process.summary
-          ? process.summary
-          : { ...process.summary, extractionQualityBySource: undefined },
-        process_documents: process.process_documents.map((document) => ({
-          id: document.id,
-          name: document.name,
-          source: document.source,
-          available: Boolean(document.storage_path),
-        })),
-      })),
+      processes: processes.map((process) => {
+        const result = decryptStoredJson(process.result);
+        const summary = decryptStoredJson(process.summary);
+        return ({
+          ...process,
+          result: showTechnicalExtractionDetails || !result
+            ? result
+            : { ...result, extractionQualityBySource: undefined },
+          summary: showTechnicalExtractionDetails || !summary
+            ? summary
+            : { ...summary, extractionQualityBySource: undefined },
+          process_documents: process.process_documents.map((document) => ({
+            id: document.id,
+            name: document.name,
+            source: document.source,
+            available: Boolean(document.storage_path),
+          })),
+        });
+      }),
     });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });

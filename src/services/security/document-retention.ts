@@ -16,6 +16,7 @@ export type RetentionResult = {
   selected: number;
   purged: number;
   failed: number;
+  renderedPagesPurged: number;
 };
 
 export async function purgeExpiredProcessDocuments(now = new Date()): Promise<RetentionResult> {
@@ -34,13 +35,14 @@ export async function purgeExpiredProcessDocuments(now = new Date()): Promise<Re
   const documents = (data ?? []).filter(
     (document): document is RetentionDocument => Boolean(document.storage_path),
   );
-  if (!documents.length) return { cutoff, selected: 0, purged: 0, failed: 0 };
+  const renderedPagesPurged = await purgeExpiredRenderedDevelopmentPages(cutoff);
+  if (!documents.length) return { cutoff, selected: 0, purged: 0, failed: 0, renderedPagesPurged };
 
   const paths = documents.map((document) => document.storage_path);
   const { error: storageError } = await supabase.storage.from("process-documents").remove(paths);
   if (storageError) {
     await recordRetentionFailure(documents, errorCode(storageError));
-    return { cutoff, selected: documents.length, purged: 0, failed: documents.length };
+    return { cutoff, selected: documents.length, purged: 0, failed: documents.length, renderedPagesPurged };
   }
 
   const purgedAt = now.toISOString();
@@ -60,7 +62,36 @@ export async function purgeExpiredProcessDocuments(now = new Date()): Promise<Re
     retentionDays: 40,
     purgedAt,
   });
-  return { cutoff, selected: documents.length, purged: documents.length, failed: 0 };
+  return { cutoff, selected: documents.length, purged: documents.length, failed: 0, renderedPagesPurged };
+}
+
+async function purgeExpiredRenderedDevelopmentPages(cutoff: string) {
+  const supabase = createSupabaseAdminClient();
+  const { data: organizations, error: organizationError } = await supabase.from("organizations").select("id");
+  if (organizationError) throw new Error("Falha ao consultar organizações para retenção de páginas renderizadas.");
+
+  let purged = 0;
+  for (const organization of organizations ?? []) {
+    const prefix = `${organization.id}/development-extractions/rendered-pages`;
+    const { data: files, error: listError } = await supabase.storage.from("process-documents").list(prefix, {
+      limit: RETENTION_BATCH_SIZE,
+      sortBy: { column: "created_at", order: "asc" },
+    });
+    if (listError) throw new Error("Falha ao listar páginas renderizadas para retenção.");
+    const paths = (files ?? [])
+      .filter((file) => file.created_at && file.created_at <= cutoff)
+      .map((file) => `${prefix}/${file.name}`);
+    if (!paths.length) continue;
+
+    const { error: removeError } = await supabase.storage.from("process-documents").remove(paths);
+    if (removeError) {
+      await recordRenderedPageRetentionFailure(organization.id, removeError.message);
+      continue;
+    }
+    purged += paths.length;
+    await recordRenderedPageRetention(organization.id, paths.length);
+  }
+  return purged;
 }
 
 async function recordRetentionFailure(documents: RetentionDocument[], failureCode: string) {
@@ -95,4 +126,28 @@ async function recordRetentionEvents(
     })),
   );
   if (error) console.error(JSON.stringify({ event: "DOCUMENT_RETENTION_AUDIT_FAILED", errorCode: errorCode(error) }));
+}
+
+async function recordRenderedPageRetention(organizationId: string, count: number) {
+  const { error } = await createSupabaseAdminClient().from("audit_events").insert({
+    organization_id: organizationId,
+    actor_id: null,
+    event_type: "DEVELOPMENT_RENDERED_PAGES_PURGED",
+    entity_type: "document_retention",
+    entity_id: null,
+    metadata: { count, retentionDays: 40 },
+  });
+  if (error) console.error(JSON.stringify({ event: "DEVELOPMENT_RENDERED_PAGES_RETENTION_AUDIT_FAILED", errorCode: errorCode(error) }));
+}
+
+async function recordRenderedPageRetentionFailure(organizationId: string, reason: string) {
+  const { error } = await createSupabaseAdminClient().from("audit_events").insert({
+    organization_id: organizationId,
+    actor_id: null,
+    event_type: "DEVELOPMENT_RENDERED_PAGES_RETENTION_FAILED",
+    entity_type: "document_retention",
+    entity_id: null,
+    metadata: { reason: errorCode(reason) },
+  });
+  if (error) console.error(JSON.stringify({ event: "DEVELOPMENT_RENDERED_PAGES_RETENTION_AUDIT_FAILED", errorCode: errorCode(error) }));
 }

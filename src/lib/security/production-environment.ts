@@ -15,6 +15,7 @@ export function productionConfigurationProblems(environment: Environment = proce
 
   const missing: string[] = SUPABASE_VARIABLES.filter((name) => !environment[name]?.trim());
   if (!environment.CRON_SECRET?.trim()) missing.push("CRON_SECRET");
+  if (!environment.CONFERIA_FIELD_ENCRYPTION_KEY?.trim()) missing.push("CONFERIA_FIELD_ENCRYPTION_KEY");
 
   const textProvider = environment.TEXT_EXTRACTION_PROVIDER ?? "HAIKU";
   const visionProvider = environment.VISION_EXTRACTION_PROVIDER ?? "HAIKU";

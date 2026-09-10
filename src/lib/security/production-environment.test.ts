@@ -9,6 +9,7 @@ const validProduction = {
   SUPABASE_SERVICE_ROLE_KEY: "service",
   CRON_SECRET: "cron",
   ANTHROPIC_API_KEY: "anthropic",
+  CONFERIA_FIELD_ENCRYPTION_KEY: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
 };
 
 test("requires security-critical configuration in production", () => {
